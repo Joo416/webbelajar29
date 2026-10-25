@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ruang Belajar</title>
+<style>
+:root{--bg:#0f1226;--card:#1a1e3a;--line:#2b3160;--tx:#eef0ff;--mut:#9aa3d6;--a:#7c8cff;--b:#3ddbb0;--bad:#ff6b8a}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--tx);background:radial-gradient(1000px 500px at 10% -10%,#2a2f6b 0,transparent 60%),radial-gradient(800px 400px at 100% 0,#13524a 0,transparent 55%),var(--bg);min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.5rem;margin:6px 0 2px}
+.sub{color:var(--mut);font-size:.9rem;margin-bottom:18px}
+.tabs{display:flex;gap:8px;background:var(--card);padding:6px;border-radius:14px;border:1px solid var(--line);margin-bottom:16px}
+.tabs button{flex:1;padding:11px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:600;font-size:.95rem;cursor:pointer}
+.tabs button.on{background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 30px #0004}
+.card h3{margin:0 0 12px;font-size:1rem}
+label{display:block;font-size:.8rem;color:var(--mut);margin:10px 0 5px}
+select,textarea,input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#12152e;color:var(--tx);font:inherit}
+textarea{min-height:110px;resize:vertical;font-family:ui-monospace,monospace;font-size:.8rem}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.btn{padding:12px 16px;border:0;border-radius:12px;font-weight:700;cursor:pointer;color:#06231c;background:linear-gradient(135deg,var(--b),#7cf0d0);font-size:.95rem}
+.btn.alt{background:#262b55;color:var(--tx)}
+.btn.full{width:100%;margin-top:14px}
+.bar{height:8px;background:#12152e;border-radius:99px;overflow:hidden;margin-bottom:14px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b));transition:width .3s}
+.q{font-size:1.1rem;line-height:1.5;margin:6px 0 16px}
+.opt{display:block;width:100%;text-align:left;padding:13px 14px;margin-bottom:9px;border-radius:12px;border:1.5px solid var(--line);background:#12152e;color:var(--tx);font:inherit;cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--a)}
+.opt.ok{border-color:var(--b);background:#12352f}.opt.no{border-color:var(--bad);background:#3a1626}
+.exp{margin-top:12px;padding:12px;border-radius:12px;background:#12152e;color:var(--mut);font-size:.9rem;line-height:1.5}
+.big{font-size:3rem;font-weight:800;text-align:center;background:linear-gradient(135deg,var(--a),var(--b));-webkit-background-clip:text;color:transparent}
+.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.item:last-child{border:0}.mut{color:var(--mut)}
+.warn{background:#3a2a10;border:1px solid #7a5a1a;color:#ffd48a;padding:12px;border-radius:12px;font-size:.85rem;margin-bottom:14px}
+.note{padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📖 Ruang Belajar</h1>
+  <div class="sub">TKA, pelajaran sekolah, dan trading dalam satu tempat</div>
+  <div id="warn"></div>
+  <div class="tabs">
+    <button id="t-sekolah" onclick="setSec('sekolah')">🎓 TKA & Sekolah</button>
+    <button id="t-trading" onclick="setSec('trading')">📈 Trading</button>
+  </div>
+  <div id="app"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// ====== ISI DENGAN CONFIG FIREBASE KAMU (Project settings > Your apps > Web app) ======
+const firebaseConfig = {
+  apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
+  authDomain: "ruangbelajar-8584c.firebaseapp.com",
+  projectId: "ruangbelajar-8584c",
+  storageBucket: "ruangbelajar-8584c.firebasestorage.app",
+  messagingSenderId: "645886662774",
+  appId: "1:645886662774:web:754d8425ed0df42f11a757"
+};
+// =====================================================================================
+
+const MAPEL = {
+  sekolah: ['Bahasa Indonesia','Matematika','IPA','IPS','Bahasa Inggris','Umum (Trivia Dunia)'],
+  trading: ['SMC / ICT','Price Action','Risk Management','Psikologi Trading']
+};
+const SAMPLE = [
+  {kategori:'sekolah',mapel:'Matematika',q:'Hasil dari 3/4 + 1/8 adalah ...',o:['7/8','4/12','1','5/8'],a:0,e:'3/4 = 6/8, jadi 6/8 + 1/8 = 7/8.'},
+  {kategori:'sekolah',mapel:'Bahasa Indonesia',q:'Kalimat yang efektif adalah ...',o:['Naik ke atas','Maju ke depan','Ia membaca buku di perpustakaan','Para hadirin-hadirin duduk'],a:2,e:'Kalimat efektif tidak mengandung pemborosan kata.'},
+  {kategori:'trading',mapel:'SMC / ICT',q:'Order Block bullish biasanya adalah ...',o:['Candle bullish terakhir sebelum jatuh','Candle bearish terakhir sebelum kenaikan impulsif','Gap di tengah trend','Equal high'],a:1,e:'OB bullish = candle bearish terakhir sebelum pergerakan naik impulsif yang menembus struktur.'},
+  {kategori:'trading',mapel:'Risk Management',q:'Risiko per trade yang umum disarankan?',o:['10-20%','5-10%','1-2%','Semua saldo'],a:2,e:'Banyak trader membatasi risiko 1-2% dari ekuitas per trade.'}
+];
+
+let db=null, cfgOK=false;
+try{ cfgOK=!firebaseConfig.apiKey.startsWith('ISI'); if(cfgOK){firebase.initializeApp(firebaseConfig);db=firebase.firestore();} }catch(e){console.error(e)}
+if(!cfgOK) document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase belum dikonfigurasi. Isi <b>firebaseConfig</b> di index.html. Mode Trivia Dunia tetap bisa dicoba.</div>';
+
+const S={sec:'sekolah',qs:[],i:0,score:0,done:false,mapel:'',view:'home'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const dec=s=>{const t=document.createElement('textarea');t.innerHTML=s;return t.value};
+
+function setSec(s){S.sec=s;S.view='home';home()}
+function tabs(){['sekolah','trading'].forEach(k=>$('t-'+k).classList.toggle('on',S.sec===k))}
+
+async function home(){
+  tabs();
+  const ms=MAPEL[S.sec];
+  $('app').innerHTML=`
+  <div class="card"><h3>Mulai latihan</h3>
+    <label>Mata pelajaran / topik</label>
+    <select id="mapel">${ms.map(m=>`<option>${m}</option>`).join('')}</select>
+    <label>Jumlah soal</label>
+    <select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+    <button class="btn full" onclick="start()">Mulai ▶</button>
+    <div id="msg" class="mut" style="margin-top:10px;font-size:.85rem"></div>
+  </div>
+  ${S.sec==='trading'?`<div class="card"><h3>📝 Catatan trading</h3>
+    <textarea id="cat" style="min-height:80px;font-family:inherit;font-size:.9rem" placeholder="Tulis catatan setup, pelajaran, evaluasi..."></textarea>
+    <button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes"></div></div>`:''}
+  <div class="card"><h3>➕ Tambah bank soal</h3>
+    <div class="mut" style="font-size:.85rem;margin-bottom:6px">Tempel JSON array soal (minta Claude: "buatkan 25 soal ${ms[0]} format JSON"). Format tiap soal:<br><code>{"mapel":"${ms[0]}","q":"...","o":["A","B","C","D"],"a":0,"e":"pembahasan"}</code></div>
+    <textarea id="imp" placeholder='[ {...}, {...} ]'></textarea>
+    <div class="row"><button class="btn full" onclick="importQ()">Simpan ke Firebase</button><button class="btn alt full" onclick="seed()">Isi contoh soal</button></div>
+  </div>
+  <div class="card"><h3>🏆 Riwayat</h3><div id="hist" class="mut">Memuat...</div></div>`;
+  loadHist(); if(S.sec==='trading') loadNotes();
+}
+
+async function loadQs(mapel,n){
+  if(mapel.startsWith('Umum')){
+    const r=await fetch(`https://opentdb.com/api.php?amount=${Math.min(n,50)}&type=multiple`);
+    const j=await r.json();
+    return j.results.map(x=>{const o=shuffle([x.correct_answer,...x.incorrect_answers]).map(dec);return{q:dec(x.question),o,a:o.indexOf(dec(x.correct_answer)),e:'Jawaban benar: '+dec(x.correct_answer)}});
+  }
+  if(!db) throw new Error('Firebase belum dikonfigurasi');
+  const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',mapel).limit(300).get();
+  return shuffle(s.docs.map(d=>d.data())).slice(0,n);
+}
+
+async function start(){
+  const mapel=$('mapel').value,n=+$('n').value;S.mapel=mapel;$('msg').textContent='Memuat soal...';
+  try{
+    const qs=await loadQs(mapel,n);
+    if(!qs.length){$('msg').textContent='Belum ada soal untuk topik ini. Tambahkan lewat bank soal di bawah.';return}
+    Object.assign(S,{qs,i:0,score:0,done:false,view:'quiz'});show();
+  }catch(e){$('msg').textContent='Gagal: '+e.message}
+}
+
+function show(){
+  if(S.i>=S.qs.length) return finish();
+  const q=S.qs[S.i];S.done=false;
+  $('app').innerHTML=`<div class="card">
+    <div class="mut" style="font-size:.8rem;margin-bottom:8px">${esc(S.mapel)} • Soal ${S.i+1}/${S.qs.length}</div>
+    <div class="bar"><i style="width:${S.i/S.qs.length*100}%"></i></div>
+    <div class="q">${esc(q.q)}</div>
+    ${q.o.map((o,k)=>`<button class="opt" onclick="pick(${k})">${String.fromCharCode(65+k)}. ${esc(o)}</button>`).join('')}
+    <div id="fb"></div></div>`;
+}
+
+function pick(k){
+  if(S.done) return;S.done=true;
+  const q=S.qs[S.i],bs=document.querySelectorAll('.opt');
+  bs.forEach((b,i)=>{b.disabled=true;if(i===q.a)b.classList.add('ok')});
+  if(k===q.a)S.score++;else bs[k].classList.add('no');
+  $('fb').innerHTML=`${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}<button class="btn full" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Lihat hasil'}</button>`;
+}
+
+async function finish(){
+  const t=S.qs.length,p=Math.round(S.score/t*100);
+  $('app').innerHTML=`<div class="card"><div class="big">${p}</div>
+    <div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}</div>
+    <button class="btn full" onclick="home()">Kembali</button></div>`;
+  if(db) try{await db.collection('hasil').add({kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
+}
+
+async function importQ(){
+  if(!db) return alert('Firebase belum dikonfigurasi');
+  let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
+  if(!Array.isArray(arr)) return alert('Harus berupa array');
+  const ok=arr.filter(x=>x.mapel&&x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length);
+  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{...x,kategori:S.sec}));await b.commit()}
+  alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati)`);$('imp').value='';
+}
+async function seed(){
+  if(!db) return alert('Firebase belum dikonfigurasi');
+  const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec).forEach(x=>b.set(db.collection('soal').doc(),x));await b.commit();alert('Contoh soal ditambahkan');
+}
+async function loadHist(){
+  if(!db){$('hist').textContent='Hubungkan Firebase untuk menyimpan riwayat.';return}
+  try{
+    const s=await db.collection('hasil').orderBy('waktu','desc').limit(30).get();
+    const r=s.docs.map(d=>d.data()).filter(x=>x.kategori===S.sec).slice(0,8);
+    $('hist').innerHTML=r.length?r.map(x=>`<div class="item"><span>${esc(x.mapel)}</span><b>${x.skor}/${x.total}</b></div>`).join(''):'Belum ada riwayat.';
+  }catch(e){$('hist').textContent='Gagal memuat riwayat.'}
+}
+async function saveNote(){
+  const v=$('cat').value.trim();if(!v||!db) return;
+  await db.collection('catatan').add({teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes();
+}
+async function loadNotes(){
+  if(!db) return;
+  const s=await db.collection('catatan').orderBy('waktu','desc').limit(8).get();
+  $('notes').innerHTML=s.docs.map(d=>`<div class="note">${esc(d.data().teks)}</div>`).join('');
+}
+home();
+</script>
+</body>
+</html>
