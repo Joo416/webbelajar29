@@ -8,39 +8,43 @@
 :root{--bg:#0f1226;--card:#1a1e3a;--line:#2b3160;--tx:#eef0ff;--mut:#9aa3d6;--a:#7c8cff;--b:#3ddbb0;--bad:#ff6b8a}
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--tx);background:radial-gradient(1000px 500px at 10% -10%,#2a2f6b 0,transparent 60%),radial-gradient(800px 400px at 100% 0,#13524a 0,transparent 55%),var(--bg);min-height:100vh}
-.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
-h1{font-size:1.5rem;margin:6px 0 2px}
-.sub{color:var(--mut);font-size:.9rem;margin-bottom:18px}
-.tabs{display:flex;gap:8px;background:var(--card);padding:6px;border-radius:14px;border:1px solid var(--line);margin-bottom:16px}
-.tabs button{flex:1;padding:11px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:600;font-size:.95rem;cursor:pointer}
-.tabs button.on{background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
+.wrap{max-width:780px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.5rem;margin:6px 0 2px}.sub{color:var(--mut);font-size:.9rem;margin-bottom:18px}
+.tabs,.stabs{display:flex;gap:6px;background:var(--card);padding:6px;border-radius:14px;border:1px solid var(--line);margin-bottom:14px}
+.tabs button,.stabs button{flex:1;padding:10px 4px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:600;font-size:.88rem;cursor:pointer}
+.tabs button.on,.stabs button.on{background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 30px #0004}
 .card h3{margin:0 0 12px;font-size:1rem}
 label{display:block;font-size:.8rem;color:var(--mut);margin:10px 0 5px}
 select,textarea,input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#12152e;color:var(--tx);font:inherit}
-textarea{min-height:110px;resize:vertical;font-family:ui-monospace,monospace;font-size:.8rem}
+input[type=checkbox]{width:18px;height:18px;margin-top:3px}
+textarea{min-height:90px;resize:vertical;font-size:.88rem}
 .row{display:flex;gap:10px}.row>*{flex:1}
 .btn{padding:12px 16px;border:0;border-radius:12px;font-weight:700;cursor:pointer;color:#06231c;background:linear-gradient(135deg,var(--b),#7cf0d0);font-size:.95rem}
-.btn.alt{background:#262b55;color:var(--tx)}
-.btn.full{width:100%;margin-top:14px}
+.btn.alt{background:#262b55;color:var(--tx)}.btn.red{background:#4a1a2c;color:#ffb3c4}.btn.full{width:100%;margin-top:14px}
 .bar{height:8px;background:#12152e;border-radius:99px;overflow:hidden;margin-bottom:14px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b));transition:width .3s}
 .q{font-size:1.1rem;line-height:1.5;margin:6px 0 16px}
 .opt{display:block;width:100%;text-align:left;padding:13px 14px;margin-bottom:9px;border-radius:12px;border:1.5px solid var(--line);background:#12152e;color:var(--tx);font:inherit;cursor:pointer}
-.opt:hover:not(:disabled){border-color:var(--a)}
-.opt.ok{border-color:var(--b);background:#12352f}.opt.no{border-color:var(--bad);background:#3a1626}
+.opt:hover:not(:disabled){border-color:var(--a)}.opt.ok{border-color:var(--b);background:#12352f}.opt.no{border-color:var(--bad);background:#3a1626}
 .exp{margin-top:12px;padding:12px;border-radius:12px;background:#12152e;color:var(--mut);font-size:.9rem;line-height:1.5}
 .big{font-size:3rem;font-weight:800;text-align:center;background:linear-gradient(135deg,var(--a),var(--b));-webkit-background-clip:text;color:transparent}
-.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}
-.item:last-child{border:0}.mut{color:var(--mut)}
+.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}.item:last-child{border:0}
+.mut{color:var(--mut)}.small{font-size:.85rem}
 .warn{background:#3a2a10;border:1px solid #7a5a1a;color:#ffd48a;padding:12px;border-radius:12px;font-size:.85rem;margin-bottom:14px}
 .note{padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem;white-space:pre-wrap}
+#chat{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px}
+.msg{padding:11px 13px;border-radius:14px;font-size:.92rem;line-height:1.55;max-width:92%}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
+.msg.assistant{align-self:flex-start;background:#12152e;border:1px solid var(--line)}
+.gi{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9rem;line-height:1.5}
+.gi>div{flex:1}.x{border:0;background:#4a1a2c;color:#ffb3c4;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>📖 Ruang Belajar</h1>
-  <div class="sub">TKA, pelajaran sekolah, dan trading dalam satu tempat</div>
+  <div class="sub">TKA, pelajaran sekolah, dan trading dengan tutor AI</div>
   <div id="warn"></div>
   <div class="tabs">
     <button id="t-sekolah" onclick="setSec('sekolah')">🎓 TKA & Sekolah</button>
@@ -52,7 +56,6 @@ textarea{min-height:110px;resize:vertical;font-family:ui-monospace,monospace;fon
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
-// ====== ISI DENGAN CONFIG FIREBASE KAMU (Project settings > Your apps > Web app) ======
 const firebaseConfig = {
   apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
   authDomain: "ruangbelajar-8584c.firebaseapp.com",
@@ -61,131 +64,214 @@ const firebaseConfig = {
   messagingSenderId: "645886662774",
   appId: "1:645886662774:web:754d8425ed0df42f11a757"
 };
-// =====================================================================================
 
-const MAPEL = {
-  sekolah: ['Bahasa Indonesia','Matematika','IPA','IPS','Bahasa Inggris','Umum (Trivia Dunia)'],
-  trading: ['SMC / ICT','Price Action','Risk Management','Psikologi Trading']
+const MAPEL={
+  sekolah:['Bahasa Indonesia','Matematika','IPA','IPS','Bahasa Inggris','Umum (Trivia Dunia)'],
+  trading:['SMC / ICT','Price Action','Risk Management','Psikologi Trading']
 };
-const SAMPLE = [
+const LEVEL={
+  sekolah:['SD kelas 4-6','SMP','SMA','TKA / UTBK','Umum'],
+  trading:['Pemula','Menengah','Lanjut']
+};
+const SAMPLE=[
   {kategori:'sekolah',mapel:'Matematika',q:'Hasil dari 3/4 + 1/8 adalah ...',o:['7/8','4/12','1','5/8'],a:0,e:'3/4 = 6/8, jadi 6/8 + 1/8 = 7/8.'},
-  {kategori:'sekolah',mapel:'Bahasa Indonesia',q:'Kalimat yang efektif adalah ...',o:['Naik ke atas','Maju ke depan','Ia membaca buku di perpustakaan','Para hadirin-hadirin duduk'],a:2,e:'Kalimat efektif tidak mengandung pemborosan kata.'},
-  {kategori:'trading',mapel:'SMC / ICT',q:'Order Block bullish biasanya adalah ...',o:['Candle bullish terakhir sebelum jatuh','Candle bearish terakhir sebelum kenaikan impulsif','Gap di tengah trend','Equal high'],a:1,e:'OB bullish = candle bearish terakhir sebelum pergerakan naik impulsif yang menembus struktur.'},
-  {kategori:'trading',mapel:'Risk Management',q:'Risiko per trade yang umum disarankan?',o:['10-20%','5-10%','1-2%','Semua saldo'],a:2,e:'Banyak trader membatasi risiko 1-2% dari ekuitas per trade.'}
+  {kategori:'sekolah',mapel:'Bahasa Indonesia',q:'Kata baku yang tepat adalah ...',o:['Apotik','Apotek','Aphotek','Apotex'],a:1,e:'Menurut KBBI bentuk bakunya apotek.'},
+  {kategori:'trading',mapel:'SMC / ICT',q:'Order Block bullish biasanya adalah ...',o:['Candle bullish terakhir sebelum jatuh','Candle bearish terakhir sebelum kenaikan impulsif','Gap di tengah trend','Equal high'],a:1,e:'OB bullish = candle bearish terakhir sebelum pergerakan naik impulsif.'},
+  {kategori:'trading',mapel:'Risk Management',q:'Risiko per trade yang umum disarankan?',o:['10-20%','5-10%','1-2%','Semua saldo'],a:2,e:'Banyak trader membatasi risiko 1-2% ekuitas per trade.'}
 ];
 
-let db=null, cfgOK=false;
-try{ cfgOK=!firebaseConfig.apiKey.startsWith('ISI'); if(cfgOK){firebase.initializeApp(firebaseConfig);db=firebase.firestore();} }catch(e){console.error(e)}
-if(!cfgOK) document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase belum dikonfigurasi. Isi <b>firebaseConfig</b> di index.html. Mode Trivia Dunia tetap bisa dicoba.</div>';
+let db=null;
+try{firebase.initializeApp(firebaseConfig);db=firebase.firestore()}catch(e){console.error(e);document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase gagal dimuat.</div>'}
 
-const S={sec:'sekolah',qs:[],i:0,score:0,done:false,mapel:'',view:'home'};
+const S={sec:'sekolah',mapel:'Bahasa Indonesia',tab:'latihan',qs:[],i:0,score:0,done:false,chat:{},gen:[],bank:[]};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const dec=s=>{const t=document.createElement('textarea');t.innerHTML=s;return t.value};
+const isUmum=()=>S.mapel.startsWith('Umum');
 
-function setSec(s){S.sec=s;S.view='home';home()}
-function tabs(){['sekolah','trading'].forEach(k=>$('t-'+k).classList.toggle('on',S.sec===k))}
-
-async function home(){
-  tabs();
-  const ms=MAPEL[S.sec];
-  $('app').innerHTML=`
-  <div class="card"><h3>Mulai latihan</h3>
-    <label>Mata pelajaran / topik</label>
-    <select id="mapel">${ms.map(m=>`<option>${m}</option>`).join('')}</select>
-    <label>Jumlah soal</label>
-    <select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
-    <button class="btn full" onclick="start()">Mulai ▶</button>
-    <div id="msg" class="mut" style="margin-top:10px;font-size:.85rem"></div>
-  </div>
-  ${S.sec==='trading'?`<div class="card"><h3>📝 Catatan trading</h3>
-    <textarea id="cat" style="min-height:80px;font-family:inherit;font-size:.9rem" placeholder="Tulis catatan setup, pelajaran, evaluasi..."></textarea>
-    <button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes"></div></div>`:''}
-  <div class="card"><h3>➕ Tambah bank soal</h3>
-    <div class="mut" style="font-size:.85rem;margin-bottom:6px">Tempel JSON array soal (minta Claude: "buatkan 25 soal ${ms[0]} format JSON"). Format tiap soal:<br><code>{"mapel":"${ms[0]}","q":"...","o":["A","B","C","D"],"a":0,"e":"pembahasan"}</code></div>
-    <textarea id="imp" placeholder='[ {...}, {...} ]'></textarea>
-    <div class="row"><button class="btn full" onclick="importQ()">Simpan ke Firebase</button><button class="btn alt full" onclick="seed()">Isi contoh soal</button></div>
-  </div>
-  <div class="card"><h3>🏆 Riwayat</h3><div id="hist" class="mut">Memuat...</div></div>`;
-  loadHist(); if(S.sec==='trading') loadNotes();
+async function ai(system,messages,big){
+  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages,big:!!big})});
+  let j;try{j=await r.json()}catch(e){throw new Error('AI hanya aktif setelah web dibuka dari Vercel (bukan file lokal).')}
+  if(!r.ok) throw new Error(j.error||'AI gagal');
+  return j.text;
 }
 
-async function loadQs(mapel,n){
-  if(mapel.startsWith('Umum')){
-    const r=await fetch(`https://opentdb.com/api.php?amount=${Math.min(n,50)}&type=multiple`);
-    const j=await r.json();
+function setSec(s){S.sec=s;S.mapel=MAPEL[s][0];S.tab='latihan';home()}
+function home(){
+  ['sekolah','trading'].forEach(k=>$('t-'+k).classList.toggle('on',S.sec===k));
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor AI'],['buat','✨ Buat Soal'],['bank','🗂 Bank Soal']];
+  $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
+    <select onchange="S.mapel=this.value;S.gen=[];pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div>
+    <div id="pane"></div>`;
+  pane();
+}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank})[S.tab]()}
+
+/* ---------- LATIHAN ---------- */
+function pLatihan(){
+  $('pane').innerHTML=`<div class="card"><h3>Mulai latihan: ${esc(S.mapel)}</h3>
+    <label>Jumlah soal</label><select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+    <button class="btn full" onclick="start()">Mulai ▶</button><div id="msg" class="mut small" style="margin-top:10px"></div></div>
+  ${S.sec==='trading'?`<div class="card"><h3>📝 Catatan trading</h3>
+    <textarea id="cat" placeholder="Catatan setup, pelajaran, evaluasi..."></textarea>
+    <button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes"></div></div>`:''}
+  <div class="card"><h3>🏆 Riwayat</h3><div id="hist" class="mut">Memuat...</div></div>`;
+  loadHist();if(S.sec==='trading')loadNotes();
+}
+async function loadQs(n){
+  if(isUmum()){
+    const r=await fetch(`https://opentdb.com/api.php?amount=${Math.min(n,50)}&type=multiple`);const j=await r.json();
     return j.results.map(x=>{const o=shuffle([x.correct_answer,...x.incorrect_answers]).map(dec);return{q:dec(x.question),o,a:o.indexOf(dec(x.correct_answer)),e:'Jawaban benar: '+dec(x.correct_answer)}});
   }
-  if(!db) throw new Error('Firebase belum dikonfigurasi');
-  const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',mapel).limit(300).get();
+  const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
   return shuffle(s.docs.map(d=>d.data())).slice(0,n);
 }
-
 async function start(){
-  const mapel=$('mapel').value,n=+$('n').value;S.mapel=mapel;$('msg').textContent='Memuat soal...';
-  try{
-    const qs=await loadQs(mapel,n);
-    if(!qs.length){$('msg').textContent='Belum ada soal untuk topik ini. Tambahkan lewat bank soal di bawah.';return}
-    Object.assign(S,{qs,i:0,score:0,done:false,view:'quiz'});show();
+  $('msg').textContent='Memuat soal...';
+  try{const qs=await loadQs(+$('n').value);
+    if(!qs.length){$('msg').textContent='Belum ada soal. Buat lewat tab ✨ Buat Soal atau 🗂 Bank Soal.';return}
+    Object.assign(S,{qs,i:0,score:0});show();
   }catch(e){$('msg').textContent='Gagal: '+e.message}
 }
-
 function show(){
   if(S.i>=S.qs.length) return finish();
   const q=S.qs[S.i];S.done=false;
-  $('app').innerHTML=`<div class="card">
-    <div class="mut" style="font-size:.8rem;margin-bottom:8px">${esc(S.mapel)} • Soal ${S.i+1}/${S.qs.length}</div>
-    <div class="bar"><i style="width:${S.i/S.qs.length*100}%"></i></div>
-    <div class="q">${esc(q.q)}</div>
-    ${q.o.map((o,k)=>`<button class="opt" onclick="pick(${k})">${String.fromCharCode(65+k)}. ${esc(o)}</button>`).join('')}
-    <div id="fb"></div></div>`;
+  $('app').innerHTML=`<div class="card"><div class="mut small" style="margin-bottom:8px">${esc(S.mapel)} • Soal ${S.i+1}/${S.qs.length}</div>
+    <div class="bar"><i style="width:${S.i/S.qs.length*100}%"></i></div><div class="q">${esc(q.q)}</div>
+    ${q.o.map((o,k)=>`<button class="opt" onclick="pick(${k})">${String.fromCharCode(65+k)}. ${esc(o)}</button>`).join('')}<div id="fb"></div></div>`;
 }
-
 function pick(k){
-  if(S.done) return;S.done=true;
-  const q=S.qs[S.i],bs=document.querySelectorAll('.opt');
+  if(S.done)return;S.done=true;const q=S.qs[S.i],bs=document.querySelectorAll('.opt');
   bs.forEach((b,i)=>{b.disabled=true;if(i===q.a)b.classList.add('ok')});
   if(k===q.a)S.score++;else bs[k].classList.add('no');
-  $('fb').innerHTML=`${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}<button class="btn full" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Lihat hasil'}</button>`;
+  $('fb').innerHTML=`${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}
+    <div id="aiexp"></div>
+    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="explain(${k})">🤖 Jelaskan lebih detail</button><button class="btn" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Hasil'}</button></div>`;
 }
-
+async function explain(k){
+  const q=S.qs[S.i];$('aiexp').innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
+  try{const t=await ai(tutorSys(),[{role:'user',content:`Jelaskan langkah demi langkah kenapa jawaban soal ini benar, dan kenapa pilihan saya (${String.fromCharCode(65+k)}) ${k===q.a?'sudah benar':'salah'}.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>String.fromCharCode(65+i)+'. '+o).join(' | ')}\nJawaban benar: ${String.fromCharCode(65+q.a)}`}]);
+    $('aiexp').innerHTML=`<div class="exp">${fmt(t)}</div>`;
+  }catch(e){$('aiexp').innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
+}
 async function finish(){
   const t=S.qs.length,p=Math.round(S.score/t*100);
-  $('app').innerHTML=`<div class="card"><div class="big">${p}</div>
-    <div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}</div>
-    <button class="btn full" onclick="home()">Kembali</button></div>`;
-  if(db) try{await db.collection('hasil').add({kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
-}
-
-async function importQ(){
-  if(!db) return alert('Firebase belum dikonfigurasi');
-  let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
-  if(!Array.isArray(arr)) return alert('Harus berupa array');
-  const ok=arr.filter(x=>x.mapel&&x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length);
-  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{...x,kategori:S.sec}));await b.commit()}
-  alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati)`);$('imp').value='';
-}
-async function seed(){
-  if(!db) return alert('Firebase belum dikonfigurasi');
-  const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec).forEach(x=>b.set(db.collection('soal').doc(),x));await b.commit();alert('Contoh soal ditambahkan');
+  $('app').innerHTML=`<div class="card"><div class="big">${p}</div><div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}</div><button class="btn full" onclick="home()">Kembali</button></div>`;
+  try{await db.collection('hasil').add({kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
 }
 async function loadHist(){
-  if(!db){$('hist').textContent='Hubungkan Firebase untuk menyimpan riwayat.';return}
-  try{
-    const s=await db.collection('hasil').orderBy('waktu','desc').limit(30).get();
+  try{const s=await db.collection('hasil').orderBy('waktu','desc').limit(30).get();
     const r=s.docs.map(d=>d.data()).filter(x=>x.kategori===S.sec).slice(0,8);
     $('hist').innerHTML=r.length?r.map(x=>`<div class="item"><span>${esc(x.mapel)}</span><b>${x.skor}/${x.total}</b></div>`).join(''):'Belum ada riwayat.';
   }catch(e){$('hist').textContent='Gagal memuat riwayat.'}
 }
-async function saveNote(){
-  const v=$('cat').value.trim();if(!v||!db) return;
-  await db.collection('catatan').add({teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes();
+async function saveNote(){const v=$('cat').value.trim();if(!v)return;await db.collection('catatan').add({teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes()}
+async function loadNotes(){const s=await db.collection('catatan').orderBy('waktu','desc').limit(8).get();$('notes').innerHTML=s.docs.map(d=>`<div class="note">${esc(d.data().teks)}</div>`).join('')}
+
+/* ---------- TUTOR AI ---------- */
+function tutorSys(){
+  return S.sec==='trading'
+   ?`Kamu tutor ${S.mapel} untuk edukasi trading forex. Jawab dalam Bahasa Indonesia, jelas, bertahap, dengan contoh. Ini edukasi, bukan saran finansial; ingatkan risiko bila relevan.`
+   :`Kamu tutor ${isUmum()?'pengetahuan umum':S.mapel} untuk siswa Indonesia (level sekolah sampai TKA). Jawab dalam Bahasa Indonesia, jelas, bertahap, ringkas, dengan contoh. Jika siswa salah, koreksi dengan sopan. Jangan mengarang fakta; jika ragu, katakan.`;
 }
-async function loadNotes(){
-  if(!db) return;
-  const s=await db.collection('catatan').orderBy('waktu','desc').limit(8).get();
-  $('notes').innerHTML=s.docs.map(d=>`<div class="note">${esc(d.data().teks)}</div>`).join('');
+function pTutor(){
+  $('pane').innerHTML=`<div class="card"><h3>🤖 Tutor ${esc(S.mapel)}</h3><div id="chat"></div>
+    <div class="row" style="margin-top:12px"><input id="ci" placeholder="Tanya materi, minta contoh, atau minta dijelaskan..." onkeydown="if(event.key==='Enter')send()"><button class="btn" style="flex:0 0 auto" onclick="send()">Kirim</button></div>
+    <button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat()">Hapus percakapan</button></div>`;
+  drawChat();
+}
+function drawChat(){
+  const c=S.chat[S.mapel]||[];
+  $('chat').innerHTML=c.length?c.map(m=>`<div class="msg ${m.role}">${fmt(m.content)}</div>`).join(''):'<div class="mut small">Tanyakan apa saja tentang materi ini. Contoh: "jelaskan pecahan dengan contoh" atau "kasih trik cepat mengerjakan soal ini".</div>';
+  $('chat').scrollTop=1e9;
+}
+async function send(){
+  const v=$('ci').value.trim();if(!v)return;$('ci').value='';
+  const c=S.chat[S.mapel]=S.chat[S.mapel]||[];c.push({role:'user',content:v},{role:'assistant',content:'⏳ Berpikir...'});drawChat();
+  let h=c.slice(0,-1).filter(m=>!m.content.startsWith('⚠️')).slice(-12);while(h.length&&h[0].role!=='user')h.shift();
+  try{c[c.length-1].content=await ai(tutorSys(),h)}catch(e){c[c.length-1].content='⚠️ '+e.message}
+  if($('chat'))drawChat();
+}
+
+/* ---------- BUAT SOAL (AI) ---------- */
+function pBuat(){
+  if(isUmum()){$('pane').innerHTML='<div class="card mut">Topik Trivia Dunia mengambil soal otomatis dari internet. Pilih pelajaran lain untuk membuat soal dengan AI.</div>';return}
+  $('pane').innerHTML=`<div class="card"><h3>✨ Buat soal ${esc(S.mapel)} dengan AI</h3>
+    <label>Topik / materi spesifik</label><input id="gt" placeholder="${S.sec==='trading'?'contoh: Order Block, Fair Value Gap, BOS vs CHoCH':'contoh: pecahan, kalimat efektif, hukum Newton'}">
+    <div class="row"><div><label>Jumlah soal</label><select id="gn"><option>5</option><option selected>10</option><option>20</option><option>25</option></select></div>
+    <div><label>Tingkat</label><select id="gl">${LEVEL[S.sec].map(l=>`<option>${l}</option>`).join('')}</select></div>
+    <div><label>Kesulitan</label><select id="gd"><option>Mudah</option><option selected>Sedang</option><option>Sulit</option><option>Campuran</option></select></div></div>
+    <label>Instruksi khusus (opsional, makin jelas makin tepat)</label>
+    <textarea id="gx" placeholder="contoh: soal cerita sehari-hari, hindari soal hitungan panjang, pilihan pengecoh harus masuk akal, sertakan pembahasan langkah demi langkah"></textarea>
+    <button class="btn full" id="gb" onclick="gen()">Buat soal ✨</button><div id="gm" class="mut small" style="margin-top:10px"></div></div>
+    <div id="gres"></div>`;
+  drawGen();
+}
+function cleanOpt(s){return String(s).replace(/^\s*[A-Da-d][.)]\s+/,'')}
+function normQ(x){
+  if(!x||!x.q||!Array.isArray(x.o)||x.o.length<2||!Number.isInteger(x.a)||x.a<0||x.a>=x.o.length)return null;
+  const o0=x.o.map(cleanOpt),c=o0[x.a],o=shuffle(o0);return{q:String(x.q),o,a:o.indexOf(c),e:x.e?String(x.e):''};
+}
+async function gen(){
+  const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
+  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,ex=$('gx').value.trim(),parts=[];
+  for(let l=n;l>0;l-=10)parts.push(Math.min(10,l));
+  const sys=`Kamu pembuat soal pilihan ganda ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar_0_sampai_3,"e":"pembahasan singkat langkah demi langkah"}. Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, fakta akurat, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada soal ganda/duplikat.`;
+  $('gb').disabled=true;$('gm').textContent=`⏳ AI sedang membuat ${n} soal...`;
+  try{
+    const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik agar tidak sama dengan bagian lain.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true)));
+    let all=[];
+    out.forEach(t=>{const m=t.match(/\[[\s\S]*\]/);if(m)try{all=all.concat(JSON.parse(m[0]).map(normQ).filter(Boolean))}catch(e){}});
+    S.gen=all;$('gm').textContent=all.length?`✅ ${all.length} soal siap. Periksa dulu, hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
+  }catch(e){$('gm').textContent='⚠️ '+e.message}
+  $('gb').disabled=false;drawGen();
+}
+function drawGen(){
+  if(!$('gres'))return;
+  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div><b>${i+1}. ${esc(x.q)}</b><div class="mut">${x.o.map((o,k)=>(k===x.a?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e)}</div></div><button class="x" onclick="S.gen.splice(${i},1);drawGen()">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
+}
+async function saveGen(){
+  const sel=S.gen.filter((x,i)=>$('g'+i)&&$('g'+i).checked);if(!sel.length)return alert('Tidak ada soal dicentang');
+  const b=db.batch();sel.forEach(x=>b.set(db.collection('soal').doc(),{...x,kategori:S.sec,mapel:S.mapel,sumber:'ai'}));await b.commit();
+  alert(`${sel.length} soal tersimpan`);S.gen=[];S.tab='bank';home();
+}
+
+/* ---------- BANK SOAL ---------- */
+function pBank(){
+  if(isUmum()){$('pane').innerHTML='<div class="card mut">Trivia Dunia tidak disimpan di bank soal.</div>';return}
+  $('pane').innerHTML=`<div class="card"><h3>🗂 Bank soal: ${esc(S.mapel)}</h3><div id="bl" class="mut">Memuat...</div></div>
+    <div class="card"><h3>➕ Tambah manual (JSON)</h3>
+    <div class="mut small" style="margin-bottom:6px">Format: <code>{"q":"...","o":["A","B","C","D"],"a":0,"e":"pembahasan"}</code> (field mapel otomatis).</div>
+    <textarea id="imp" placeholder='[ {...}, {...} ]'></textarea>
+    <div class="row"><button class="btn full" onclick="importQ()">Simpan</button><button class="btn alt full" onclick="seed()">Isi contoh</button></div></div>`;
+  loadBank();
+}
+async function loadBank(){
+  try{const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+    S.bank=s.docs.map(d=>({id:d.id,...d.data()}));drawBank();
+  }catch(e){$('bl').textContent='Gagal memuat: '+e.message}
+}
+function drawBank(){
+  $('bl').innerHTML=S.bank.length?`<div class="small" style="margin-bottom:8px">${S.bank.length} soal</div>`+S.bank.map(x=>`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(x.o[x.a])} ${x.sumber==='ai'?'• 🤖 AI':''}</div></div><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join('')+`<button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Buat Soal atau tambah manual.';
+}
+async function del(id){if(!confirm('Hapus soal ini?'))return;await db.collection('soal').doc(id).delete();S.bank=S.bank.filter(x=>x.id!==id);drawBank()}
+async function delAll(){
+  if(!confirm(`Hapus SEMUA ${S.bank.length} soal ${S.mapel}? Tidak bisa dibatalkan.`))return;
+  for(let i=0;i<S.bank.length;i+=400){const b=db.batch();S.bank.slice(i,i+400).forEach(x=>b.delete(db.collection('soal').doc(x.id)));await b.commit()}
+  S.bank=[];drawBank();
+}
+async function importQ(){
+  let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
+  if(!Array.isArray(arr))return alert('Harus berupa array');
+  const ok=arr.filter(x=>x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length);
+  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati)`);pBank();
+}
+async function seed(){
+  const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec&&x.mapel===S.mapel).forEach(x=>b.set(db.collection('soal').doc(),x));await b.commit();pBank();
 }
 home();
 </script>
