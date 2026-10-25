@@ -45,12 +45,15 @@ async function verify(req) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idToken: tk })
   });
-  return r.ok;
+  if (!r.ok) return null;
+  const j = await r.json();
+  return (j.users && j.users[0] && j.users[0].localId) || 'x';
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Hanya POST' });
-  if (!(await verify(req))) return res.status(401).json({ error: 'Silakan login dulu' });
+  const uid = await verify(req);
+  if (!uid) return res.status(401).json({ error: 'Silakan login dulu' });
   const { system = '', messages = [], big = false } = req.body || {};
   if (!Array.isArray(messages) || !messages.length || JSON.stringify(messages).length > 30000)
     return res.status(400).json({ error: 'Pesan tidak valid atau terlalu panjang' });
