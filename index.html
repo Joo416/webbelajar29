@@ -46,6 +46,7 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
   <h1>📖 Ruang Belajar</h1>
   <div class="sub">TKA, pelajaran sekolah, dan trading dengan tutor AI</div>
   <div id="warn"></div>
+  <div id="userbar"></div>
   <div class="tabs">
     <button id="t-sekolah" onclick="setSec('sekolah')">🎓 TKA & Sekolah</button>
     <button id="t-trading" onclick="setSec('trading')">📈 Trading</button>
@@ -55,6 +56,7 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
@@ -80,8 +82,8 @@ const SAMPLE=[
   {kategori:'trading',mapel:'Risk Management',q:'Risiko per trade yang umum disarankan?',o:['10-20%','5-10%','1-2%','Semua saldo'],a:2,e:'Banyak trader membatasi risiko 1-2% ekuitas per trade.'}
 ];
 
-let db=null;
-try{firebase.initializeApp(firebaseConfig);db=firebase.firestore()}catch(e){console.error(e);document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase gagal dimuat.</div>'}
+let db=null,auth=null,user=null;
+try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();auth=firebase.auth()}catch(e){console.error(e);document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase gagal dimuat.</div>'}
 
 const S={sec:'sekolah',mapel:'Bahasa Indonesia',tab:'latihan',qs:[],i:0,score:0,done:false,chat:{},gen:[],bank:[]};
 const $=id=>document.getElementById(id);
@@ -92,7 +94,8 @@ const dec=s=>{const t=document.createElement('textarea');t.innerHTML=s;return t.
 const isUmum=()=>S.mapel.startsWith('Umum');
 
 async function ai(system,messages,big){
-  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages,big:!!big})});
+  const tk=await user.getIdToken();
+  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big})});
   let j;try{j=await r.json()}catch(e){throw new Error('AI hanya aktif setelah web dibuka dari Vercel (bukan file lokal).')}
   if(!r.ok) throw new Error(j.error||'AI gagal');
   return j.text;
@@ -126,7 +129,7 @@ async function loadQs(n){
     const r=await fetch(`https://opentdb.com/api.php?amount=${Math.min(n,50)}&type=multiple`);const j=await r.json();
     return j.results.map(x=>{const o=shuffle([x.correct_answer,...x.incorrect_answers]).map(dec);return{q:dec(x.question),o,a:o.indexOf(dec(x.correct_answer)),e:'Jawaban benar: '+dec(x.correct_answer)}});
   }
-  const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
   return shuffle(s.docs.map(d=>d.data())).slice(0,n);
 }
 async function start(){
@@ -160,16 +163,16 @@ async function explain(k){
 async function finish(){
   const t=S.qs.length,p=Math.round(S.score/t*100);
   $('app').innerHTML=`<div class="card"><div class="big">${p}</div><div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}</div><button class="btn full" onclick="home()">Kembali</button></div>`;
-  try{await db.collection('hasil').add({kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
+  try{await db.collection('hasil').add({uid:user.uid,kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
 }
 async function loadHist(){
-  try{const s=await db.collection('hasil').orderBy('waktu','desc').limit(30).get();
-    const r=s.docs.map(d=>d.data()).filter(x=>x.kategori===S.sec).slice(0,8);
+  try{const s=await db.collection('hasil').where('uid','==',user.uid).limit(100).get();
+    const r=s.docs.map(d=>d.data()).filter(x=>x.kategori===S.sec).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0)).slice(0,8);
     $('hist').innerHTML=r.length?r.map(x=>`<div class="item"><span>${esc(x.mapel)}</span><b>${x.skor}/${x.total}</b></div>`).join(''):'Belum ada riwayat.';
   }catch(e){$('hist').textContent='Gagal memuat riwayat.'}
 }
-async function saveNote(){const v=$('cat').value.trim();if(!v)return;await db.collection('catatan').add({teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes()}
-async function loadNotes(){const s=await db.collection('catatan').orderBy('waktu','desc').limit(8).get();$('notes').innerHTML=s.docs.map(d=>`<div class="note">${esc(d.data().teks)}</div>`).join('')}
+async function saveNote(){const v=$('cat').value.trim();if(!v)return;await db.collection('catatan').add({uid:user.uid,teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes()}
+async function loadNotes(){const s=await db.collection('catatan').where('uid','==',user.uid).limit(50).get();const r=s.docs.map(d=>d.data()).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0)).slice(0,8);$('notes').innerHTML=r.map(x=>`<div class="note">${esc(x.teks)}</div>`).join('')}
 
 /* ---------- TUTOR AI ---------- */
 function tutorSys(){
@@ -235,7 +238,7 @@ function drawGen(){
 }
 async function saveGen(){
   const sel=S.gen.filter((x,i)=>$('g'+i)&&$('g'+i).checked);if(!sel.length)return alert('Tidak ada soal dicentang');
-  const b=db.batch();sel.forEach(x=>b.set(db.collection('soal').doc(),{...x,kategori:S.sec,mapel:S.mapel,sumber:'ai'}));await b.commit();
+  const b=db.batch();sel.forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel,sumber:'ai'}));await b.commit();
   alert(`${sel.length} soal tersimpan`);S.gen=[];S.tab='bank';home();
 }
 
@@ -250,7 +253,7 @@ function pBank(){
   loadBank();
 }
 async function loadBank(){
-  try{const s=await db.collection('soal').where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+  try{const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
     S.bank=s.docs.map(d=>({id:d.id,...d.data()}));drawBank();
   }catch(e){$('bl').textContent='Gagal memuat: '+e.message}
 }
@@ -267,13 +270,23 @@ async function importQ(){
   let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
   if(!Array.isArray(arr))return alert('Harus berupa array');
   const ok=arr.filter(x=>x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length);
-  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
   alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati)`);pBank();
 }
 async function seed(){
-  const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec&&x.mapel===S.mapel).forEach(x=>b.set(db.collection('soal').doc(),x));await b.commit();pBank();
+  const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec&&x.mapel===S.mapel).forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid}));await b.commit();pBank();
 }
-home();
+function loginView(){
+  document.querySelector('.tabs').style.display='none';$('userbar').innerHTML='';
+  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 18px"><div style="font-size:2.4rem">🔐</div><h3 style="font-size:1.2rem">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:18px">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri.</div><button class="btn" onclick="login()">Masuk dengan Google</button><div id="lerr" class="mut small" style="margin-top:12px"></div></div>`;
+}
+async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){$('lerr').textContent='Gagal masuk: '+e.message}}
+if(auth)auth.onAuthStateChanged(u=>{
+  user=u;if(!u)return loginView();
+  document.querySelector('.tabs').style.display='';
+  $('userbar').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 14px">${u.photoURL?`<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" style="width:32px;height:32px;border-radius:50%">`:''}<span style="flex:1;font-size:.9rem">${esc(u.displayName||u.email||'Pengguna')}</span><button class="btn alt" style="padding:8px 12px" onclick="auth.signOut()">Keluar</button></div>`;
+  home();
+});
 </script>
 </body>
 </html>
