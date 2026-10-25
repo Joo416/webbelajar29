@@ -35,8 +35,22 @@ async function groq(system, messages, max) {
   return t;
 }
 
+async function verify(req) {
+  const h = req.headers.authorization || '';
+  const tk = h.startsWith('Bearer ') ? h.slice(7) : '';
+  if (!tk) return false;
+  const key = process.env.FIREBASE_API_KEY || 'AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w';
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + key, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken: tk })
+  });
+  return r.ok;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Hanya POST' });
+  if (!(await verify(req))) return res.status(401).json({ error: 'Silakan login dulu' });
   const { system = '', messages = [], big = false } = req.body || {};
   if (!Array.isArray(messages) || !messages.length || JSON.stringify(messages).length > 30000)
     return res.status(400).json({ error: 'Pesan tidak valid atau terlalu panjang' });
