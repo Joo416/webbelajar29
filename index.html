@@ -40,6 +40,7 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
 .gi{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9rem;line-height:1.5}
 .gi>div{flex:1}.x{border:0;background:#4a1a2c;color:#ffb3c4;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
 <div class="wrap">
@@ -57,6 +58,8 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
@@ -222,12 +225,12 @@ async function gen(){
   const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
   const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,ex=$('gx').value.trim(),parts=[];
   for(let l=n;l>0;l-=10)parts.push(Math.min(10,l));
-  const sys=`Kamu pembuat soal pilihan ganda ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar_0_sampai_3,"e":"pembahasan singkat langkah demi langkah"}. Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, fakta akurat, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada soal ganda/duplikat.`;
+  const sys=`Kamu pembuat soal pilihan ganda ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar_0_sampai_3,"e":"pembahasan singkat langkah demi langkah"}. Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, fakta akurat, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada soal ganda/duplikat. Rumus matematika ditulis LaTeX di antara \\( dan \\); semua backslash di dalam JSON wajib digandakan.`;
   $('gb').disabled=true;$('gm').textContent=`⏳ AI sedang membuat ${n} soal...`;
   try{
     const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik agar tidak sama dengan bagian lain.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true)));
     let all=[];
-    out.forEach(t=>{const m=t.match(/\[[\s\S]*\]/);if(m)try{all=all.concat(JSON.parse(m[0]).map(normQ).filter(Boolean))}catch(e){}});
+    out.forEach(t=>{const m=t.match(/\[[\s\S]*\]/);if(m)try{all=all.concat(JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:"\\\\")).map(normQ).filter(Boolean))}catch(e){}});
     S.gen=all;$('gm').textContent=all.length?`✅ ${all.length} soal siap. Periksa dulu, hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
   }catch(e){$('gm').textContent='⚠️ '+e.message}
   $('gb').disabled=false;drawGen();
@@ -287,6 +290,169 @@ if(auth)auth.onAuthStateChanged(u=>{
   $('userbar').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 14px">${u.photoURL?`<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" style="width:32px;height:32px;border-radius:50%">`:''}<span style="flex:1;font-size:.9rem">${esc(u.displayName||u.email||'Pengguna')}</span><button class="btn alt" style="padding:8px 12px" onclick="auth.signOut()">Keluar</button></div>`;
   home();
 });
+</script>
+<script>
+/* ===== UPDATE V3 ===== */
+let mo,rt;
+function renderMath(){if(!window.renderMathInElement)return;mo.disconnect();try{renderMathInElement($('app'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})}catch(e){}mo.observe($('app'),{childList:true,subtree:true})}
+mo=new MutationObserver(()=>{clearTimeout(rt);rt=setTimeout(renderMath,60)});mo.observe($('app'),{childList:true,subtree:true});
+const fmtT=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const nk=q=>String(q).toLowerCase().replace(/[^a-z0-9]/g,'');
+function tutorSys(){
+  return (S.sec==='trading'
+   ?`Kamu tutor ${S.mapel} untuk edukasi trading forex. Jawab dalam Bahasa Indonesia, jelas, bertahap, dengan contoh. Ini edukasi, bukan saran finansial; ingatkan risiko bila relevan.`
+   :`Kamu tutor ${isUmum()?'pengetahuan umum':S.mapel} untuk siswa Indonesia (level sekolah sampai TKA). Jawab dalam Bahasa Indonesia, jelas, bertahap, ringkas, dengan contoh. Jika siswa salah, koreksi dengan sopan. Jangan mengarang fakta.`)
+   +` Tulis rumus matematika dengan LaTeX di antara \\( dan \\).`+(S.avg!=null?` Rata-rata nilai latihan siswa di pelajaran ini ${S.avg}%; sesuaikan tingkat penjelasan.`:'');
+}
+function home(){
+  ['sekolah','trading'].forEach(k=>$('t-'+k).classList.toggle('on',S.sec===k));
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['jurnal','📒 Jurnal']);
+  $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
+    <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
+  pane();
+}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal})[S.tab]()}
+
+/* ---- Latihan, ujian, review, statistik ---- */
+function pLatihan(){
+  $('pane').innerHTML=`<div class="card"><h3>Mulai latihan: ${esc(S.mapel)}</h3>
+    ${isUmum()?'':`<label>Subtopik (opsional)</label><input id="sub" placeholder="kosong = semua, contoh: pecahan" value="${esc(S.sub||'')}">`}
+    <label>Jumlah soal</label><select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="ex" style="width:18px"> Mode ujian (timer, pembahasan setelah selesai)</label>
+    <button class="btn full" onclick="start()">Mulai ▶</button><div id="msg" class="mut small" style="margin-top:10px"></div></div>
+    <div class="card"><h3>📊 Statistik</h3><div id="stat" class="mut">Memuat...</div></div>
+    <div class="card"><h3>🏆 Riwayat</h3><div id="hist" class="mut">Memuat...</div></div>`;
+  loadHist();
+}
+async function loadQs2(n){
+  if(isUmum())return loadQs(n);
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+  let a=s.docs.map(d=>d.data()),sub=(S.sub||'').toLowerCase();
+  if(sub)a=a.filter(x=>(x.sub||'').toLowerCase().includes(sub));
+  return shuffle(a).slice(0,n);
+}
+async function start(){
+  S.sub=$('sub')?$('sub').value.trim():'';S.exam=$('ex').checked;S.retry=false;$('msg').textContent='Memuat soal...';
+  try{const qs=await loadQs2(+$('n').value);
+    if(!qs.length){$('msg').textContent='Tidak ada soal (cek subtopik atau buat soal dulu).';return}
+    Object.assign(S,{qs,i:0,score:0,wrong:[]});clearInterval(S.tm);
+    if(S.exam){S.left=Math.ceil(qs.length*90);S.tm=setInterval(()=>{S.left--;const e=$('tmr');if(e)e.textContent=fmtT(S.left);if(S.left<=0)finish()},1000)}
+    show();
+  }catch(e){$('msg').textContent='Gagal: '+e.message}
+}
+function retry(){Object.assign(S,{qs:shuffle(S.wrong.map(({pick,...q})=>q)),i:0,score:0,wrong:[],exam:false,retry:true});show()}
+function show(){
+  if(S.i>=S.qs.length)return finish();
+  const q=S.qs[S.i];S.done=false;
+  $('app').innerHTML=`<div class="card"><div class="mut small" style="margin-bottom:8px;display:flex;justify-content:space-between"><span>${esc(S.mapel)} • Soal ${S.i+1}/${S.qs.length}</span>${S.exam?`<b id="tmr">${fmtT(S.left)}</b>`:''}</div>
+    <div class="bar"><i style="width:${S.i/S.qs.length*100}%"></i></div><div class="q">${esc(q.q)}</div>
+    ${q.o.map((o,k)=>`<button class="opt" onclick="pick(${k})">${String.fromCharCode(65+k)}. ${esc(o)}</button>`).join('')}<div id="fb"></div></div>`;
+}
+function pick(k){
+  if(S.done)return;S.done=true;const q=S.qs[S.i];
+  if(k===q.a)S.score++;else S.wrong.push({...q,pick:k});
+  if(S.exam){S.i++;return show()}
+  const bs=document.querySelectorAll('.opt');bs.forEach((b,i)=>{b.disabled=true;if(i===q.a)b.classList.add('ok')});if(k!==q.a)bs[k].classList.add('no');
+  $('fb').innerHTML=`${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}<div id="aiexp"></div>
+    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="explain(${k})">🤖 Jelaskan lebih detail</button><button class="btn" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Hasil'}</button></div>`;
+}
+async function finish(){
+  clearInterval(S.tm);const t=S.qs.length,p=Math.round(S.score/t*100),w=S.wrong;
+  $('app').innerHTML=`<div class="card"><div class="big">${p}</div><div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}${S.exam?' • mode ujian':''}</div>
+    ${w.length?`<button class="btn full" onclick="retry()">🔁 Ulangi ${w.length} soal yang salah</button>`:''}<button class="btn alt full" onclick="S.tab='latihan';home()">Kembali</button></div>
+    ${w.length?`<div class="card"><h3>Review soal salah</h3>${w.map((x,i)=>`<div class="gi" style="display:block"><b>${i+1}. ${esc(x.q)}</b><div class="small" style="margin-top:6px;color:var(--bad)">Jawabanmu: ${esc(x.o[x.pick])}</div><div class="small" style="color:var(--b)">Benar: ${esc(x.o[x.a])}</div>${x.e?`<div class="exp">💡 ${esc(x.e)}</div>`:''}</div>`).join('')}</div>`:''}`;
+  if(!S.retry)try{await db.collection('hasil').add({uid:user.uid,kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,mode:S.exam?'ujian':'latihan',waktu:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.error(e)}
+}
+async function loadHist(){
+  try{const s=await db.collection('hasil').where('uid','==',user.uid).limit(300).get();
+    const r=s.docs.map(d=>d.data()).filter(x=>x.kategori===S.sec).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0));
+    const g={};r.forEach(x=>(g[x.mapel]=g[x.mapel]||[]).push(x.skor/x.total*100));
+    const av=a=>Math.round(a.reduce((p,c)=>p+c,0)/a.length);S.avg=g[S.mapel]?av(g[S.mapel]):null;
+    if(!$('stat'))return;
+    $('stat').innerHTML=Object.keys(g).length?Object.entries(g).map(([m,a])=>`<div style="margin-bottom:10px"><div class="small" style="display:flex;justify-content:space-between"><span>${esc(m)} (${a.length}x)</span><b>${av(a)}%</b></div><div class="bar" style="margin:4px 0 0"><i style="width:${av(a)}%"></i></div></div>`).join(''):'Belum ada data.';
+    $('hist').innerHTML=r.length?r.slice(0,8).map(x=>`<div class="item"><span>${esc(x.mapel)}${x.mode==='ujian'?' 📝':''}</span><b>${x.skor}/${x.total}</b></div>`).join(''):'Belum ada riwayat.';
+  }catch(e){if($('hist'))$('hist').textContent='Gagal memuat riwayat.'}
+}
+
+/* ---- Tutor: riwayat chat tersimpan ---- */
+const chatId=()=>user.uid+'__'+S.sec+'__'+S.mapel.replace(/\W/g,'');
+async function saveChat(){const c=(S.chat[S.mapel]||[]).filter(m=>!/^(⚠️|⏳)/.test(m.content)).slice(-30);try{await db.collection('chat').doc(chatId()).set({uid:user.uid,mapel:S.mapel,msgs:c})}catch(e){console.error(e)}}
+async function pTutor(){
+  $('pane').innerHTML=`<div class="card"><h3>🤖 Tutor ${esc(S.mapel)}</h3><div id="chat"></div>
+    <div class="row" style="margin-top:12px"><input id="ci" placeholder="Tanya materi, minta contoh, atau minta dijelaskan..." onkeydown="if(event.key==='Enter')send2()"><button class="btn" style="flex:0 0 auto" onclick="send2()">Kirim</button></div>
+    <button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat();saveChat()">Hapus percakapan</button></div>`;
+  if(!S.chat[S.mapel]){S.chat[S.mapel]=[];try{const d=await db.collection('chat').doc(chatId()).get();if(d.exists)S.chat[S.mapel]=d.data().msgs||[]}catch(e){}}
+  if($('chat'))drawChat();
+}
+async function send2(){await send();saveChat()}
+
+/* ---- Bank soal: edit, subtopik, anti-duplikat ---- */
+function editForm(x){return `<div class="gi" style="display:block"><label>Soal</label><textarea id="eq" style="min-height:70px">${esc(x.q)}</textarea>${x.o.map((o,k)=>`<label>Opsi ${String.fromCharCode(65+k)}</label><input id="eo${k}" value="${esc(o)}">`).join('')}
+  <div class="row"><div><label>Jawaban benar</label><select id="ea">${x.o.map((_,k)=>`<option value="${k}" ${k===x.a?'selected':''}>${String.fromCharCode(65+k)}</option>`).join('')}</select></div><div><label>Subtopik</label><input id="es" value="${esc(x.sub||'')}"></div></div>
+  <label>Pembahasan</label><textarea id="ee" style="min-height:60px">${esc(x.e||'')}</textarea>
+  <div class="row" style="margin-top:10px"><button class="btn" onclick="saveEdit('${x.id}')">Simpan</button><button class="btn alt" onclick="S.edit=null;drawBank()">Batal</button></div></div>`}
+function drawBank(){
+  $('bl').innerHTML=S.bank.length?`<div class="small" style="margin-bottom:8px">${S.bank.length} soal</div>`+S.bank.map(x=>x.id===S.edit?editForm(x):`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(x.o[x.a])}${x.sub?' • 🏷 '+esc(x.sub):''}${x.sumber==='ai'?' • 🤖':''}</div></div><button class="x" style="background:#262b55;color:#eef0ff" onclick="S.edit='${x.id}';drawBank()">✏️</button><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join('')+`<button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Soal atau tambah manual.';
+}
+async function saveEdit(id){
+  const x=S.bank.find(b=>b.id===id),o=x.o.map((_,k)=>$('eo'+k).value.trim());
+  if(!$('eq').value.trim()||o.some(v=>!v))return alert('Soal dan semua opsi harus diisi');
+  const d={q:$('eq').value.trim(),o,a:+$('ea').value,sub:$('es').value.trim(),e:$('ee').value.trim()};
+  await db.collection('soal').doc(id).update(d);Object.assign(x,d);S.edit=null;drawBank();
+}
+async function dedupe(list){
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).get();
+  const have=new Set(s.docs.map(d=>nk(d.data().q)));return list.filter(x=>{const k=nk(x.q);if(have.has(k))return false;have.add(k);return true});
+}
+async function saveGen(){
+  const sel=S.gen.filter((x,i)=>$('g'+i)&&$('g'+i).checked);if(!sel.length)return alert('Tidak ada soal dicentang');
+  const sub=$('gt')?$('gt').value.trim():'',nw=await dedupe(sel),b=db.batch();
+  nw.forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,sumber:'ai'}));await b.commit();
+  alert(`${nw.length} soal tersimpan`+(sel.length>nw.length?` (${sel.length-nw.length} duplikat dilewati)`:''));S.gen=[];S.tab='bank';home();
+}
+async function importQ(){
+  let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
+  if(!Array.isArray(arr))return alert('Harus berupa array');
+  const ok=await dedupe(arr.filter(x=>x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length));
+  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',sub:x.sub||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati: tidak valid/duplikat)`);pBank();
+}
+
+/* ---- Jurnal trading + kalkulator lot ---- */
+function pJurnal(){
+  $('pane').innerHTML=`<div class="card"><h3>🧮 Kalkulator lot</h3><div class="row"><div><label>Saldo ($)</label><input id="kb" type="number" value="1000"></div><div><label>Risiko (%)</label><input id="kr" type="number" value="1" step="0.1"></div></div>
+    <div class="row"><div><label>Stop loss (pips)</label><input id="ks" type="number" value="20"></div><div><label>Nilai pip per 1 lot ($)</label><input id="kp" type="number" value="10"></div></div>
+    <button class="btn full" onclick="calc()">Hitung</button><div id="kout" class="exp"></div></div>
+  <div class="card"><h3>📒 Catat trade</h3><div class="row"><input id="jp" placeholder="Pair (EURUSD)"><select id="jd"><option>Buy</option><option>Sell</option></select></div>
+    <div class="row" style="margin-top:10px"><input id="je" type="number" step="any" placeholder="Entry"><input id="jl" type="number" step="any" placeholder="SL"><input id="jt" type="number" step="any" placeholder="TP"></div>
+    <div class="row" style="margin-top:10px"><input id="jr" type="number" step="any" placeholder="Hasil (R, contoh 2 / -1)"><input id="js" placeholder="Setup (OB, FVG...)"></div>
+    <textarea id="jn" style="margin-top:10px;min-height:70px" placeholder="Catatan / evaluasi"></textarea><button class="btn full" onclick="saveJ()">Simpan trade</button></div>
+  <div class="card"><h3>📈 Jurnal</h3><div id="jlist" class="mut">Memuat...</div></div>
+  <div class="card"><h3>📝 Catatan</h3><textarea id="cat" placeholder="Catatan bebas..."></textarea><button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes"></div></div>`;
+  calc();loadJ();loadNotes();
+}
+function calc(){
+  const b=+$('kb').value,r=+$('kr').value,s=+$('ks').value,p=+$('kp').value;
+  if(!(b>0&&r>0&&s>0&&p>0)){$('kout').textContent='Isi semua angka dengan benar.';return}
+  const risk=b*r/100;$('kout').innerHTML=`Risiko: <b>$${risk.toFixed(2)}</b><br>Ukuran lot: <b>${(risk/(s*p)).toFixed(2)}</b> lot<br><span class="small">Nilai pip $10/lot berlaku untuk pair berakhiran USD. Pair lain berbeda, cek broker-mu.</span>`;
+}
+async function saveJ(){
+  if(!$('jp').value.trim())return alert('Isi pair');
+  const n=id=>$(id).value===''?null:+$(id).value;
+  await db.collection('jurnal').add({uid:user.uid,pair:$('jp').value.trim().toUpperCase(),arah:$('jd').value,entry:n('je'),sl:n('jl'),tp:n('jt'),r:n('jr'),setup:$('js').value.trim(),catatan:$('jn').value.trim(),waktu:firebase.firestore.FieldValue.serverTimestamp()});
+  ['jp','je','jl','jt','jr','js','jn'].forEach(i=>$(i).value='');loadJ();
+}
+async function loadJ(){
+  try{const s=await db.collection('jurnal').where('uid','==',user.uid).limit(200).get();
+    const a=s.docs.map(d=>({id:d.id,...d.data()})).sort((x,y)=>(y.waktu?.seconds||0)-(x.waktu?.seconds||0));
+    const rs=a.filter(x=>x.r!=null),tot=rs.reduce((p,x)=>p+x.r,0),win=rs.filter(x=>x.r>0).length;
+    if(!$('jlist'))return;
+    $('jlist').innerHTML=a.length?`<div class="small" style="margin-bottom:8px;color:var(--tx)">${a.length} trade • Win rate ${rs.length?Math.round(win/rs.length*100):0}% • Total <b>${tot.toFixed(2)}R</b> • Rata-rata ${rs.length?(tot/rs.length).toFixed(2):0}R</div>`+a.slice(0,15).map(x=>`<div class="gi"><div><b>${esc(x.pair)} ${esc(x.arah)}</b> ${x.setup?'• '+esc(x.setup):''}<div class="mut small">${x.r!=null?(x.r>0?'✅ +':'❌ ')+x.r+'R':'—'}${x.catatan?' • '+esc(x.catatan):''}</div></div><button class="x" onclick="delJ('${x.id}')">🗑</button></div>`).join(''):'Belum ada trade.';
+  }catch(e){if($('jlist'))$('jlist').textContent='Gagal memuat jurnal.'}
+}
+async function delJ(id){if(!confirm('Hapus trade ini?'))return;await db.collection('jurnal').doc(id).delete();loadJ()}
+/* ===== END V3 ===== */
 </script>
 </body>
 </html>
