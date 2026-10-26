@@ -1039,7 +1039,7 @@ async function kLookup(w){
     ${tr&&tr.toLowerCase()!==w?`<div style="margin:8px 0">🇮🇩 <b>${esc(tr)}</b> <span class="mut small">(terjemahan otomatis, cek ulang)</span></div>`:''}${defs||'<div class="mut small">Definisi tidak tersedia untuk bentuk kata ini.</div>'}
     <button class="btn alt full" onclick="kAI('${esc(w)}')">🤖 Contoh kalimat & penjelasan</button><div id="kai"></div></div>${vf}`;
 }
-async function kAI(w){$('kai').innerHTML='<div class="exp">⏳ AI menjelaskan...</div>';
+async function kAI(w){if(!$('kai'))return;$('kai').innerHTML='<div class="exp">⏳ AI menjelaskan...</div>';
   try{const t=await ai('You are an English dictionary assistant for Indonesian learners. Be accurate; do not invent.',[{role:'user',content:`Word: "${w}". Give: 1) meaning in Indonesian, 2) 3 natural example sentences with Indonesian translation, 3) common collocations, 4) frequent mistakes by Indonesian learners. Keep it concise.`}],false,false,'',S.sec);
     $('kai').innerHTML=`<div class="exp">${fmt(t)}</div>`}catch(e){$('kai').innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}}
 function kIrr(f){
@@ -1058,8 +1058,15 @@ async function kAZ(pre,more){
   }catch(e){$('kaz').textContent='Gagal memuat daftar kata.'}
 }
 function setSec(s){S.sec=s;if(MAPEL[s])S.mapel=MAPEL[s][0];S.tab='latihan';home()}
-const _home=home;
-function home(){if(S.sec==='kamus')return kamusView();_home()}
+function home(){
+  if(S.sec==='kamus')return kamusView();
+  ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['jurnal','📒 Jurnal']);
+  $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
+    <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
+  pane();
+}
 document.querySelector('.tabs').insertAdjacentHTML('beforeend','<button id="t-kamus" onclick="setSec(\'kamus\')">📚 Kamus</button>');
 if(user)home();
 /* ===== END V6 ===== */
