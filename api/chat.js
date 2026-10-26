@@ -18,7 +18,8 @@ async function callGemini(key, system, messages, max, search) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(Number(process.env.CALL_TIMEOUT_MS || 20000))
   });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error?.message || String(r.status));
@@ -33,16 +34,19 @@ async function gemini(system, messages, max, search) {
   const keys = geminiKeys();
   if (!keys.length) throw new Error('Gemini: belum ada key');
   const start = Math.floor(Math.random() * keys.length);
-  const errs = [];
-  for (let i = 0; i < keys.length; i++) {
+  const errs = [], deadline = Date.now() + 40000;
+  const msg = e => (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout (Gemini terlalu lama menjawab)' : e.message;
+  for (let i = 0; i < keys.length && Date.now() < deadline; i++) {
     const key = keys[(start + i) % keys.length];
     try { return await callGemini(key, system, messages, max, search); }
     catch (e) {
-      errs.push(e.message);
-      if (search) { try { return await callGemini(key, system, messages, max, false); } catch (e2) { errs.push(e2.message); } }
+      errs.push(msg(e));
+      if (search && Date.now() < deadline && !/timeout/.test(msg(e))) {
+        try { return await callGemini(key, system, messages, max, false); } catch (e2) { errs.push(msg(e2)); }
+      }
     }
   }
-  throw new Error('Gemini (' + keys.length + ' key gagal): ' + [...new Set(errs)].join(' | ').slice(0, 300));
+  throw new Error('Gemini gagal: ' + [...new Set(errs)].join(' | ').slice(0, 300));
 }
 
 async function groq(system, messages, max) {
@@ -53,7 +57,8 @@ async function groq(system, messages, max) {
       model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
       max_tokens: max,
       messages: [{ role: 'system', content: system }, ...messages.map(m => ({ role: m.role, content: String(m.content) }))]
-    })
+    }),
+    signal: AbortSignal.timeout(15000)
   });
   const j = await r.json();
   if (!r.ok) throw new Error('Groq: ' + (j.error?.message || r.status));
