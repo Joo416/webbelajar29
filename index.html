@@ -1168,5 +1168,85 @@ function vqCheck(){
 }
 /* ===== END V7 ===== */
 </script>
+<script>
+/* ===== UPDATE V8: kamus penuh — terjemahan, suara, contoh untuk SETIAP kata & setiap definisi ===== */
+const POSID={noun:'kata benda',verb:'kata kerja',adjective:'kata sifat',adverb:'kata keterangan',pronoun:'kata ganti',preposition:'kata depan',conjunction:'kata sambung',interjection:'kata seru',exclamation:'kata seru',determiner:'kata penentu',article:'kata sandang',numeral:'kata bilangan',particle:'partikel',prefix:'awalan',suffix:'akhiran',contraction:'singkatan',phrase:'frasa',idiom:'idiom'};
+const dictR=async w=>{try{const r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w));if(r.status===404)return{d:null};if(!r.ok)return{err:'kamus membalas '+r.status};const j=await r.json();return{d:Array.isArray(j)?j:null}}catch(e){return{err:'tidak bisa terhubung ke kamus'}}};
+async function trans(text,from,to){
+  const key='ktr_'+from+to+'_'+text;try{const c=localStorage.getItem(key);if(c)return c}catch(e){}
+  let t='';
+  try{const j=await (await fetch(`https://api.mymemory.translated.net/get?langpair=${from}|${to}&q=${encodeURIComponent(text)}`)).json();
+    t=(j.responseStatus==null||+j.responseStatus===200)?(j.responseData&&j.responseData.translatedText||''):'';if(/MYMEMORY WARNING|INVALID|QUERY LENGTH/i.test(t))t=''}catch(e){}
+  if(!t){try{t=(await ai('You are a precise translator. Output ONLY the translation, nothing else.',[{role:'user',content:`Translate from ${from==='en'?'English':'Indonesian'} to ${to==='en'?'English':'Indonesian'}. Give the 1-3 most common equivalents separated by commas: ${text}`}],false,false)).trim().split('\n')[0]}catch(e){}}
+  if(t)try{localStorage.setItem(key,t)}catch(e){}
+  return t;
+}
+let KL=0,ksTok=0;
+function kSug(v){
+  clearTimeout(ksT);const my=++ksTok;v=v.trim();if(v.length<2){const e=$('ksug');if(e)e.innerHTML='';return}
+  ksT=setTimeout(async()=>{try{const r=await fetch('https://api.datamuse.com/sug?max=8&s='+encodeURIComponent(v)),j=await r.json();if(my!==ksTok||!$('ksug'))return;$('ksug').innerHTML=j.map(x=>chip(x.word)).join('')}catch(e){}},250);
+}
+function kGo(){const v=($('kq').value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[^a-z' -]/g,'').trim();if(v){KM.tab='cari';KM.w=v;kamusView()}}
+const spk=el=>speak(el.dataset.t);
+const spBtn=t=>`<button class="x" style="background:#262b55;color:#eef0ff" data-t="${esc(t)}" onclick="spk(this)">🔊</button>`;
+let ITEMS={};
+function fillEnr(j){
+  const ar=$('kar');if(ar&&j.arti)ar.textContent=j.arti;
+  document.querySelectorAll('.posid').forEach(e=>{const v=j.pos&&j.pos[e.dataset.pos];if(v)e.textContent='= '+v});
+  (j.items||[]).forEach(it=>{
+    const a=$('dfid_'+it.i);if(a&&it.id)a.innerHTML='🇮🇩 '+esc(it.id);
+    const dx=ITEMS[it.i]&&ITEMS[it.i].ex,box=$('dfex_'+it.i);let html='';
+    (it.ex||[]).forEach(x=>{if(!x||!x.en)return;
+      if(dx&&dx.toLowerCase().trim()===String(x.en).toLowerCase().trim()){const t=$('dfxt_'+it.i);if(t)t.textContent=x.id||''}
+      else html+=`<div style="margin-top:6px">“${esc(x.en)}” ${spBtn(x.en)}<div class="mut small">${esc(x.id||'')}</div></div>`});
+    if(box)box.innerHTML=html;
+  });
+}
+async function kEnrich(w,items){
+  const key='kenr_'+w;let j=null;try{j=JSON.parse(localStorage.getItem(key))}catch(e){}
+  if(!j){
+    try{const t=await ai('You are a dictionary enrichment assistant for Indonesian learners of English. Output ONLY valid JSON, no markdown.',[{role:'user',content:`Word: "${w}". Definitions (index|part of speech|definition|existing example):\n${items.map(x=>`${x.i}|${x.pos}|${x.def}|${x.ex||''}`).join('\n')}\n\nFor every index write "id" = a natural Indonesian translation of that definition, and "ex" = array of 2 short natural English example sentences using the word in THAT sense (reuse the existing example as the first one when present), each with an Indonesian translation. Also give "arti" = the most common Indonesian meaning(s) of the word (short) and "pos" = object mapping each part of speech to its short Indonesian equivalent. JSON: {"arti":"","pos":{"adjective":""},"items":[{"i":0,"id":"","ex":[{"en":"","id":""},{"en":"","id":""}]}]}`}],false,false,'',S.sec);
+      const m=t.match(/\{[\s\S]*\}/);j=JSON.parse(fixJ(m[0]));try{localStorage.setItem(key,JSON.stringify(j))}catch(e){}
+    }catch(e){document.querySelectorAll('[id^=dfid_]').forEach(x=>x.innerHTML=`<span class="mut">🇮🇩 terjemahan AI belum tersedia</span>`);const r=$('kretry');if(r)r.innerHTML=`<div class="exp">⚠️ Terjemahan & contoh AI gagal (${esc(e.message)}). <button class="x" onclick="kEnrich('${w}',ITEMLIST)">Coba lagi</button></div>`;return}
+  }
+  const r=$('kretry');if(r)r.innerHTML='';fillEnr(j);
+}
+let ITEMLIST=[];
+async function verbCard(w,d,base){
+  const vb=base||w,f=verbForms(vb),forms=[...new Set([f.v1,...f.v2.split('/'),...f.v3.split('/'),f.ing,f.s])],ph={};
+  await Promise.all(forms.map(async x=>{ph[x]=phon(x===w?d:await dict(x))}));
+  const cell=x=>x.split('/').map(y=>`<div style="margin-bottom:4px"><b>${esc(y)}</b> <button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(ph[y]&&ph[y].a||'')}','${esc(y)}')">🔊</button> <span class="mut small">${esc(ph[y]&&ph[y].t||'')}</span></div>`).join('');
+  return `<div class="card"><h3>🔁 Verb "${esc(f.v1)}" ${f.irr?'(irregular)':'(regular — bentuk dibuat dari aturan ejaan, cek ulang bila ragu)'}</h3>${IRRREV[w]?`<div class="mut small" style="margin-bottom:8px">"${esc(w)}" adalah bentuk lampau/participle dari "${esc(base)}".</div>`:''}
+  ${['v1','v2','v3','ing','s'].map(k=>`<div class="exp" style="margin-bottom:10px;color:var(--tx)"><div style="color:var(--b);font-weight:700">${USE[k][0]}</div><div style="margin:6px 0">${cell(f[k])}</div><div class="small"><b>Kapan dipakai:</b> ${esc(USE[k][1])}</div><div class="small mut" style="margin-top:4px"><b>Pola:</b> ${esc(USE[k][2])}</div><div id="ex_${k}" class="small" style="margin-top:8px"><span class="mut">⏳ contoh kalimat...</span></div></div>`).join('')}<div id="ex_tip"></div></div>`;
+}
+async function kLookup(w){
+  const my=++KL,box=$('kbody'),live=()=>my===KL&&$('kbody');
+  box.innerHTML='<div class="card">⏳ Mencari...</div>';addHist(w);
+  const base=IRRMAP[w]?w:IRRREV[w]||null;
+  const [R,tr]=await Promise.all([dictR(w),trans(w,'en','id'),loadWords()]);if(!live())return;
+  const d=R.d;
+  if(R.err&&!base){box.innerHTML=`<div class="card">⚠️ Gagal memuat "<b>${esc(w)}</b>": ${esc(R.err)}.<button class="btn full" onclick="kLookup('${esc(w).replace(/'/g,'')}')">🔄 Coba lagi</button></div>`;return}
+  if(!d&&!base){
+    let sg=[],en='';try{[sg,en]=await Promise.all([fetch('https://api.datamuse.com/words?max=8&sp='+encodeURIComponent(w)).then(r=>r.json()).catch(()=>[]),trans(w,'id','en')])}catch(e){}
+    if(!live())return;
+    const ens=(en||'').split(/[,;]/).map(x=>x.trim().toLowerCase()).filter(x=>x&&x!==w&&/^[a-z' -]+$/.test(x));
+    box.innerHTML=`<div class="card">Kata "<b>${esc(w)}</b>" tidak ditemukan di kamus Inggris.${ens.length?`<div style="margin-top:10px">🇮🇩→🇬🇧 Jika "${esc(w)}" bahasa Indonesia, terjemahan Inggrisnya: ${ens.map(chip).join('')}</div>`:''}${sg.length?`<div style="margin-top:10px">Mungkin maksudmu: ${sg.map(x=>chip(x.word)).join('')}</div>`:''}</div>`;return}
+  const p=phon(d),ms=(d||[]).flatMap(e=>e.meanings||[]);let k=0;const items=[];ITEMS={};
+  const defs=ms.map(m=>{if(k>=12)return'';const pos=m.partOfSpeech;
+    const rows=(m.definitions||[]).slice(0,3).map(x=>{if(k>=12)return'';const i=k++;items.push({i,pos,def:x.definition,ex:x.example||''});ITEMS[i]={ex:x.example||''};
+      return `<div class="small" style="margin:10px 0 10px 4px">• ${esc(x.definition)}<div id="dfid_${i}" class="mut" style="margin-top:3px">🇮🇩 <i>menerjemahkan...</i></div>${x.example?`<div class="mut" style="margin-top:4px">“${esc(x.example)}” ${spBtn(x.example)}<div id="dfxt_${i}" class="small"></div></div>`:''}<div id="dfex_${i}"></div></div>`}).join('');
+    return `<div style="margin-bottom:14px"><i style="color:var(--b);font-size:1.05rem">${esc(pos)}</i> <span class="mut small">· ${esc(POSID[pos]||'')} <span class="posid" data-pos="${esc(pos)}"></span></span>${rows}${(m.synonyms||[]).length?`<div class="mut small">Sinonim: ${esc(m.synonyms.slice(0,6).join(', '))}</div>`:''}</div>`}).join('');
+  ITEMLIST=items;
+  const vb=base||(d&&d.some(e=>(e.meanings||[]).some(m=>m.partOfSpeech==='verb'))?w:null);
+  const vf=vb?await verbCard(w,d,base):'';if(!live())return;
+  const saved=(S.kw||[]).some(x=>x.w===w);
+  box.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(w)}</h2><span class="mut">${esc(p.t)}</span><button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(p.a)}','${esc(w)}')">🔊 Dengar</button><button id="ksv" class="x" style="background:#262b55;color:#eef0ff" onclick="saveWord('${esc(w)}',${JSON.stringify(tr||'').replace(/"/g,'&quot;')})">${saved?'★ Tersimpan':'☆ Simpan'}</button></div>
+    <div style="margin:10px 0">🇮🇩 <b id="kar">${esc(tr||'…')}</b> <span class="mut small">(arti umum, cek ulang)</span></div>${defs||'<div class="mut small">Definisi tidak tersedia untuk bentuk kata ini.</div>'}<div id="kretry"></div>
+    <button class="btn alt full" onclick="kAI('${esc(w).replace(/'/g,'')}')">🤖 Penjelasan tambahan, kolokasi & kesalahan umum</button><div id="kai"></div></div>${vf}`;
+  if(items.length)kEnrich(w,items);
+  if(vb)kExamples(vb,verbForms(vb));
+}
+/* ===== END V8 ===== */
+</script>
 </body>
 </html>
