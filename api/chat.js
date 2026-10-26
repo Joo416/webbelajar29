@@ -1,21 +1,48 @@
 // Vercel Serverless Function: /api/chat
-// Urutan AI: Gemini (GEMINI_API_KEY) -> Groq (GROQ_API_KEY). Jika satu gagal, pakai berikutnya.
-async function gemini(system, messages, max) {
+// Gemini (banyak key, rotasi otomatis, Google Search) -> cadangan Groq.
+// Env: GEMINI_API_KEYS="key1,key2,key3,key4,key5" (atau GEMINI_API_KEY_1.._10), GROQ_API_KEY, GEMINI_MODEL, GROQ_MODEL
+function geminiKeys() {
+  const raw = [process.env.GEMINI_API_KEYS || '', process.env.GEMINI_API_KEY || '',
+    ...Array.from({ length: 10 }, (_, i) => process.env['GEMINI_API_KEY_' + (i + 1)] || '')].join(',');
+  return [...new Set(raw.split(/[\s,]+/).filter(Boolean))];
+}
+
+async function callGemini(key, system, messages, max, search) {
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] })),
+    generationConfig: { maxOutputTokens: max }
+  };
+  if (search) body.tools = [{ google_search: {} }];
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] })),
-      generationConfig: { maxOutputTokens: max }
-    })
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify(body)
   });
   const j = await r.json();
-  if (!r.ok) throw new Error('Gemini: ' + (j.error?.message || r.status));
-  const t = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
-  if (!t) throw new Error('Gemini: jawaban kosong');
-  return t;
+  if (!r.ok) throw new Error(j.error?.message || String(r.status));
+  const cand = j.candidates?.[0];
+  const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
+  if (!text) throw new Error('jawaban kosong');
+  const sources = (cand?.groundingMetadata?.groundingChunks || []).filter(c => c.web?.uri).map(c => ({ title: c.web.title || 'sumber', uri: c.web.uri }));
+  return { text, sources, provider: 'gemini' };
+}
+
+async function gemini(system, messages, max, search) {
+  const keys = geminiKeys();
+  if (!keys.length) throw new Error('Gemini: belum ada key');
+  const start = Math.floor(Math.random() * keys.length);
+  const errs = [];
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[(start + i) % keys.length];
+    try { return await callGemini(key, system, messages, max, search); }
+    catch (e) {
+      errs.push(e.message);
+      if (search) { try { return await callGemini(key, system, messages, max, false); } catch (e2) { errs.push(e2.message); } }
+    }
+  }
+  throw new Error('Gemini (' + keys.length + ' key gagal): ' + [...new Set(errs)].join(' | ').slice(0, 300));
 }
 
 async function groq(system, messages, max) {
@@ -32,18 +59,16 @@ async function groq(system, messages, max) {
   if (!r.ok) throw new Error('Groq: ' + (j.error?.message || r.status));
   const t = j.choices?.[0]?.message?.content || '';
   if (!t) throw new Error('Groq: jawaban kosong');
-  return t;
+  return { text: t, sources: [], provider: 'groq' };
 }
 
 async function verify(req) {
   const h = req.headers.authorization || '';
   const tk = h.startsWith('Bearer ') ? h.slice(7) : '';
-  if (!tk) return false;
+  if (!tk) return null;
   const key = process.env.FIREBASE_API_KEY || 'AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w';
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + key, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken: tk })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: tk })
   });
   if (!r.ok) return null;
   const j = await r.json();
@@ -52,25 +77,20 @@ async function verify(req) {
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Hanya POST' });
-  const uid = await verify(req);
-  if (!uid) return res.status(401).json({ error: 'Silakan login dulu' });
-  const { system = '', messages = [], big = false } = req.body || {};
+  if (!(await verify(req))) return res.status(401).json({ error: 'Silakan login dulu' });
+  const { system = '', messages = [], big = false, search = false } = req.body || {};
   if (!Array.isArray(messages) || !messages.length || JSON.stringify(messages).length > 30000)
     return res.status(400).json({ error: 'Pesan tidak valid atau terlalu panjang' });
 
   const providers = [];
-  if (process.env.GEMINI_API_KEY) providers.push(gemini);
+  if (geminiKeys().length) providers.push(gemini);
   if (process.env.GROQ_API_KEY) providers.push(groq);
-  if (!providers.length) return res.status(500).json({ error: 'API key belum diatur di Vercel (GEMINI_API_KEY atau GROQ_API_KEY)' });
+  if (!providers.length) return res.status(500).json({ error: 'API key belum diatur di Vercel (GEMINI_API_KEYS atau GROQ_API_KEY)' });
 
   const errors = [];
   for (const p of providers) {
-    try {
-      const text = await p(system, messages, big ? 8000 : 2000);
-      return res.status(200).json({ text });
-    } catch (e) {
-      errors.push(e.message);
-    }
+    try { return res.status(200).json(await p(system, messages, big ? 8000 : 2000, !!search)); }
+    catch (e) { errors.push(e.message); }
   }
   res.status(500).json({ error: errors.join(' | ') });
 };
