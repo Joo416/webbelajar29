@@ -456,17 +456,18 @@ async function delJ(id){if(!confirm('Hapus trade ini?'))return;await db.collecti
 </script>
 <script>
 /* ===== UPDATE V4 ===== */
-async function ai(system,messages,big,search){
+async function ai(system,messages,big,search,q){
   const tk=await user.getIdToken();
   const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
-  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:true})})}
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||''})})}
   catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi, atau matikan Google Search.':e.message)}finally{clearTimeout(to)}
   let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel (kemungkinan timeout atau fungsi error).')}
   if(!r.ok)throw new Error(j.error||'AI gagal');
   let t=j.text;
-  if(!big){
+  if(search&&!big){
     if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber Google:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).replace(/[|\]]/g,' ')}|${s.uri}]]`).join('\n');
     else if(j.grounded===false)t+='\n\n⚠️ Google Search tidak tersedia untuk jawaban ini.';
+    if(j.videos&&j.videos.length)t+='\n\n🎬 Video belajar (rekomendasi, bukan sumber fakta):\n'+j.videos.slice(0,4).map(v=>`[[${String(v.title).replace(/[|\]]/g,' ')}|${v.uri}]]`).join('\n');
   }
   return t;
 }
@@ -481,12 +482,12 @@ async function send(){
   const v=$('ci').value.trim();if(!v)return;$('ci').value='';
   const c=S.chat[S.mapel]=S.chat[S.mapel]||[];c.push({role:'user',content:v},{role:'assistant',content:'⏳ Mencari & berpikir...'});drawChat();
   let h=c.slice(0,-1).filter(m=>!m.content.startsWith('⚠️')).slice(-12);while(h.length&&h[0].role!=='user')h.shift();
-  try{c[c.length-1].content=await ai(tutorSys(),h,false,true)}catch(e){c[c.length-1].content='⚠️ '+e.message}
+  try{c[c.length-1].content=await ai(tutorSys(),h,false,true,S.mapel+': '+v)}catch(e){c[c.length-1].content='⚠️ '+e.message}
   if($('chat'))drawChat();
 }
 async function explain(k){
-  const q=S.qs[S.i];$('aiexp').innerHTML='<div class="exp">⏳ Tutor AI mencari & menjelaskan...</div>';
-  try{const t=await ai(tutorSys(),[{role:'user',content:`Jelaskan langkah demi langkah kenapa jawaban soal ini benar, dan kenapa pilihan saya (${String.fromCharCode(65+k)}) ${k===q.a?'sudah benar':'salah'}.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>String.fromCharCode(65+i)+'. '+o).join(' | ')}\nJawaban benar: ${String.fromCharCode(65+q.a)}`}],false,true);
+  const q=S.qs[S.i];$('aiexp').innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
+  try{const t=await ai(tutorSys(),[{role:'user',content:`Jelaskan langkah demi langkah kenapa jawaban soal ini benar, dan kenapa pilihan saya (${String.fromCharCode(65+k)}) ${k===q.a?'sudah benar':'salah'}.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>String.fromCharCode(65+i)+'. '+o).join(' | ')}\nJawaban benar: ${String.fromCharCode(65+q.a)}`}],false,false);
     $('aiexp').innerHTML=`<div class="exp">${fmt(t)}</div>`;
   }catch(e){$('aiexp').innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
 }
@@ -519,9 +520,17 @@ async function gen(){
   const sys=`Kamu pembuat soal ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar,"e":"pembahasan singkat langkah demi langkah"}. ${jt} Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, fakta akurat, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada duplikat. Rumus matematika ditulis LaTeX di antara \\( dan \\); semua backslash di dalam JSON wajib digandakan.${se?' Verifikasi fakta dengan Google Search dan jadikan hasilnya patokan kebenaran jawaban.':''}`;
   $('gb').disabled=true;$('gm').textContent=`⏳ AI sedang membuat ${n} soal...`;
   try{
-    const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nJenis: ${jn}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true,se)));
+    const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nJenis: ${jn}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true,se,S.mapel+' '+topik)));
     let all=[];out.forEach(t=>{const m=t.match(/\[[\s\S]*\]/);if(m)try{all=all.concat(JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\')).map(normQ).filter(Boolean))}catch(e){}});
-    S.gen=all;$('gm').textContent=all.length?`✅ ${all.length} soal siap. Periksa, hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
+    let vf=false;
+    if(all.length){$('gm').textContent='🔎 Memverifikasi silang jawaban dengan sumber...';
+      try{const ch=[];for(let i=0;i<all.length;i+=10)ch.push(all.slice(i,i+10));
+        const vs=`Kamu pemeriksa soal ${S.mapel}. Periksa setiap soal terhadap sumber pencarian dan pengetahuan yang valid. Perbaiki kunci jawaban dan pembahasan yang salah, buang soal yang ambigu atau tidak bisa dipastikan. Keluarkan HANYA JSON array valid dengan format item yang sama ({"q","o","a","e"}, tambah "tipe":"bs" untuk Benar/Salah), tanpa teks lain. Backslash di JSON wajib digandakan.`;
+        const vr=await Promise.all(ch.map(cc=>ai(vs,[{role:'user',content:JSON.stringify(cc)}],true,true,S.mapel+' '+topik)));
+        let ok=[];vr.forEach(t=>{const m=t.match(/\[[\s\S]*\]/);if(m)try{ok=ok.concat(JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\')).map(normQ).filter(Boolean))}catch(e){}});
+        if(ok.length){all=ok;vf=true}
+      }catch(e){}}
+    S.gen=all;$('gm').textContent=all.length?`✅ ${all.length} soal siap${vf?' (sudah diverifikasi silang dengan sumber)':' (verifikasi silang gagal, periksa manual)'}. Hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
   }catch(e){$('gm').textContent='⚠️ '+e.message}
   $('gb').disabled=false;drawGen();
 }
@@ -561,7 +570,7 @@ function pick(k){
   if(S.exam){S.i++;return show()}
   const bs=document.querySelectorAll('.opt');bs.forEach((b,i)=>{b.disabled=true;if(i===q.a)b.classList.add('ok')});if(k!==q.a)bs[k].classList.add('no');
   $('fb').innerHTML=`${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}<div id="aiexp"></div>
-    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="explain(${k})">🤖 Jelaskan (Google)</button><button class="btn" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Hasil'}</button></div>`;
+    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="explain(${k})">🤖 Jelaskan lebih detail</button><button class="btn" onclick="S.i++;show()">${S.i+1<S.qs.length?'Lanjut ▶':'Hasil'}</button></div>`;
 }
 async function finish(){
   clearInterval(S.tm);const t=S.qs.length,p=Math.round(S.score/t*100),w=S.wrong;
@@ -602,6 +611,162 @@ function showMapel(i){
     ${wl.length?`<button class="btn full" onclick="S.sec=S.att[0].kategori;S.mapel=${JSON.stringify(m).replace(/"/g,'&quot;')};S.wrong=S.wl;retry()">🔁 Latih soal-soal ini</button>`:''}</div>`;
 }
 /* ===== END V4 ===== */
+</script>
+<script>
+/* ===== UPDATE V5 ===== */
+document.head.insertAdjacentHTML('beforeend','<style>.opt.sel{border-color:var(--a);background:#1d2250}.nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.nb{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#12152e;color:var(--tx);cursor:pointer;font-size:.8rem}.nb.done{background:#12352f;border-color:var(--b)}.nb.flag{border-color:#ffd48a;background:#3a2a10}.nb.cur{outline:2px solid var(--a)}a{word-break:break-all}.btn:disabled{opacity:.4}</style>');
+let SRC=[],LT=0,RV={};
+const hostOf=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return u}};
+const optL=(i)=>String.fromCharCode(65+i);
+const srcLinks=x=>x.src&&x.src.length?`<div class="small" style="margin-top:8px">📚 Sumber: ${x.src.map(s=>`<a href="${esc(s.uri)}" target="_blank" rel="noopener" style="color:var(--b)">${esc(hostOf(s.uri))}</a>`).join(' • ')}</div>`:'';
+
+async function ai(system,messages,big,search,q,cat){
+  const tk=await user.getIdToken();
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||'',cat:cat||S.sec})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
+  if(!r.ok)throw new Error(j.error||'AI gagal');
+  let t=j.text;
+  if(search){(j.sources||[]).forEach(s=>{if(!SRC.some(x=>x.uri===s.uri))SRC.push(s)});LT=Math.max(LT,j.trusted||0)}
+  if(search&&!big){
+    if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).replace(/[|\]]/g,' ')}|${s.uri}]]`).join('\n');
+    else if(j.grounded===false)t+='\n\n⚠️ Tidak ada sumber terpercaya yang ditemukan; jawaban ini dari pengetahuan AI, cek ulang sebelum dipakai.';
+  }
+  return t;
+}
+
+/* ---- penjelasan AI kenapa salah ---- */
+const whyPrompt=(q,k)=>`${k===q.a?'Siswa menjawab BENAR. Jelaskan singkat konsep di balik jawaban ini dan jebakan pengecohnya.':k<0?'Siswa TIDAK menjawab soal ini. Jelaskan cara berpikir untuk menjawabnya dan kenapa kunci benar.':'Siswa menjawab SALAH. Jelaskan: (1) kenapa pilihan siswa ('+optL(k)+') salah, (2) kenapa kunci ('+optL(q.a)+') benar, (3) tips agar tidak keliru lagi.'} Jangan mengubah kunci jawaban.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>optL(i)+'. '+o).join(' | ')}\nKunci: ${optL(q.a)}\nPembahasan awal: ${q.e||'-'}`;
+async function explainAuto(force){
+  const q=S.qs[S.i],k=S.sel[S.i];if(k==null||(q.aiw&&!force))return;const b=()=>$('aiexp');
+  if(b())b().innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
+  try{const t=await ai(tutorSys(),[{role:'user',content:whyPrompt(q,k)}],false,false);q.aiw=t;if(S.qs[S.i]===q&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
+  catch(e){if(b())b().innerHTML=`<div class="exp">⚠️ ${esc(e.message)} <button class="x" onclick="explainAuto(true)">Coba lagi</button></div>`}
+}
+async function whyReview(id){
+  const o=RV[id],x=o.x,b=$('w_'+id);if(b)b.innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
+  try{x.aiw=await ai(tutorSys(),[{role:'user',content:whyPrompt(x,x.pick)}],false,false);if(b)b.innerHTML=`<div class="exp">🤖 ${fmt(x.aiw)}</div>`;if(o.save)o.save()}
+  catch(e){if(b)b.innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
+}
+async function explainAll(){const ids=Object.keys(RV).filter(i=>!RV[i].x.aiw&&RV[i].x.pick!==RV[i].x.a).slice(0,10);for(const i of ids)await whyReview(i)}
+function qCard(x,id,save){
+  RV[id]={x,save};const ok=x.pick===x.a;
+  return `<div class="card"><b>${ok?'✅':'❌'} ${esc(x.q)}</b>${x.o.map((o,k)=>`<div class="small" style="padding:4px 0;color:${k===x.a?'var(--b)':k===x.pick?'var(--bad)':'var(--mut)'}">${k===x.a?'✔ ':k===x.pick?'✘ ':'• '}${esc(o)}${k===x.pick?' <i>(jawabanmu)</i>':''}</div>`).join('')}${x.pick<0?'<div class="small" style="color:var(--bad)">Tidak dijawab</div>':''}${x.e?`<div class="exp">💡 ${esc(x.e)}</div>`:''}${srcLinks(x)}<div id="w_${id}">${x.aiw?`<div class="exp">🤖 ${fmt(x.aiw)}</div>`:''}</div>${ok||x.aiw?'':`<button class="btn alt full" onclick="whyReview('${id}')">🤖 Kenapa jawabanku salah?</button>`}</div>`;
+}
+
+/* ---- mesin kuis: navigasi, ragu, timer, lanjutkan ---- */
+const progKey=()=>'prog_'+user.uid;
+const clearProg=()=>{try{localStorage.removeItem(progKey())}catch(e){}};
+function saveProg(){try{localStorage.setItem(progKey(),JSON.stringify({qs:S.qs,i:S.i,sel:S.sel,flag:S.flag,exam:S.exam,left:S.left,mapel:S.mapel,sec:S.sec,retry:S.retry}))}catch(e){}}
+function startTimer(){clearInterval(S.tm);if(!S.exam)return;S.tm=setInterval(()=>{S.left--;const e=$('tmr');if(e)e.textContent=fmtT(S.left);if(S.left<=0)finish()},1000)}
+function pLatihan(){
+  let pr=null;try{pr=JSON.parse(localStorage.getItem(progKey()))}catch(e){}
+  $('pane').innerHTML=`${pr&&pr.qs?`<div class="card"><h3>⏯ Latihan belum selesai</h3><div class="mut small">${esc(pr.mapel)} • ${pr.sel.filter(v=>v!=null).length}/${pr.qs.length} terjawab</div><div class="row"><button class="btn full" onclick="resume()">Lanjutkan</button><button class="btn alt full" onclick="clearProg();pLatihan()">Buang</button></div></div>`:''}
+    <div class="card"><h3>Mulai latihan: ${esc(S.mapel)}</h3>
+    ${isUmum()?'':`<label>Subtopik (opsional)</label><input id="sub" placeholder="kosong = semua, contoh: pecahan" value="${esc(S.sub||'')}">
+    <label>Jenis soal</label><select id="lt"><option value="">Semua</option><option value="pg">Pilihan ganda</option><option value="bs">Benar/Salah</option></select>`}
+    <label>Jumlah soal</label><select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="ex" style="width:18px"> Mode ujian (timer, bisa pindah soal, pembahasan setelah selesai)</label>
+    <button class="btn full" onclick="start()">Mulai ▶</button><div id="msg" class="mut small" style="margin-top:10px"></div></div>
+    <div class="card"><h3>📊 Statistik <span class="mut small">(ketuk untuk detail)</span></h3><div id="stat" class="mut">Memuat...</div></div>
+    <div class="card"><h3>🏆 Riwayat <span class="mut small">(ketuk untuk lihat soal)</span></h3><div id="hist" class="mut">Memuat...</div></div>`;
+  loadHist();
+}
+async function loadQs2(n){
+  if(isUmum())return loadQs(n);
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+  let a=s.docs.map(d=>d.data()),sub=(S.sub||'').toLowerCase();
+  if(sub)a=a.filter(x=>(x.sub||'').toLowerCase().includes(sub));
+  if(S.jenis==='bs')a=a.filter(x=>x.tipe==='bs');if(S.jenis==='pg')a=a.filter(x=>x.tipe!=='bs');
+  return shuffle(a).slice(0,n).map(q=>{if(q.tipe==='bs')return q;const c=q.o[q.a],o=shuffle(q.o);return{...q,o,a:o.indexOf(c)}});
+}
+async function start(){
+  S.sub=$('sub')?$('sub').value.trim():'';S.jenis=$('lt')?$('lt').value:'';const ex=$('ex').checked;$('msg').textContent='Memuat soal...';
+  try{const qs=await loadQs2(+$('n').value);
+    if(!qs.length){$('msg').textContent='Tidak ada soal (cek subtopik/jenis soal atau buat soal dulu).';return}
+    if(qs.length<+$('n').value)alert(`Hanya ${qs.length} soal tersedia untuk pilihan ini.`);
+    Object.assign(S,{qs,i:0,sel:Array(qs.length).fill(null),flag:[],exam:ex,retry:false,left:Math.ceil(qs.length*90)});startTimer();show();
+  }catch(e){$('msg').textContent='Gagal: '+e.message}
+}
+function resume(){try{const p=JSON.parse(localStorage.getItem(progKey()));Object.assign(S,p);startTimer();show()}catch(e){clearProg();home()}}
+function retry(){const w=S.wrong.map(({pick,...q})=>q);Object.assign(S,{qs:shuffle(w),i:0,sel:Array(w.length).fill(null),flag:[],exam:false,retry:true});clearInterval(S.tm);show()}
+function quit(){if(confirm('Keluar dari latihan? Progres tersimpan dan bisa dilanjutkan dari menu Latihan.')){clearInterval(S.tm);S.tab='latihan';home()}}
+function go(d){S.i=Math.max(0,Math.min(S.qs.length-1,S.i+d));show()}
+function pick(k){const i=S.i;if(!S.exam&&S.sel[i]!=null)return;S.sel[i]=k;show()}
+function confirmFinish(){const u=S.sel.filter(v=>v==null).length;if(u&&!confirm(u+' soal belum dijawab (dihitung salah). Selesai sekarang?'))return;finish()}
+function fbHtml(q){return `${q.e?`<div class="exp">💡 ${esc(q.e)}</div>`:''}${srcLinks(q)}<div id="aiexp">${q.aiw?`<div class="exp">🤖 ${fmt(q.aiw)}</div>`:''}</div><button class="btn alt full" onclick="explainAuto(true)">🤖 Jelaskan lebih detail</button>`}
+function show(){
+  const i=S.i,q=S.qs[i],sel=S.sel[i],rev=!S.exam&&sel!=null,last=i+1>=S.qs.length;
+  $('app').innerHTML=`<div class="card"><div class="mut small" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>${esc(S.mapel)} • ${i+1}/${S.qs.length}${S.retry?' • ulangi salah':''}</span><span>${S.exam?`<b id="tmr">${fmtT(S.left)}</b> `:''}<button class="x" style="background:#262b55;color:#eef0ff" onclick="quit()">✕ Keluar</button></span></div>
+    <div class="bar"><i style="width:${S.sel.filter(v=>v!=null).length/S.qs.length*100}%"></i></div><div class="q">${esc(q.q)}</div>
+    ${q.o.map((o,k)=>`<button class="opt ${rev?(k===q.a?'ok':k===sel?'no':''):(sel===k?'sel':'')}" ${rev?'disabled':''} onclick="pick(${k})">${optL(k)}. ${esc(o)}</button>`).join('')}
+    <div id="fb">${rev?fbHtml(q):''}</div>
+    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="go(-1)" ${i?'':'disabled'}>◀ Sebelumnya</button>${S.exam?`<button class="btn alt" onclick="S.flag[${i}]=!S.flag[${i}];show()">${S.flag[i]?'🚩 Ragu':'🏳 Ragu?'}</button>`:''}<button class="btn" onclick="${last?'confirmFinish()':'go(1)'}">${last?'Selesai ✔':'Lanjut ▶'}</button></div>
+    ${S.exam?`<div class="nav">${S.qs.map((_,k)=>`<button class="nb ${k===i?'cur':''} ${S.sel[k]!=null?'done':''} ${S.flag[k]?'flag':''}" onclick="S.i=${k};show()">${k+1}</button>`).join('')}</div><button class="btn alt full" onclick="confirmFinish()">Kumpulkan sekarang</button>`:''}</div>`;
+  saveProg();
+  if(rev&&sel!==q.a&&!q.aiw)explainAuto();
+}
+async function finish(){
+  clearInterval(S.tm);clearProg();RV={};
+  const ans=S.qs.map((q,i)=>({q:q.q,o:q.o,a:q.a,pick:S.sel[i]==null?-1:S.sel[i],e:q.e||'',tipe:q.tipe||'pg',src:(q.src||[]).slice(0,3),aiw:q.aiw||''}));
+  S.ans=ans;S.score=ans.filter(x=>x.pick===x.a).length;const t=ans.length,p=Math.round(S.score/t*100),w=ans.filter(x=>x.pick!==x.a);S.wrong=w;S.curId=null;
+  const na=w.filter(x=>x.pick<0).length;
+  $('app').innerHTML=`<div class="card"><div class="big">${p}</div><div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}${S.exam?' • mode ujian':''}${na?` • ${na} tidak dijawab`:''}</div>
+    ${w.length?`<button class="btn full" onclick="retry()">🔁 Ulangi ${w.length} soal yang salah</button><button class="btn alt full" onclick="explainAll()">🤖 Jelaskan semua yang salah</button>`:'<div style="text-align:center;margin-top:10px">🎉 Semua benar!</div>'}<button class="btn alt full" onclick="S.tab='latihan';home()">Kembali</button></div>
+    ${w.map((x,i)=>qCard(x,'f'+i,()=>{if(S.curId)db.collection('hasil').doc(S.curId).update({detail:S.ans}).catch(()=>{})})).join('')}`;
+  if(!S.retry)try{const r=await db.collection('hasil').add({uid:user.uid,kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,mode:S.exam?'ujian':'latihan',detail:ans,waktu:firebase.firestore.FieldValue.serverTimestamp()});S.curId=r.id}catch(e){console.error(e)}
+}
+function showAttempt(id,f){
+  const h=S.att.find(x=>x.id===id);if(!h)return;f=f||'semua';const d=h.detail||[],ok=x=>x.pick===x.a;RV={};
+  const list=d.filter(x=>f==='semua'||(f==='salah'?!ok(x):ok(x)));
+  $('app').innerHTML=`<div class="card"><button class="btn alt" onclick="home()">← Kembali</button><h3 style="margin-top:14px">${esc(h.mapel)} • ${h.skor}/${h.total}</h3><div class="mut small">${dt(h)}${h.mode==='ujian'?' • mode ujian':''}</div>
+    ${d.length?`<div class="row" style="margin-top:12px">${['semua','salah','benar'].map(k=>`<button class="btn ${f===k?'':'alt'}" style="padding:9px 4px" onclick="showAttempt('${id}','${k}')">${k==='semua'?'Semua ('+d.length+')':k==='salah'?'❌ ('+d.filter(x=>!ok(x)).length+')':'✅ ('+d.filter(ok).length+')'}</button>`).join('')}</div>
+    ${d.some(x=>!ok(x))?`<button class="btn full" onclick="redoWrong('${id}')">🔁 Latih ulang soal yang salah</button>`:''}`:'<div class="mut" style="margin-top:12px">Detail soal tidak tersedia untuk latihan lama ini.</div>'}</div>
+    ${list.map((x,i)=>qCard(x,'h'+i,()=>db.collection('hasil').doc(id).update({detail:d}).catch(()=>{}))).join('')}`;
+}
+
+/* ---- Bank soal: sumber + ekspor ---- */
+function drawBank(){
+  $('bl').innerHTML=S.bank.length?`<div class="small" style="margin-bottom:8px">${S.bank.length} soal</div>`+S.bank.map(x=>x.id===S.edit?editForm(x):`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(x.o[x.a])}${x.sub?' • 🏷 '+esc(x.sub):''}${x.sumber==='ai'?' • 🤖':''}${x.src&&x.src.length?' • 📚 '+x.src.length+' sumber':''}</div></div><button class="x" style="background:#262b55;color:#eef0ff" onclick="S.edit='${x.id}';drawBank()">✏️</button><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join('')+`<button class="btn alt full" onclick="expBank()">⬇️ Ekspor JSON (cadangan)</button><button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Soal atau tambah manual.';
+}
+function expBank(){const b=new Blob([JSON.stringify(S.bank.map(({id,uid,...r})=>r),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='bank-'+S.mapel.replace(/\W/g,'')+'.json';a.click()}
+
+/* ---- Buat soal: sumber terpercaya + verifikasi silang ---- */
+const parseQs=t=>{const m=t.match(/\[[\s\S]*\]/);if(!m)return[];try{return JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\')).map(normQ).filter(Boolean)}catch(e){return[]}};
+async function gen(){
+  const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
+  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),parts=[];
+  for(let l=n;l>0;l-=10)parts.push(Math.min(10,l));SRC=[];LT=0;
+  const jt={'Pilihan ganda':'SEMUA soal pilihan ganda dengan 4 opsi (tanpa field tipe).','Benar/Salah':'SEMUA soal Benar/Salah: "q" berupa pernyataan, "o":["Benar","Salah"], "a" 0 jika pernyataan benar atau 1 jika salah, dan tambah "tipe":"bs".','Campuran':'Campuran pilihan ganda (4 opsi) dan Benar/Salah, kira-kira setengah-setengah; soal Benar/Salah memakai "o":["Benar","Salah"], "a" 0/1, "tipe":"bs".'}[jn];
+  const sys=`Kamu pembuat soal ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar,"e":"pembahasan singkat langkah demi langkah"}. ${jt} Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, SETIAP fakta dan kunci jawaban harus didukung sumber tepercaya yang diberikan (utamakan ★resmi), jangan membuat soal dari fakta yang tidak bisa dipastikan, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada duplikat. Rumus matematika ditulis LaTeX di antara \\( dan \\); semua backslash di dalam JSON wajib digandakan.`;
+  $('gb').disabled=true;$('gm').textContent=`⏳ Mengumpulkan sumber terpercaya & membuat ${n} soal...`;
+  try{
+    const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nJenis: ${jn}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true,true,S.mapel+' '+topik)));
+    let all=[];out.forEach(t=>{all=all.concat(parseQs(t))});
+    let vf=false;
+    if(all.length){$('gm').textContent='🔎 Memverifikasi silang jawaban dengan sumber...';
+      try{const vs=`Kamu pemeriksa soal ${S.mapel}. Periksa setiap soal terhadap sumber tepercaya yang diberikan. Perbaiki kunci jawaban dan pembahasan yang salah, buang soal yang ambigu atau tidak bisa dipastikan dari sumber. Keluarkan HANYA JSON array valid dengan format item yang sama ({"q","o","a","e"}, tambah "tipe":"bs" untuk Benar/Salah), tanpa teks lain. Backslash di JSON wajib digandakan.`;
+        const ch=[];for(let i=0;i<all.length;i+=10)ch.push(all.slice(i,i+10));
+        const vr=await Promise.all(ch.map(cc=>ai(vs,[{role:'user',content:JSON.stringify(cc)}],true,true,S.mapel+' '+topik)));
+        let ok=[];vr.forEach(t=>{ok=ok.concat(parseQs(t))});if(ok.length){all=ok;vf=true}
+      }catch(e){}}
+    const src=SRC.filter(s=>/^https?:/.test(s.uri)).slice(0,4).map(s=>({title:String(s.title).slice(0,80),uri:s.uri}));
+    S.gen=all.map(x=>({...x,src}));
+    $('gm').textContent=all.length?`✅ ${all.length} soal siap${vf?' (terverifikasi silang)':' (verifikasi silang gagal, periksa manual)'}${LT?` • ${LT} sumber resmi dipakai`:' • ⚠️ tidak ada sumber resmi ditemukan, periksa manual'}. Hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
+  }catch(e){$('gm').textContent='⚠️ '+e.message}
+  $('gb').disabled=false;drawGen();
+}
+function drawGen(){
+  if(!$('gres'))return;
+  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div><b>${i+1}. ${esc(x.q)}</b><div class="mut">${x.o.map((o,k)=>(k===x.a?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e)}</div>${i===0?srcLinks(x):''}</div><button class="x" onclick="S.gen.splice(${i},1);drawGen()">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
+}
+document.addEventListener('keydown',e=>{
+  if(!document.querySelector('.opt')||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+  const k='abcd'.indexOf(e.key.toLowerCase()),n='1234'.indexOf(e.key),x=k>=0?k:n;
+  if(x>=0&&x<S.qs[S.i].o.length)pick(x);else if(e.key==='ArrowRight'&&S.i+1<S.qs.length)go(1);else if(e.key==='ArrowLeft')go(-1);
+});
+/* ===== END V5 ===== */
 </script>
 </body>
 </html>
