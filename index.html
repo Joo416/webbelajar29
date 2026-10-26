@@ -459,14 +459,14 @@ async function delJ(id){if(!confirm('Hapus trade ini?'))return;await db.collecti
 async function ai(system,messages,big,search){
   const tk=await user.getIdToken();
   const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
-  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search})})}
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:true})})}
   catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi, atau matikan Google Search.':e.message)}finally{clearTimeout(to)}
   let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel (kemungkinan timeout atau fungsi error).')}
   if(!r.ok)throw new Error(j.error||'AI gagal');
   let t=j.text;
-  if(search&&!big){
+  if(!big){
     if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber Google:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).replace(/[|\]]/g,' ')}|${s.uri}]]`).join('\n');
-    else if(j.provider!=='gemini')t+='\n\n⚠️ Jawaban ini tidak memakai Google Search (memakai AI cadangan).';
+    else if(j.grounded===false)t+='\n\n⚠️ Google Search tidak tersedia untuk jawaban ini.';
   }
   return t;
 }
@@ -507,13 +507,13 @@ function pBuat(){
     <div class="row"><div><label>Tingkat</label><select id="gl">${LEVEL[S.sec].map(l=>`<option>${l}</option>`).join('')}</select></div>
     <div><label>Kesulitan</label><select id="gd"><option>Mudah</option><option selected>Sedang</option><option>Sulit</option><option>Campuran</option></select></div></div>
     <label>Instruksi khusus (opsional)</label><textarea id="gx" placeholder="contoh: soal cerita sehari-hari, pengecoh masuk akal, pembahasan langkah demi langkah"></textarea>
-    <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="gs" checked style="width:18px"> Pakai Google Search sebagai patokan fakta</label>
+    <div class="mut small" style="margin-top:10px">🔎 Semua soal diverifikasi dengan Google Search.</div>
     <button class="btn full" id="gb" onclick="gen()">Buat soal ✨</button><div id="gm" class="mut small" style="margin-top:10px"></div></div><div id="gres"></div>`;
   drawGen();
 }
 async function gen(){
   const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
-  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),se=$('gs').checked,parts=[];
+  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),se=true,parts=[];
   for(let l=n;l>0;l-=10)parts.push(Math.min(10,l));
   const jt={'Pilihan ganda':'SEMUA soal pilihan ganda dengan 4 opsi (tanpa field tipe).','Benar/Salah':'SEMUA soal Benar/Salah: "q" berupa pernyataan, "o":["Benar","Salah"], "a" 0 jika pernyataan benar atau 1 jika salah, dan tambah "tipe":"bs".','Campuran':'Campuran pilihan ganda (4 opsi) dan Benar/Salah, kira-kira setengah-setengah; soal Benar/Salah memakai "o":["Benar","Salah"], "a" 0/1, "tipe":"bs".'}[jn];
   const sys=`Kamu pembuat soal ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown. Tiap item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar,"e":"pembahasan singkat langkah demi langkah"}. ${jt} Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar, fakta akurat, Bahasa Indonesia, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada duplikat. Rumus matematika ditulis LaTeX di antara \\( dan \\); semua backslash di dalam JSON wajib digandakan.${se?' Verifikasi fakta dengan Google Search dan jadikan hasilnya patokan kebenaran jawaban.':''}`;
