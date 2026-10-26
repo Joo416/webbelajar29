@@ -623,7 +623,7 @@ const srcLinks=x=>x.src&&x.src.length?`<div class="small" style="margin-top:8px"
 async function ai(system,messages,big,search,q,cat){
   const tk=await user.getIdToken();
   const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
-  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||'',cat:cat||S.sec})})}
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||'',cat:cat||catFor()})})}
   catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi.':e.message)}finally{clearTimeout(to)}
   let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
   if(!r.ok)throw new Error(j.error||'AI gagal');
@@ -733,7 +733,7 @@ function drawBank(){
 function expBank(){const b=new Blob([JSON.stringify(S.bank.map(({id,uid,...r})=>r),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='bank-'+S.mapel.replace(/\W/g,'')+'.json';a.click()}
 
 /* ---- Buat soal: sumber terpercaya + verifikasi silang ---- */
-const parseQs=t=>{const m=t.match(/\[[\s\S]*\]/);if(!m)return[];try{return JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\')).map(normQ).filter(Boolean)}catch(e){return[]}};
+const parseQsOld=t=>{const m=t.match(/\[[\s\S]*\]/);if(!m)return[];try{return JSON.parse(m[0].replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\')).map(normQ).filter(Boolean)}catch(e){return[]}};
 async function gen(){
   const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
   const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),parts=[];
@@ -767,6 +767,302 @@ document.addEventListener('keydown',e=>{
   if(x>=0&&x<S.qs[S.i].o.length)pick(x);else if(e.key==='ArrowRight'&&S.i+1<S.qs.length)go(1);else if(e.key==='ArrowLeft')go(-1);
 });
 /* ===== END V5 ===== */
+</script>
+<script>
+/* ===== UPDATE V6: jenis soal baru (bahasa), teks bacaan, kamus Inggris ===== */
+const isLang=()=>S.mapel==='Bahasa Indonesia'||S.mapel==='Bahasa Inggris';
+const isEng=()=>S.mapel==='Bahasa Inggris';
+function catFor(){return S.sec==='trading'?'trading':S.mapel==='Bahasa Inggris'?'inggris':S.mapel==='Bahasa Indonesia'?'indonesia':'sekolah'}
+const unans=x=>x.tipe==='multi'?!(x.pick||[]).length:x.tipe==='essay'?!String(x.pick||'').trim():x.pick<0;
+const isOK=x=>x.tipe==='essay'?(x.sc||0)>=60:x.tipe==='multi'?Array.isArray(x.pick)&&x.pick.length===x.a.length&&x.a.every(i=>x.pick.includes(i)):x.pick===x.a;
+const letters=a=>Array.isArray(a)?(a.length?a.map(optL).join(', '):'-'):(a<0?'-':optL(a));
+const answered=k=>{const v=S.sel[k];return v!=null&&(Array.isArray(v)?v.length>0:String(v).trim()!=='')};
+function entry(q,i){const t=q.tipe||'pg',v=S.sel[i];return{q:q.q,o:q.o||[],a:q.a,pick:v!=null?v:(t==='multi'?[]:t==='essay'?'':-1),e:q.e||'',tipe:t,src:(q.src||[]).slice(0,3),aiw:q.aiw||'',teks:q.teks||'',k:q.k||'',kw:q.kw||[],sc:t==='essay'?(S.sc[i]!=null?S.sc[i]:(q.sc!=null?q.sc:0)):null}}
+
+function normQ(x){
+  if(!x||!x.q)return null;const base={q:String(x.q),e:x.e?String(x.e):''};if(x.teks)base.teks=String(x.teks);const t=x.tipe;
+  if(t==='essay'){if(!x.k)return null;return{...base,tipe:'essay',o:[],a:0,k:String(x.k),kw:Array.isArray(x.kw)?x.kw.map(String).slice(0,8):[]}}
+  if(!Array.isArray(x.o)||x.o.length<2)return null;
+  if(t==='multi'||Array.isArray(x.a)){const a=[...new Set((Array.isArray(x.a)?x.a:[x.a]).filter(i=>Number.isInteger(i)&&i>=0&&i<x.o.length))];if(!a.length)return null;const o0=x.o.map(cleanOpt),cs=a.map(i=>o0[i]),o=shuffle(o0);return{...base,tipe:'multi',o,a:cs.map(c=>o.indexOf(c)).sort((p,q)=>p-q)}}
+  if(!Number.isInteger(x.a)||x.a<0||x.a>=x.o.length)return null;
+  const bs=t==='bs'||(x.o.length===2&&/^benar$/i.test(String(x.o[0]).trim())&&/^salah$/i.test(String(x.o[1]).trim())),tr=/^(benar|true)$/i;
+  if(bs)return{...base,o:['Benar','Salah'],a:tr.test(String(x.o[x.a]).trim())?0:1,tipe:'bs'};
+  const o0=x.o.map(cleanOpt),c=o0[x.a],o=shuffle(o0);return{...base,o,a:o.indexOf(c)};
+}
+const fixJ=s=>s.replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\');
+function parseQs(t){
+  const mo=t.match(/\{[\s\S]*\}/),ma=t.match(/\[[\s\S]*\]/);
+  try{if(mo&&(!ma||mo.index<ma.index)){const o=JSON.parse(fixJ(mo[0]));return(o.soal||[]).map(s=>normQ({...s,teks:o.teks||s.teks})).filter(Boolean)}}catch(e){}
+  try{if(ma)return JSON.parse(fixJ(ma[0])).map(normQ).filter(Boolean)}catch(e){}return[];
+}
+function tutorSys(){
+  return (S.sec==='trading'
+   ?`Kamu tutor ${S.mapel} untuk edukasi trading forex. Jawab dalam Bahasa Indonesia, jelas, bertahap, dengan contoh. Ini edukasi, bukan saran finansial; ingatkan risiko bila relevan.`
+   :isEng()?`You are an English tutor for Indonesian students. Answer in clear, simple English, and add a short Indonesian hint for difficult words. Be accurate; do not invent facts.`
+   :`Kamu tutor ${isUmum()?'pengetahuan umum':S.mapel} untuk siswa Indonesia (level sekolah sampai TKA). Jawab dalam Bahasa Indonesia, jelas, bertahap, ringkas, dengan contoh. Jika siswa salah, koreksi dengan sopan. Jangan mengarang fakta.`)
+   +` Tulis rumus matematika dengan LaTeX di antara \\( dan \\).`+(S.avg!=null?` Rata-rata nilai latihan siswa di pelajaran ini ${S.avg}%; sesuaikan tingkat penjelasan.`:'')
+   +' Jadikan sumber terpercaya sebagai patokan fakta; jika tidak ada sumber yang jelas, katakan terus terang.';
+}
+
+/* ---- penjelasan & penilaian AI ---- */
+function whyP(x){const ok=isOK(x),en=isEng();
+  return `${ok?'Siswa menjawab BENAR. Jelaskan singkat konsep di balik jawaban ini dan jebakan pengecohnya.':unans(x)?'Siswa TIDAK menjawab. Jelaskan cara berpikirnya dan kenapa kunci benar.':'Siswa menjawab SALAH. Jelaskan: (1) kenapa jawaban siswa salah, (2) kenapa kunci benar, (3) tips agar tidak keliru lagi.'} ${en?'Explain in simple English (add short Indonesian hints for hard words).':''} Jangan mengubah kunci jawaban.\n${x.teks?'Teks: '+x.teks.slice(0,1500)+'\n':''}Soal: ${x.q}\nPilihan: ${x.o.map((o,i)=>optL(i)+'. '+o).join(' | ')}\nKunci: ${letters(x.a)}\nJawaban siswa: ${letters(x.pick)}\nPembahasan awal: ${x.e||'-'}`}
+async function gradeEssay(q,text){
+  if(!String(text||'').trim())return{sc:0,fb:'Tidak ada jawaban.'};
+  const t=await ai(`Kamu penilai essay ${S.mapel}. ${isEng()?'Write the feedback in English.':'Tulis umpan balik dalam Bahasa Indonesia.'} Nilai jawaban siswa terhadap kunci dan kata kunci; jawaban yang benar dengan kata berbeda tetap diterima. Format WAJIB:\nSKOR: <angka 0-100>\nSudah tepat: ...\nKurang/keliru: ...\nSaran: ...`,[{role:'user',content:`Soal: ${q.q}\n${q.teks?'Teks: '+q.teks.slice(0,1500)+'\n':''}Kunci jawaban: ${q.k}\nKata kunci: ${(q.kw||[]).join(', ')}\nRubrik: ${q.e||'-'}\nJawaban siswa: ${text}`}],false,false);
+  const m=t.match(/SKOR:\s*(\d{1,3})/i);return{sc:m?Math.min(100,+m[1]):0,fb:t.replace(/SKOR:\s*\d{1,3}/i,'').trim()};
+}
+const essayFb=g=>`**Skor: ${g.sc}/100**\n${g.fb}`;
+async function gradeNow(i){
+  const q=S.qs[i],b=()=>$('aiexp');if(b())b().innerHTML='<div class="exp">⏳ AI menilai jawabanmu...</div>';
+  try{const g=await gradeEssay(q,S.sel[i]);q.sc=S.sc[i]=g.sc;q.aiw=essayFb(g);if(S.i===i&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(q.aiw)}</div>`;saveProg()}
+  catch(e){if(b())b().innerHTML=`<div class="exp">⚠️ ${esc(e.message)} <button class="x" onclick="gradeNow(${i})">Coba lagi</button></div>`}
+}
+async function explainAuto(force){
+  const i=S.i,q=S.qs[i];if(!S.dn[i]||q.tipe==='essay'||(q.aiw&&!force))return;const b=()=>$('aiexp');
+  if(b())b().innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
+  try{const t=await ai(tutorSys(),[{role:'user',content:whyP(entry(q,i))}],false,false);q.aiw=t;if(S.i===i&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
+  catch(e){if(b())b().innerHTML=`<div class="exp">⚠️ ${esc(e.message)} <button class="x" onclick="explainAuto(true)">Coba lagi</button></div>`}
+}
+async function whyReview(id){
+  const o=RV[id],x=o.x,b=$('w_'+id);if(b)b.innerHTML='<div class="exp">⏳ AI bekerja...</div>';
+  try{if(x.tipe==='essay'){const g=await gradeEssay(x,x.pick);x.sc=g.sc;x.aiw=essayFb(g)}else x.aiw=await ai(tutorSys(),[{role:'user',content:whyP(x)}],false,false);
+    if(b)b.innerHTML=`<div class="exp">🤖 ${fmt(x.aiw)}</div>`;if(o.save)o.save()}
+  catch(e){if(b)b.innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
+}
+function qCard(x,id,save){
+  RV[id]={x,save};const ok=isOK(x),t=x.tipe||'pg';let body='';
+  if(t==='essay')body=`<div class="small" style="margin:6px 0"><b>Jawabanmu:</b> ${x.pick?fmt(x.pick):'<i>kosong</i>'}</div><div class="exp"><b>Kunci:</b> ${fmt(x.k||'')}</div>`;
+  else body=x.o.map((o,k)=>{const c=t==='multi'?x.a.includes(k):k===x.a,p=t==='multi'?(x.pick||[]).includes(k):k===x.pick;return `<div class="small" style="padding:4px 0;color:${c?'var(--b)':p?'var(--bad)':'var(--mut)'}">${c?'✔ ':p?'✘ ':'• '}${esc(o)}${p?' <i>(jawabanmu)</i>':''}</div>`}).join('')+(unans(x)?'<div class="small" style="color:var(--bad)">Tidak dijawab</div>':'');
+  return `<div class="card">${x.teks?`<details style="margin-bottom:8px"><summary class="mut small">📖 Teks bacaan</summary><div class="exp">${fmt(x.teks)}</div></details>`:''}<b>${ok?'✅':'❌'} ${esc(x.q)}</b>${t==='essay'&&x.sc!=null?` <span class="mut small">(${x.sc}/100)</span>`:''}${body}${t!=='essay'&&x.e?`<div class="exp">💡 ${fmt(x.e)}</div>`:''}${srcLinks(x)}<div id="w_${id}">${x.aiw?`<div class="exp">🤖 ${fmt(x.aiw)}</div>`:''}</div>${ok&&t!=='essay'||x.aiw?'':`<button class="btn alt full" onclick="whyReview('${id}')">🤖 ${t==='essay'?'Nilai jawabanku':'Kenapa jawabanku salah?'}</button>`}</div>`;
+}
+async function explainAll(){const ids=Object.keys(RV).filter(i=>!RV[i].x.aiw&&!isOK(RV[i].x)).slice(0,10);for(const i of ids)await whyReview(i)}
+
+/* ---- mesin kuis dengan semua jenis soal ---- */
+function saveProg(){try{localStorage.setItem(progKey(),JSON.stringify({qs:S.qs,i:S.i,sel:S.sel,dn:S.dn,sc:S.sc,flag:S.flag,exam:S.exam,left:S.left,mapel:S.mapel,sec:S.sec,retry:S.retry}))}catch(e){}}
+function resume(){try{const p=JSON.parse(localStorage.getItem(progKey()));Object.assign(S,p);S.dn=S.dn||[];S.sc=S.sc||[];startTimer();show()}catch(e){clearProg();home()}}
+function initRun(qs,ex,rt){Object.assign(S,{qs,i:0,sel:Array(qs.length).fill(null),dn:[],sc:[],flag:[],exam:ex,retry:rt,left:Math.ceil(qs.length*(qs.some(q=>q.tipe==='essay')?180:90))});startTimer();show()}
+function pLatihan(){
+  let pr=null;try{pr=JSON.parse(localStorage.getItem(progKey()))}catch(e){}
+  $('pane').innerHTML=`${pr&&pr.qs?`<div class="card"><h3>⏯ Latihan belum selesai</h3><div class="mut small">${esc(pr.mapel)} • ${pr.sel.filter(v=>v!=null&&v!==''&&!(Array.isArray(v)&&!v.length)).length}/${pr.qs.length} terjawab</div><div class="row"><button class="btn full" onclick="resume()">Lanjutkan</button><button class="btn alt full" onclick="clearProg();pLatihan()">Buang</button></div></div>`:''}
+    <div class="card"><h3>Mulai latihan: ${esc(S.mapel)}</h3>
+    ${isUmum()?'':`<label>Subtopik (opsional)</label><input id="sub" placeholder="kosong = semua" value="${esc(S.sub||'')}">
+    <label>Jenis soal</label><select id="lt"><option value="">Semua</option><option value="pg">Pilihan ganda</option><option value="bs">Benar/Salah</option>${isLang()?'<option value="multi">Pilih semua yang benar</option><option value="essay">Essay</option>':''}</select>`}
+    <label>Jumlah soal</label><select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="ex" style="width:18px"> Mode ujian (timer, bisa pindah soal, pembahasan setelah selesai)</label>
+    <button class="btn full" onclick="start()">Mulai ▶</button><div id="msg" class="mut small" style="margin-top:10px"></div></div>
+    <div class="card"><h3>📊 Statistik <span class="mut small">(ketuk untuk detail)</span></h3><div id="stat" class="mut">Memuat...</div></div>
+    <div class="card"><h3>🏆 Riwayat <span class="mut small">(ketuk untuk lihat soal)</span></h3><div id="hist" class="mut">Memuat...</div></div>`;
+  loadHist();
+}
+async function loadQs2(n){
+  if(isUmum())return loadQs(n);
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(300).get();
+  let a=s.docs.map(d=>d.data()),sub=(S.sub||'').toLowerCase();
+  if(sub)a=a.filter(x=>(x.sub||'').toLowerCase().includes(sub));
+  if(S.jenis)a=a.filter(x=>(x.tipe||'pg')===S.jenis);
+  return shuffle(a).slice(0,n).map(q=>{const t=q.tipe||'pg';if(t==='bs'||t==='essay')return q;const o=shuffle(q.o);return t==='multi'?{...q,o,a:q.a.map(i=>o.indexOf(q.o[i])).sort((p,r)=>p-r)}:{...q,o,a:o.indexOf(q.o[q.a])}});
+}
+async function start(){
+  S.sub=$('sub')?$('sub').value.trim():'';S.jenis=$('lt')?$('lt').value:'';const ex=$('ex').checked;$('msg').textContent='Memuat soal...';
+  try{const qs=await loadQs2(+$('n').value);
+    if(!qs.length){$('msg').textContent='Tidak ada soal (cek subtopik/jenis soal atau buat soal dulu).';return}
+    if(qs.length<+$('n').value)alert(`Hanya ${qs.length} soal tersedia untuk pilihan ini.`);
+    initRun(qs,ex,false);
+  }catch(e){$('msg').textContent='Gagal: '+e.message}
+}
+function retry(){const w=S.wrong.map(({pick,sc,aiw,...q})=>q);clearInterval(S.tm);initRun(shuffle(w),false,true)}
+function pick(k){const i=S.i;if(!S.exam&&S.dn[i])return;S.sel[i]=k;if(!S.exam)S.dn[i]=true;show()}
+function tog(k){const i=S.i;if(!S.exam&&S.dn[i])return;const a=S.sel[i]||[];S.sel[i]=a.includes(k)?a.filter(v=>v!==k):[...a,k];show()}
+function lockMulti(){if(!(S.sel[S.i]||[]).length)return alert('Pilih minimal satu jawaban');S.dn[S.i]=true;show()}
+function submitEssay(){if(!String(S.sel[S.i]||'').trim())return alert('Tulis jawabanmu dulu');S.dn[S.i]=true;show()}
+function confirmFinish(){const u=S.qs.filter((_,k)=>!answered(k)).length;if(u&&!confirm(u+' soal belum dijawab (dihitung salah). Selesai sekarang?'))return;finish()}
+function fbHtml(q){const e=q.tipe==='essay';return `${e?`<div class="exp"><b>${isEng()?'Model answer':'Kunci jawaban'}:</b> ${fmt(q.k)}</div>`:''}${!e&&q.e?`<div class="exp">💡 ${fmt(q.e)}</div>`:''}${srcLinks(q)}<div id="aiexp">${q.aiw?`<div class="exp">🤖 ${fmt(q.aiw)}</div>`:''}</div>${e?'':`<button class="btn alt full" onclick="explainAuto(true)">🤖 Jelaskan lebih detail</button>`}`}
+function show(){
+  const i=S.i,q=S.qs[i],t=q.tipe||'pg',sel=S.sel[i],rev=!S.exam&&S.dn[i],last=i+1>=S.qs.length;let body='';
+  if(t==='essay')body=`<textarea id="esa" style="min-height:140px" placeholder="${isEng()?'Write your answer here...':'Tulis jawabanmu di sini...'}" ${rev?'disabled':''} oninput="S.sel[S.i]=this.value;saveProg()">${esc(sel||'')}</textarea>${rev||S.exam?'':'<button class="btn full" onclick="submitEssay()">Kirim jawaban</button>'}`;
+  else if(t==='multi')body=`<div class="mut small" style="margin-bottom:8px">${isEng()?'Choose ALL correct answers.':'Pilih SEMUA jawaban yang benar.'}</div>`+q.o.map((o,k)=>{const on=(sel||[]).includes(k);return `<button class="opt ${rev?(q.a.includes(k)?'ok':on?'no':''):(on?'sel':'')}" ${rev?'disabled':''} onclick="tog(${k})">${on?'☑':'☐'} ${optL(k)}. ${esc(o)}</button>`}).join('')+(rev||S.exam?'':'<button class="btn full" onclick="lockMulti()">Periksa jawaban</button>');
+  else body=q.o.map((o,k)=>`<button class="opt ${rev?(k===q.a?'ok':k===sel?'no':''):(sel===k?'sel':'')}" ${rev?'disabled':''} onclick="pick(${k})">${optL(k)}. ${esc(o)}</button>`).join('');
+  $('app').innerHTML=`<div class="card"><div class="mut small" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>${esc(S.mapel)} • ${i+1}/${S.qs.length}${S.retry?' • ulangi salah':''}</span><span>${S.exam?`<b id="tmr">${fmtT(S.left)}</b> `:''}<button class="x" style="background:#262b55;color:#eef0ff" onclick="quit()">✕ Keluar</button></span></div>
+    <div class="bar"><i style="width:${S.qs.filter((_,k)=>answered(k)).length/S.qs.length*100}%"></i></div>
+    ${q.teks?`<div class="exp" style="margin-bottom:12px;max-height:280px;overflow:auto;color:var(--tx)">📖 ${fmt(q.teks)}</div>`:''}<div class="q">${esc(q.q)}</div>${body}
+    <div id="fb">${rev?fbHtml(q):''}</div>
+    <div class="row" style="margin-top:12px"><button class="btn alt" onclick="go(-1)" ${i?'':'disabled'}>◀</button>${S.exam?`<button class="btn alt" onclick="S.flag[${i}]=!S.flag[${i}];show()">${S.flag[i]?'🚩 Ragu':'🏳 Ragu?'}</button>`:''}<button class="btn" onclick="${last?'confirmFinish()':'go(1)'}">${last?'Selesai ✔':'Lanjut ▶'}</button></div>
+    ${S.exam?`<div class="nav">${S.qs.map((_,k)=>`<button class="nb ${k===i?'cur':''} ${answered(k)?'done':''} ${S.flag[k]?'flag':''}" onclick="S.i=${k};show()">${k+1}</button>`).join('')}</div><button class="btn alt full" onclick="confirmFinish()">Kumpulkan sekarang</button>`:''}</div>`;
+  saveProg();
+  if(rev){if(t==='essay'){if(!q.aiw)gradeNow(i)}else if(!isOK(entry(q,i))&&!q.aiw)explainAuto()}
+}
+async function finish(){
+  clearInterval(S.tm);clearProg();RV={};
+  const es=S.qs.map((q,i)=>q.tipe==='essay'&&answered(i)&&S.sc[i]==null?i:-1).filter(i=>i>=0).slice(0,12);
+  if(es.length){$('app').innerHTML=`<div class="card">⏳ Menilai ${es.length} essay dengan AI...</div>`;for(const i of es){try{const g=await gradeEssay(S.qs[i],S.sel[i]);S.qs[i].sc=S.sc[i]=g.sc;S.qs[i].aiw=essayFb(g)}catch(e){S.sc[i]=0;S.qs[i].aiw='⚠️ Penilaian gagal: '+e.message}}}
+  const ans=S.qs.map((q,i)=>entry(q,i));S.ans=ans;S.score=ans.filter(isOK).length;
+  const t=ans.length,p=Math.round(S.score/t*100),w=ans.filter(x=>!isOK(x));S.wrong=w;S.curId=null;const na=ans.filter(unans).length;
+  $('app').innerHTML=`<div class="card"><div class="big">${p}</div><div style="text-align:center" class="mut">Benar ${S.score} dari ${t} • ${esc(S.mapel)}${S.exam?' • mode ujian':''}${na?` • ${na} tidak dijawab`:''}</div>
+    ${w.length?`<button class="btn full" onclick="retry()">🔁 Ulangi ${w.length} soal yang salah</button><button class="btn alt full" onclick="explainAll()">🤖 Jelaskan semua yang salah</button>`:'<div style="text-align:center;margin-top:10px">🎉 Semua benar!</div>'}<button class="btn alt full" onclick="S.tab='latihan';home()">Kembali</button></div>
+    ${w.map((x,i)=>qCard(x,'f'+i,()=>{if(S.curId)db.collection('hasil').doc(S.curId).update({detail:JSON.parse(JSON.stringify(S.ans))}).catch(()=>{})})).join('')}`;
+  if(!S.retry)try{const r=await db.collection('hasil').add({uid:user.uid,kategori:S.sec,mapel:S.mapel,skor:S.score,total:t,mode:S.exam?'ujian':'latihan',detail:JSON.parse(JSON.stringify(ans)),waktu:firebase.firestore.FieldValue.serverTimestamp()});S.curId=r.id}catch(e){console.error(e)}
+}
+function showAttempt(id,f){
+  const h=S.att.find(x=>x.id===id);if(!h)return;f=f||'semua';const d=h.detail||[],ok=isOK;RV={};
+  const list=d.filter(x=>f==='semua'||(f==='salah'?!ok(x):ok(x)));
+  $('app').innerHTML=`<div class="card"><button class="btn alt" onclick="home()">← Kembali</button><h3 style="margin-top:14px">${esc(h.mapel)} • ${h.skor}/${h.total}</h3><div class="mut small">${dt(h)}${h.mode==='ujian'?' • mode ujian':''}</div>
+    ${d.length?`<div class="row" style="margin-top:12px">${['semua','salah','benar'].map(k=>`<button class="btn ${f===k?'':'alt'}" style="padding:9px 4px" onclick="showAttempt('${id}','${k}')">${k==='semua'?'Semua ('+d.length+')':k==='salah'?'❌ ('+d.filter(x=>!ok(x)).length+')':'✅ ('+d.filter(ok).length+')'}</button>`).join('')}</div>
+    ${d.some(x=>!ok(x))?`<button class="btn full" onclick="redoWrong('${id}')">🔁 Latih ulang soal yang salah</button>`:''}`:'<div class="mut" style="margin-top:12px">Detail soal tidak tersedia untuk latihan lama ini.</div>'}</div>
+    ${list.map((x,i)=>qCard(x,'h'+i,()=>db.collection('hasil').doc(id).update({detail:JSON.parse(JSON.stringify(d))}).catch(()=>{}))).join('')}`;
+}
+function redoWrong(id){const h=S.att.find(x=>x.id===id);S.sec=h.kategori;S.mapel=h.mapel;S.wrong=(h.detail||[]).filter(x=>!isOK(x));retry()}
+function showMapel(i){
+  const m=S.gk[i],at=S.att.filter(x=>x.mapel===m),mp=new Map();
+  at.forEach(a=>(a.detail||[]).forEach(x=>{if(!isOK(x)){const k=nk(x.q),v=mp.get(k);if(v)v.n++;else mp.set(k,{...x,n:1})}}));
+  const wl=[...mp.values()].sort((a,b)=>b.n-a.n);S.wl=wl;RV={};
+  $('app').innerHTML=`<div class="card"><button class="btn alt" onclick="home()">← Kembali</button><h3 style="margin-top:14px">${esc(m)}</h3><div class="mut small">${at.length} latihan • rata-rata ${avg(at.map(x=>x.skor/x.total*100))}%</div></div>
+    <div class="card"><h3>Riwayat</h3>${at.map(x=>`<div class="item" style="cursor:pointer" onclick="showAttempt('${x.id}')"><span class="mut small">${dt(x)}</span><b>${x.skor}/${x.total} ›</b></div>`).join('')}</div>
+    <div class="card"><h3>❌ Soal yang pernah salah (${wl.length})</h3>${wl.length?`<button class="btn full" onclick="S.sec=S.att[0].kategori;S.mapel=S.gk[${i}];S.wrong=S.wl;retry()">🔁 Latih soal-soal ini</button>`:'<div class="mut">Belum ada soal yang salah 🎉</div>'}</div>
+    ${wl.slice(0,30).map((x,k)=>qCard(x,'m'+k)).join('')}`;
+}
+
+/* ---- Bank soal untuk semua jenis ---- */
+const ansTxt=x=>x.tipe==='essay'?String(x.k||'').slice(0,70):x.tipe==='multi'?x.a.map(i=>x.o[i]).join(' + '):x.o[x.a];
+const TL={bs:'Benar/Salah',multi:'Pilih semua',essay:'Essay'};
+function drawBank(){
+  $('bl').innerHTML=S.bank.length?`<div class="small" style="margin-bottom:8px">${S.bank.length} soal</div>`+S.bank.map(x=>x.id===S.edit?editForm(x):`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(ansTxt(x))}${TL[x.tipe]?' • '+TL[x.tipe]:''}${x.teks?' • 📖 bacaan':''}${x.sub?' • 🏷 '+esc(x.sub):''}${x.sumber==='ai'?' • 🤖':''}${x.src&&x.src.length?' • 📚 '+x.src.length+' sumber':''}</div></div><button class="x" style="background:#262b55;color:#eef0ff" onclick="S.edit='${x.id}';drawBank()">✏️</button><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join('')+`<button class="btn alt full" onclick="expBank()">⬇️ Ekspor JSON (cadangan)</button><button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Soal atau tambah manual.';
+}
+function editForm(x){const t=x.tipe||'pg';return `<div class="gi" style="display:block">${x.teks?`<label>Teks bacaan</label><textarea id="et" style="min-height:90px">${esc(x.teks)}</textarea>`:''}<label>Soal</label><textarea id="eq" style="min-height:70px">${esc(x.q)}</textarea>
+ ${t==='essay'?`<label>Kunci jawaban</label><textarea id="ek" style="min-height:70px">${esc(x.k||'')}</textarea><label>Kata kunci (pisah koma)</label><input id="ekw" value="${esc((x.kw||[]).join(', '))}">`
+ :x.o.map((o,k)=>`<label>Opsi ${optL(k)}</label><input id="eo${k}" value="${esc(o)}">`).join('')+(t==='multi'?`<label>Jawaban benar (centang)</label><div class="row">${x.o.map((_,k)=>`<label style="color:var(--tx)"><input type="checkbox" id="ec${k}" ${x.a.includes(k)?'checked':''} style="width:18px"> ${optL(k)}</label>`).join('')}</div>`:`<label>Jawaban benar</label><select id="ea">${x.o.map((_,k)=>`<option value="${k}" ${k===x.a?'selected':''}>${optL(k)}</option>`).join('')}</select>`)}
+ <label>Subtopik</label><input id="es2" value="${esc(x.sub||'')}"><label>Pembahasan</label><textarea id="ee" style="min-height:60px">${esc(x.e||'')}</textarea>
+ <div class="row" style="margin-top:10px"><button class="btn" onclick="saveEdit('${x.id}')">Simpan</button><button class="btn alt" onclick="S.edit=null;drawBank()">Batal</button></div></div>`}
+async function saveEdit(id){
+  const x=S.bank.find(b=>b.id===id),t=x.tipe||'pg',d={q:$('eq').value.trim(),sub:$('es2').value.trim(),e:$('ee').value.trim()};
+  if(!d.q)return alert('Soal harus diisi');if($('et'))d.teks=$('et').value.trim();
+  if(t==='essay'){d.k=$('ek').value.trim();d.kw=$('ekw').value.split(',').map(s=>s.trim()).filter(Boolean);if(!d.k)return alert('Kunci jawaban harus diisi')}
+  else{d.o=x.o.map((_,k)=>$('eo'+k).value.trim());if(d.o.some(v=>!v))return alert('Semua opsi harus diisi');
+    if(t==='multi'){d.a=x.o.map((_,k)=>k).filter(k=>$('ec'+k).checked);if(!d.a.length)return alert('Pilih minimal satu jawaban benar')}else d.a=+$('ea').value}
+  await db.collection('soal').doc(id).update(d);Object.assign(x,d);S.edit=null;drawBank();
+}
+async function importQ(){
+  let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
+  if(!Array.isArray(arr))return alert('Harus berupa array');
+  const ok=await dedupe(arr.map(x=>{const n=normQ(x);return n?{...n,sub:x.sub||''}:null}).filter(Boolean));
+  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati: tidak valid/duplikat)`);pBank();
+}
+
+/* ---- Buat soal: semua jenis, bacaan, Inggris penuh ---- */
+function pBuat(){
+  if(isUmum()){$('pane').innerHTML='<div class="card mut">Trivia Dunia mengambil soal otomatis dari internet. Pilih pelajaran lain untuk membuat soal dengan AI.</div>';return}
+  const L=isLang();
+  $('pane').innerHTML=`<div class="card"><h3>✨ Buat soal ${esc(S.mapel)} dengan AI</h3>
+    <label>Topik / materi spesifik</label><input id="gt" placeholder="${isEng()?'e.g. past tense, climate change, conditional sentences':S.sec==='trading'?'contoh: Order Block, Fair Value Gap':'contoh: pecahan, kalimat efektif, hukum Newton'}">
+    <div class="row"><div><label>Jumlah</label><select id="gn"><option>5</option><option selected>10</option><option>20</option><option>25</option></select></div>
+    <div><label>Jenis soal</label><select id="gj"><option>Pilihan ganda</option><option>Benar/Salah</option>${L?'<option>Pilih semua yang benar</option><option>Essay</option>':''}<option>Campuran</option></select></div></div>
+    ${L?`<label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="gb2" style="width:18px"> Dengan teks bacaan (soal dari sebuah teks, uji pemahaman)</label>`:''}
+    <div class="row"><div><label>Tingkat</label><select id="gl">${LEVEL[S.sec].map(l=>`<option>${l}</option>`).join('')}</select></div>
+    <div><label>Kesulitan</label><select id="gd"><option>Mudah</option><option selected>Sedang</option><option>Sulit</option><option>Campuran</option></select></div></div>
+    <label>Instruksi khusus (opsional)</label><textarea id="gx" placeholder="contoh: soal cerita sehari-hari, pengecoh masuk akal"></textarea>
+    <div class="mut small" style="margin-top:10px">🔎 Soal dibuat dari sumber terpercaya lalu diverifikasi silang.${isEng()?' Semua soal 100% bahasa Inggris.':''}</div>
+    <button class="btn full" id="gb" onclick="gen()">Buat soal ✨</button><div id="gm" class="mut small" style="margin-top:10px"></div></div><div id="gres"></div>`;
+  drawGen();
+}
+async function gen(){
+  const topik=$('gt').value.trim();if(!topik){$('gm').textContent='Isi topik dulu.';return}
+  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),bc=!!($('gb2')&&$('gb2').checked),parts=[],sz=bc?5:10,L=isLang();
+  for(let l=n;l>0;l-=sz)parts.push(Math.min(sz,l));SRC=[];LT=0;
+  const jt={'Pilihan ganda':'SEMUA soal pilihan ganda dengan 4 opsi (tanpa field tipe).','Benar/Salah':'SEMUA soal Benar/Salah: "q" berupa pernyataan, "o":["Benar","Salah"], "a" 0 jika pernyataan benar atau 1 jika salah, dan tambah "tipe":"bs".','Pilih semua yang benar':'SEMUA soal pilihan ganda kompleks: "tipe":"multi", 4-5 opsi, "a" berupa ARRAY indeks semua jawaban benar (2-3 jawaban benar), untuk melatih ketelitian membaca teks.','Essay':'SEMUA soal essay/uraian untuk uji pemahaman: {"tipe":"essay","q":"...","k":"jawaban ideal 1-3 kalimat","kw":["kata kunci"],"e":"rubrik penilaian singkat"} tanpa field "o" dan "a".','Campuran':L?'Campuran pilihan ganda (4 opsi), Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), pilih semua yang benar ("tipe":"multi","a":[indeks...]), dan essay ("tipe":"essay","k","kw") dengan proporsi seimbang.':'Campuran pilihan ganda (4 opsi) dan Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), kira-kira setengah-setengah.'}[jn];
+  const lang=isEng()?'Semua teks soal, opsi, pembahasan, kunci, dan teks bacaan HARUS dalam Bahasa Inggris penuh (full English, tanpa campuran Indonesia), tata bahasa sempurna.':S.mapel==='Bahasa Indonesia'?'Gunakan Bahasa Indonesia baku sesuai PUEBI/KBBI.':'Gunakan Bahasa Indonesia.';
+  const sys=`Kamu pembuat soal ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. ${bc?'Keluarkan HANYA JSON object {"teks":"teks bacaan informatif 120-200 kata yang berdasar sumber tepercaya","soal":[...]} dan semua soal harus bisa dijawab dari teks itu, tanpa teks lain dan tanpa markdown.':'Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown.'} Format item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar,"e":"pembahasan singkat langkah demi langkah"}. ${jt} ${lang} Aturan: soal jelas dan tidak ambigu, SETIAP fakta dan kunci jawaban harus didukung sumber tepercaya yang diberikan (utamakan ★resmi), jangan membuat soal dari fakta yang tidak bisa dipastikan, opsi tanpa awalan huruf, pengecoh masuk akal, tidak ada duplikat. Rumus matematika ditulis LaTeX di antara \\( dan \\); semua backslash di dalam JSON wajib digandakan.`;
+  $('gb').disabled=true;$('gm').textContent=`⏳ Mengumpulkan sumber terpercaya & membuat ${n} soal...`;
+  try{
+    const out=await Promise.all(parts.map((c,i)=>ai(sys,[{role:'user',content:`Buat ${c} soal.\nMapel: ${S.mapel}\nTopik: ${topik}\nJenis: ${jn}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; variasikan sub-topik${bc?' dan buat teks bacaan yang berbeda':''}.\n`:''}${ex?'Instruksi khusus: '+ex:''}`}],true,true,S.mapel+' '+topik)));
+    let all=[];out.forEach(t=>{all=all.concat(parseQs(t))});let vf=false;
+    if(all.length){$('gm').textContent='🔎 Memverifikasi silang jawaban dengan sumber...';
+      try{const vs=`Kamu pemeriksa soal ${S.mapel}. Periksa setiap soal terhadap sumber tepercaya yang diberikan. Perbaiki kunci jawaban, kata kunci, dan pembahasan yang salah; buang soal yang ambigu atau tidak bisa dipastikan. Pertahankan field "teks", "tipe", "k", "kw" bila ada. ${lang} Keluarkan HANYA JSON array valid dengan format item yang sama, tanpa teks lain. Backslash di JSON wajib digandakan.`;
+        const ch=[];for(let i=0;i<all.length;i+=sz)ch.push(all.slice(i,i+sz));
+        const vr=await Promise.all(ch.map(cc=>ai(vs,[{role:'user',content:JSON.stringify(cc)}],true,true,S.mapel+' '+topik)));
+        let ok=[];vr.forEach(t=>{ok=ok.concat(parseQs(t))});if(ok.length){all=ok;vf=true}
+      }catch(e){}}
+    const src=SRC.filter(s=>/^https?:/.test(s.uri)).slice(0,4).map(s=>({title:String(s.title).slice(0,80),uri:s.uri}));
+    S.gen=all.map(x=>({...x,src}));
+    $('gm').textContent=all.length?`✅ ${all.length} soal siap${vf?' (terverifikasi silang)':' (verifikasi silang gagal, periksa manual)'}${LT?` • ${LT} sumber resmi dipakai`:' • ⚠️ tidak ada sumber resmi ditemukan, periksa manual'}. Hapus yang salah (✕), lalu simpan.`:'AI tidak mengembalikan soal yang valid. Coba lagi.';
+  }catch(e){$('gm').textContent='⚠️ '+e.message}
+  $('gb').disabled=false;drawGen();
+}
+function drawGen(){
+  if(!$('gres'))return;
+  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div>${x.teks&&(i===0||S.gen[i-1].teks!==x.teks)?`<div class="exp" style="margin-bottom:8px">📖 ${fmt(x.teks)}</div>`:''}<b>${i+1}. ${esc(x.q)}</b> ${TL[x.tipe]?`<span class="mut small">[${TL[x.tipe]}]</span>`:''}<div class="mut">${x.tipe==='essay'?'✅ '+esc(x.k)+((x.kw||[]).length?'<br>🔑 '+esc(x.kw.join(', ')):''):x.o.map((o,k)=>((x.tipe==='multi'?x.a.includes(k):k===x.a)?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e)}</div>${i===0?srcLinks(x):''}</div><button class="x" onclick="S.gen.splice(${i},1);drawGen()">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
+}
+
+/* ================= KAMUS INGGRIS ================= */
+const IRR=('arise>arose>arisen;awake>awoke>awoken;be>was/were>been;bear>bore>borne/born;beat>beat>beaten;become>became>become;begin>began>begun;bend>bent>bent;bet>bet>bet;bid>bid>bid;bind>bound>bound;bite>bit>bitten;bleed>bled>bled;blow>blew>blown;break>broke>broken;breed>bred>bred;bring>brought>brought;broadcast>broadcast>broadcast;build>built>built;burn>burnt/burned>burnt/burned;burst>burst>burst;buy>bought>bought;cast>cast>cast;catch>caught>caught;choose>chose>chosen;cling>clung>clung;come>came>come;cost>cost>cost;creep>crept>crept;cut>cut>cut;deal>dealt>dealt;dig>dug>dug;do>did>done;draw>drew>drawn;dream>dreamt/dreamed>dreamt/dreamed;drink>drank>drunk;drive>drove>driven;eat>ate>eaten;fall>fell>fallen;feed>fed>fed;feel>felt>felt;fight>fought>fought;find>found>found;fit>fit/fitted>fit/fitted;flee>fled>fled;fling>flung>flung;fly>flew>flown;forbid>forbade>forbidden;forecast>forecast>forecast;foresee>foresaw>foreseen;forget>forgot>forgotten;forgive>forgave>forgiven;freeze>froze>frozen;get>got>got/gotten;give>gave>given;go>went>gone/been;grind>ground>ground;grow>grew>grown;hang>hung>hung;have>had>had;hear>heard>heard;hide>hid>hidden;hit>hit>hit;hold>held>held;hurt>hurt>hurt;keep>kept>kept;kneel>knelt>knelt;know>knew>known;lay>laid>laid;lead>led>led;lean>leant/leaned>leant/leaned;leap>leapt/leaped>leapt/leaped;learn>learnt/learned>learnt/learned;leave>left>left;lend>lent>lent;let>let>let;lie>lay>lain;light>lit>lit;lose>lost>lost;make>made>made;mean>meant>meant;meet>met>met;mistake>mistook>mistaken;overcome>overcame>overcome;oversee>oversaw>overseen;pay>paid>paid;put>put>put;quit>quit>quit;read>read>read;rebuild>rebuilt>rebuilt;redo>redid>redone;ride>rode>ridden;ring>rang>rung;rise>rose>risen;run>ran>run;say>said>said;see>saw>seen;seek>sought>sought;sell>sold>sold;send>sent>sent;set>set>set;sew>sewed>sewn/sewed;shake>shook>shaken;shed>shed>shed;shine>shone>shone;shoot>shot>shot;show>showed>shown/showed;shrink>shrank>shrunk;shut>shut>shut;sing>sang>sung;sink>sank>sunk;sit>sat>sat;slay>slew>slain;sleep>slept>slept;slide>slid>slid;smell>smelt/smelled>smelt/smelled;speak>spoke>spoken;speed>sped>sped;spell>spelt/spelled>spelt/spelled;spend>spent>spent;spill>spilt/spilled>spilt/spilled;spin>spun>spun;spit>spat>spat;split>split>split;spoil>spoilt/spoiled>spoilt/spoiled;spread>spread>spread;spring>sprang>sprung;stand>stood>stood;steal>stole>stolen;stick>stuck>stuck;sting>stung>stung;stink>stank>stunk;stride>strode>stridden;strike>struck>struck;strive>strove>striven;swear>swore>sworn;sweep>swept>swept;swim>swam>swum;swing>swung>swung;take>took>taken;teach>taught>taught;tear>tore>torn;tell>told>told;think>thought>thought;throw>threw>thrown;thrive>throve/thrived>thriven/thrived;understand>understood>understood;undergo>underwent>undergone;undo>undid>undone;upset>upset>upset;wake>woke>woken;wear>wore>worn;weave>wove>woven;weep>wept>wept;wet>wet/wetted>wet/wetted;win>won>won;wind>wound>wound;withdraw>withdrew>withdrawn;withhold>withheld>withheld;withstand>withstood>withstood;write>wrote>written').split(';').map(s=>s.split('>'));
+const IRRMAP={},IRRREV={};IRR.forEach(r=>IRRMAP[r[0]]=r);IRR.forEach(r=>r[1].split('/').concat(r[2].split('/')).forEach(f=>{if(f!==r[0]&&!IRRMAP[f]&&!IRRREV[f])IRRREV[f]=r[0]}));
+const ING_FIX={begin:'beginning',forget:'forgetting',upset:'upsetting',admit:'admitting',commit:'committing',occur:'occurring',refer:'referring',regret:'regretting',submit:'submitting',prefer:'preferring',permit:'permitting',be:'being',lie:'lying',die:'dying',tie:'tying'};
+function verbForms(w){
+  let ed,ing,s;
+  if(w.endsWith('ie')){ed=w+'d';ing=w.slice(0,-2)+'ying'}else if(/[^aeiou]e$/.test(w)||/ue$/.test(w)){ed=w+'d';ing=w.slice(0,-1)+'ing'}else if(/[^aeiou]y$/.test(w)){ed=w.slice(0,-1)+'ied';ing=w+'ing'}else if(/^[^aeiou]*[aeiou][^aeiouwxy]$/.test(w)){ed=w+w.slice(-1)+'ed';ing=w+w.slice(-1)+'ing'}else{ed=w+'ed';ing=w+'ing'}
+  s=w==='have'?'has':/(s|x|z|ch|sh|o)$/.test(w)?w+'es':/[^aeiou]y$/.test(w)?w.slice(0,-1)+'ies':w+'s';
+  const r=IRRMAP[w];return{v1:w,v2:r?r[1]:ed,v3:r?r[2]:ed,ing:ING_FIX[w]||ing,s:w==='be'?'is':s,irr:!!r};
+}
+const KM={tab:'cari',w:'',pre:'',pg:100};
+const speak=w=>{try{const u=new SpeechSynthesisUtterance(w);u.lang='en-US';speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
+const playAudio=(u,w)=>{if(u){new Audio(u).play().catch(()=>speak(w))}else speak(w)};
+const dict=async w=>{try{const r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w));if(!r.ok)return null;const j=await r.json();return Array.isArray(j)?j:null}catch(e){return null}};
+const phon=d=>{if(!d)return{t:'',a:''};let t='',a='';d.forEach(e=>{(e.phonetics||[]).forEach(p=>{if(!t&&p.text)t=p.text;if(!a&&p.audio)a=p.audio});if(!t&&e.phonetic)t=e.phonetic});return{t,a}};
+function kamusView(){
+  ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
+  $('app').innerHTML=`<div class="card"><h3>📚 Kamus Inggris</h3><div class="mut small" style="margin-bottom:8px">Cari kata, lihat pelafalan (IPA + suara), arti, contoh, dan Verb 1-2-3. Data: Wiktionary (dictionaryapi.dev), Datamuse, MyMemory.</div>
+    <div style="position:relative"><input id="kq" placeholder="Ketik kata Inggris... (contoh: go, went, beautiful)" autocomplete="off" oninput="kSug(this.value)" onkeydown="if(event.key==='Enter')kGo()"><div id="ksug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div></div>
+    <button class="btn full" onclick="kGo()">🔍 Cari</button></div>
+  <div class="stabs"><button class="${KM.tab==='cari'?'on':''}" onclick="KM.tab='cari';kamusView()">🔍 Hasil</button><button class="${KM.tab==='irr'?'on':''}" onclick="KM.tab='irr';kamusView()">📖 Irregular Verbs</button><button class="${KM.tab==='az'?'on':''}" onclick="KM.tab='az';kamusView()">🔤 Jelajah A–Z</button></div><div id="kbody"></div>`;
+  if(KM.tab==='cari'){$('kbody').innerHTML=KM.w?'':'<div class="card mut small">Ketik kata di atas, atau buka tab Irregular Verbs / Jelajah A–Z. Cari juga bisa memakai bentuk lampau (misal "went" akan dikenali sebagai bentuk dari "go").</div>';if(KM.w){$('kq').value=KM.w;kLookup(KM.w)}}
+  else if(KM.tab==='irr')kIrr('');else kAZ();
+}
+let ksT;
+function kSug(v){clearTimeout(ksT);v=v.trim();if(v.length<2){$('ksug').innerHTML='';return}
+  ksT=setTimeout(async()=>{try{const r=await fetch('https://api.datamuse.com/sug?max=8&s='+encodeURIComponent(v)),j=await r.json();if($('ksug'))$('ksug').innerHTML=j.map(x=>`<button class="x" style="background:#262b55;color:#eef0ff" onclick="kPick('${esc(x.word).replace(/'/g,'')}')">${esc(x.word)}</button>`).join('')}catch(e){}},250)}
+function kPick(w){KM.tab='cari';KM.w=w;kamusView()}
+function kGo(){const v=$('kq').value.trim().toLowerCase();if(v){KM.tab='cari';KM.w=v;kamusView()}}
+async function kLookup(w){
+  const box=$('kbody');box.innerHTML='<div class="card">⏳ Mencari...</div>';
+  const base=IRRMAP[w]?w:IRRREV[w]||null;
+  const [d,tr]=await Promise.all([dict(w),fetch('https://api.mymemory.translated.net/get?langpair=en|id&q='+encodeURIComponent(w)).then(r=>r.json()).then(j=>j.responseData&&j.responseData.translatedText||'').catch(()=>'')]);
+  const hasVerb=base||(d&&d.some(e=>(e.meanings||[]).some(m=>m.partOfSpeech==='verb')));
+  if(!d&&!base){let sg=[];try{sg=await (await fetch('https://api.datamuse.com/words?max=8&sp='+encodeURIComponent(w))).json()}catch(e){}
+    box.innerHTML=`<div class="card">Kata "<b>${esc(w)}</b>" tidak ditemukan di kamus.${sg.length?`<div style="margin-top:8px">Mungkin maksudmu: ${sg.map(x=>`<button class="x" style="background:#262b55;color:#eef0ff;margin:3px" onclick="kPick('${esc(x.word).replace(/'/g,'')}')">${esc(x.word)}</button>`).join('')}</div>`:''}</div>`;return}
+  const p=phon(d);let vf='';
+  if(hasVerb){const f=verbForms(base||w),forms=[...new Set([f.v1,...f.v2.split('/'),...f.v3.split('/'),f.ing,f.s])];
+    const ph={};await Promise.all(forms.map(async x=>{const dd=x===w?d:await dict(x);ph[x]=phon(dd)}));
+    const cell=x=>x.split('/').map(y=>`<div>${esc(y)} <button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(ph[y]&&ph[y].a||'')}','${esc(y)}')">🔊</button><div class="mut small">${esc(ph[y]&&ph[y].t||'')}</div></div>`).join('');
+    vf=`<div class="card"><h3>🔁 Bentuk verb ${esc(f.v1)} ${f.irr?'(irregular)':'(regular, bentuk dibuat dari aturan)'}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">${[['V1 (dasar)',f.v1],['V2 (lampau)',f.v2],['V3 (participle)',f.v3],['V-ing',f.ing],['V-s/es',f.s]].map(([l,x])=>`<div class="exp"><div class="small">${l}</div><b>${cell(x)}</b></div>`).join('')}</div>${IRRREV[w]?`<div class="mut small" style="margin-top:8px">"${esc(w)}" adalah bentuk lampau/participle dari "${esc(base)}".</div>`:''}</div>`}
+  const defs=(d||[]).flatMap(e=>e.meanings||[]).slice(0,5).map(m=>`<div style="margin-bottom:10px"><i style="color:var(--b)">${esc(m.partOfSpeech)}</i>${(m.definitions||[]).slice(0,3).map(x=>`<div class="small" style="margin:4px 0">• ${esc(x.definition)}${x.example?`<div class="mut">“${esc(x.example)}”</div>`:''}</div>`).join('')}${(m.synonyms||[]).length?`<div class="mut small">Sinonim: ${esc(m.synonyms.slice(0,6).join(', '))}</div>`:''}</div>`).join('');
+  box.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(w)}</h2><span class="mut">${esc(p.t)}</span><button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(p.a)}','${esc(w)}')">🔊 Dengar</button></div>
+    ${tr&&tr.toLowerCase()!==w?`<div style="margin:8px 0">🇮🇩 <b>${esc(tr)}</b> <span class="mut small">(terjemahan otomatis, cek ulang)</span></div>`:''}${defs||'<div class="mut small">Definisi tidak tersedia untuk bentuk kata ini.</div>'}
+    <button class="btn alt full" onclick="kAI('${esc(w)}')">🤖 Contoh kalimat & penjelasan</button><div id="kai"></div></div>${vf}`;
+}
+async function kAI(w){$('kai').innerHTML='<div class="exp">⏳ AI menjelaskan...</div>';
+  try{const t=await ai('You are an English dictionary assistant for Indonesian learners. Be accurate; do not invent.',[{role:'user',content:`Word: "${w}". Give: 1) meaning in Indonesian, 2) 3 natural example sentences with Indonesian translation, 3) common collocations, 4) frequent mistakes by Indonesian learners. Keep it concise.`}],false,false,'',S.sec);
+    $('kai').innerHTML=`<div class="exp">${fmt(t)}</div>`}catch(e){$('kai').innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}}
+function kIrr(f){
+  f=(f||'').toLowerCase();const rows=IRR.filter(r=>!f||r.join(' ').includes(f));
+  $('kbody').innerHTML=`<div class="card"><h3>📖 Irregular Verbs (${IRR.length})</h3><input id="kf" placeholder="Filter... (contoh: go, ken, written)" value="${esc(f)}" oninput="kIrr(this.value);$('kf').focus()"><div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:.9rem"><tr class="mut"><th align="left">V1</th><th align="left">V2</th><th align="left">V3</th></tr>${rows.map(r=>`<tr style="border-top:1px solid var(--line);cursor:pointer" onclick="kPick('${r[0]}')"><td style="padding:7px 4px"><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table></div></div>`;
+}
+async function kAZ(pre,more){
+  if(pre!==undefined&&!more){KM.pre=pre;KM.pg=100}if(more)KM.pg+=100;
+  const L='abcdefghijklmnopqrstuvwxyz'.split('');
+  $('kbody').innerHTML=`<div class="card"><h3>🔤 Jelajah kata</h3><div class="mut small" style="margin-bottom:8px">Pilih huruf, atau ketik awalan apa saja (misal "inter") untuk menampilkan hingga 1000 kata berawalan itu.</div><div style="display:flex;flex-wrap:wrap;gap:6px">${L.map(c=>`<button class="x" style="background:#262b55;color:#eef0ff" onclick="kAZ('${c}')">${c.toUpperCase()}</button>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><input id="kp" placeholder="awalan, contoh: inter" value="${esc(KM.pre)}" onkeydown="if(event.key==='Enter')kAZ(this.value.trim().toLowerCase())"><button class="btn" style="flex:0 0 auto" onclick="kAZ($('kp').value.trim().toLowerCase())">Tampilkan</button></div>
+    ${KM.pre&&KM.pre.length===1?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${L.map(c=>`<button class="x" style="background:#1d2250;color:#eef0ff" onclick="kAZ('${KM.pre}${c}')">${KM.pre}${c}</button>`).join('')}</div>`:''}<div id="kaz" class="mut small" style="margin-top:12px"></div></div>`;
+  if(!KM.pre)return;$('kaz').textContent='⏳ Memuat...';
+  try{const r=await fetch('https://api.datamuse.com/words?max=1000&sp='+encodeURIComponent(KM.pre)+'*'),j=await r.json(),ws=j.map(x=>x.word).filter(w=>/^[a-z]+$/.test(w)).sort();
+    $('kaz').innerHTML=`<div style="margin-bottom:8px">${ws.length} kata berawalan "<b>${esc(KM.pre)}</b>"${ws.length>=1000?' (maks. 1000, persempit awalan untuk melihat lebih banyak)':''}</div><div style="display:flex;flex-wrap:wrap;gap:6px">${ws.slice(0,KM.pg).map(w=>`<button class="x" style="background:#12152e;color:var(--tx);border:1px solid var(--line)" onclick="kPick('${w}')">${w}</button>`).join('')}</div>${ws.length>KM.pg?`<button class="btn alt full" onclick="kAZ(undefined,true)">Muat lebih banyak</button>`:''}`;
+  }catch(e){$('kaz').textContent='Gagal memuat daftar kata.'}
+}
+function setSec(s){S.sec=s;if(MAPEL[s])S.mapel=MAPEL[s][0];S.tab='latihan';home()}
+const _home=home;
+function home(){if(S.sec==='kamus')return kamusView();_home()}
+document.querySelector('.tabs').insertAdjacentHTML('beforeend','<button id="t-kamus" onclick="setSec(\'kamus\')">📚 Kamus</button>');
+if(user)home();
+/* ===== END V6 ===== */
 </script>
 </body>
 </html>
