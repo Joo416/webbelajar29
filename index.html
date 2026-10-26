@@ -1071,5 +1071,102 @@ document.querySelector('.tabs').insertAdjacentHTML('beforeend','<button id="t-ka
 if(user)home();
 /* ===== END V6 ===== */
 </script>
+<script>
+/* ===== UPDATE V7: kamus lengkap (contoh & kapan dipakai tiap bentuk verb, kata tersimpan, flashcard, latihan verb) ===== */
+const USE={
+ v1:['V1 — bentuk dasar','Present simple untuk kebiasaan/fakta (I, you, we, they + V1), infinitive (to + V1), kalimat perintah, dan setelah modal (can, will, must, should) atau do/does/did.','I / you / we / they + V1'],
+ v2:['V2 — bentuk lampau (past simple)','Kejadian yang sudah selesai di masa lampau, biasanya dengan yesterday, last week, ago, in 2020. Juga untuk pengandaian tidak nyata: If I + V2, I would ...','Subject + V2'],
+ v3:['V3 — past participle','Setelah have/has (present perfect: sudah/pernah), had (past perfect), dan bentuk pasif (be + V3). Bisa juga berfungsi sebagai kata sifat.','have/has/had + V3  •  be + V3'],
+ ing:['V-ing','Continuous tense (be + V-ing: sedang melakukan), gerund (kegiatan sebagai subjek/objek: Swimming is fun), setelah preposisi, dan setelah verba seperti enjoy, finish, avoid.','am / is / are / was / were + V-ing'],
+ s:['V-s / V-es','Present simple untuk subjek orang ketiga tunggal (he, she, it): He goes, she works.','he / she / it + V-s/es']
+};
+const KH=()=>{try{return JSON.parse(localStorage.getItem('khist')||'[]')}catch(e){return[]}};
+function addHist(w){const h=[w,...KH().filter(x=>x!==w)].slice(0,12);try{localStorage.setItem('khist',JSON.stringify(h))}catch(e){}}
+const chip=w=>`<button class="x" style="background:#262b55;color:#eef0ff;margin:2px" onclick="kPick('${String(w).replace(/[^a-zA-Z' -]/g,'')}')">${esc(w)}</button>`;
+function kamusView(){
+  ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
+  const TB=[['cari','🔍 Hasil'],['irr','📖 Irregular'],['az','🔤 A–Z'],['sv','⭐ Simpan'],['vq','🎯 Latihan']],h=KH();
+  $('app').innerHTML=`<div class="card"><h3>📚 Kamus Inggris</h3><div class="mut small" style="margin-bottom:8px">Pelafalan (IPA + suara), arti, contoh, Verb 1-2-3 dengan contoh dan aturan pemakaian. Data: Wiktionary (dictionaryapi.dev), Datamuse, MyMemory.</div>
+    <input id="kq" placeholder="Ketik kata Inggris... (contoh: go, went, beautiful)" autocomplete="off" autocapitalize="off" oninput="kSug(this.value)" onkeydown="if(event.key==='Enter')kGo()"><div id="ksug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    <button class="btn full" onclick="kGo()">🔍 Cari</button>${h.length?`<div class="mut small" style="margin-top:10px">Terakhir dicari:</div><div>${h.map(chip).join('')}</div>`:''}</div>
+  <div class="stabs">${TB.map(([k,l])=>`<button class="${KM.tab===k?'on':''}" style="font-size:.78rem" onclick="KM.tab='${k}';kamusView()">${l}</button>`).join('')}</div><div id="kbody"></div>`;
+  if(KM.tab==='cari'){if(KM.w){$('kq').value=KM.w;kLookup(KM.w)}else $('kbody').innerHTML='<div class="card mut small">Ketik kata di atas. Bentuk lampau seperti "went" atau "written" otomatis dikenali sebagai bentuk dari "go" dan "write".</div>'}
+  else if(KM.tab==='irr')kIrr();else if(KM.tab==='az')kAZ();else if(KM.tab==='sv')kSaved();else kVQ();
+}
+/* filter irregular: HANYA baris tabel yang diganti, kolom ketik tidak dibuat ulang (memperbaiki teks terbalik) */
+function kIrr(){
+  $('kbody').innerHTML=`<div class="card"><h3>📖 Irregular Verbs (${IRR.length})</h3><input id="kf" placeholder="Filter... (contoh: go, ken, written)" autocomplete="off" oninput="kIrrRows(this.value)"><div id="kirr" style="overflow-x:auto;margin-top:10px"></div></div>`;kIrrRows('');
+}
+function kIrrRows(f){
+  f=(f||'').toLowerCase().trim();const rows=IRR.filter(r=>!f||r.join(' ').includes(f));
+  $('kirr').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:.9rem"><tr class="mut"><th align="left">V1</th><th align="left">V2</th><th align="left">V3</th></tr>${rows.map(r=>`<tr style="border-top:1px solid var(--line);cursor:pointer" onclick="kPick('${r[0]}')"><td style="padding:7px 4px"><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table>`:'<div class="mut small">Tidak ada verb yang cocok.</div>';
+}
+async function loadWords(){try{const s=await db.collection('kata').where('uid','==',user.uid).limit(500).get();S.kw=s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){S.kw=S.kw||[]}return S.kw}
+async function saveWord(w,tr){
+  S.kw=S.kw||[];const ex=S.kw.find(x=>x.w===w),b=$('ksv');
+  try{if(ex){await db.collection('kata').doc(ex.id).delete();S.kw=S.kw.filter(x=>x.id!==ex.id)}else{const d={uid:user.uid,w,arti:tr||'',waktu:firebase.firestore.FieldValue.serverTimestamp()},r=await db.collection('kata').add(d);S.kw.push({id:r.id,...d})}}catch(e){alert('Gagal menyimpan: '+e.message)}
+  if(b)b.textContent=S.kw.some(x=>x.w===w)?'★ Tersimpan':'☆ Simpan'
+}
+const ex5=f=>({v1:f.v1,v2:f.v2.split('/')[0],v3:f.v3.split('/')[0],ing:f.ing,s:f.s});
+async function kExamples(base,f){
+  const key='kex_'+base;let j=null;try{j=JSON.parse(localStorage.getItem(key))}catch(e){}
+  const fill=o=>{['v1','v2','v3','ing','s'].forEach(k=>{const e=$('ex_'+k);if(e&&o[k]&&o[k].en)e.innerHTML=`<div>${esc(o[k].en)}</div><div class="mut small">${esc(o[k].id||'')}</div>`});const t=$('ex_tip');if(t&&o.tip)t.innerHTML=`<div class="exp">💡 ${esc(o.tip)}</div>`};
+  if(j){fill(j);return}
+  const fm=ex5(f);
+  try{const t=await ai('You are an accurate English grammar teacher for Indonesian learners. Output ONLY valid JSON, no markdown.',[{role:'user',content:`Verb: "${base}". Forms: V1="${fm.v1}", V2="${fm.v2}", V3="${fm.v3}", V-ing="${fm.ing}", V-s="${fm.s}". For EACH form write ONE natural example sentence (level A2-B1) that uses that exact form in the right grammar (V1: present simple or after a modal; V2: past simple; V3: present perfect or passive; V-ing: continuous; V-s: he/she/it). Add the Indonesian translation. Also add a short "tip" in Indonesian about a common mistake with this verb. JSON: {"v1":{"en":"","id":""},"v2":{"en":"","id":""},"v3":{"en":"","id":""},"ing":{"en":"","id":""},"s":{"en":"","id":""},"tip":""}`}],false,false,'',S.sec);
+    const m=t.match(/\{[\s\S]*\}/);j=JSON.parse(fixJ(m[0]));try{localStorage.setItem(key,JSON.stringify(j))}catch(e){}fill(j);
+  }catch(e){const t=$('ex_tip');if(t)t.innerHTML=`<div class="exp">⚠️ Contoh kalimat AI belum tersedia (${esc(e.message)}). <button class="x" onclick="kExamples('${base}',verbForms('${base}'))">Coba lagi</button></div>`}
+}
+async function kLookup(w){
+  const box=$('kbody');box.innerHTML='<div class="card">⏳ Mencari...</div>';addHist(w);
+  const base=IRRMAP[w]?w:IRRREV[w]||null;
+  const [d,tr]=await Promise.all([dict(w),fetch('https://api.mymemory.translated.net/get?langpair=en|id&q='+encodeURIComponent(w)).then(r=>r.json()).then(j=>j.responseData&&j.responseData.translatedText||'').catch(()=>''),loadWords()]);
+  if(KM.w!==w||!$('kbody'))return;
+  const isVerb=base||(d&&d.some(e=>(e.meanings||[]).some(m=>m.partOfSpeech==='verb')));
+  if(!d&&!base){let sg=[];try{sg=await (await fetch('https://api.datamuse.com/words?max=8&sp='+encodeURIComponent(w))).json()}catch(e){}
+    box.innerHTML=`<div class="card">Kata "<b>${esc(w)}</b>" tidak ditemukan di kamus.${sg.length?`<div style="margin-top:8px">Mungkin maksudmu: ${sg.map(x=>chip(x.word)).join('')}</div>`:''}</div>`;return}
+  const p=phon(d);let vf='';const vb=base||w,f=isVerb?verbForms(vb):null;
+  if(isVerb){const fm=ex5(f),forms=[...new Set([f.v1,...f.v2.split('/'),...f.v3.split('/'),f.ing,f.s])],ph={};
+    await Promise.all(forms.map(async x=>{ph[x]=phon(x===w?d:await dict(x))}));
+    const cell=x=>x.split('/').map(y=>`<div style="margin-bottom:4px"><b>${esc(y)}</b> <button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(ph[y]&&ph[y].a||'')}','${esc(y)}')">🔊</button> <span class="mut small">${esc(ph[y]&&ph[y].t||'')}</span></div>`).join('');
+    vf=`<div class="card"><h3>🔁 Verb "${esc(f.v1)}" ${f.irr?'(irregular)':'(regular — bentuk dibuat dari aturan ejaan, cek ulang bila ragu)'}</h3>${IRRREV[w]?`<div class="mut small" style="margin-bottom:8px">"${esc(w)}" adalah bentuk lampau/participle dari "${esc(base)}".</div>`:''}
+    ${['v1','v2','v3','ing','s'].map(k=>`<div class="exp" style="margin-bottom:10px;color:var(--tx)"><div style="color:var(--b);font-weight:700">${USE[k][0]}</div><div style="margin:6px 0">${cell(f[k])}</div><div class="small"><b>Kapan dipakai:</b> ${esc(USE[k][1])}</div><div class="small mut" style="margin-top:4px"><b>Pola:</b> ${esc(USE[k][2])}</div><div id="ex_${k}" class="small" style="margin-top:8px"><span class="mut">⏳ contoh kalimat...</span></div></div>`).join('')}<div id="ex_tip"></div></div>`}
+  const defs=(d||[]).flatMap(e=>e.meanings||[]).slice(0,5).map(m=>`<div style="margin-bottom:10px"><i style="color:var(--b)">${esc(m.partOfSpeech)}</i>${(m.definitions||[]).slice(0,3).map(x=>`<div class="small" style="margin:4px 0">• ${esc(x.definition)}${x.example?`<div class="mut">“${esc(x.example)}”</div>`:''}</div>`).join('')}${(m.synonyms||[]).length?`<div class="mut small">Sinonim: ${esc(m.synonyms.slice(0,6).join(', '))}</div>`:''}</div>`).join('');
+  const saved=(S.kw||[]).some(x=>x.w===w);
+  box.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(w)}</h2><span class="mut">${esc(p.t)}</span><button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(p.a)}','${esc(w)}')">🔊 Dengar</button><button id="ksv" class="x" style="background:#262b55;color:#eef0ff" onclick="saveWord('${esc(w)}',${JSON.stringify(tr||'').replace(/"/g,'&quot;')})">${saved?'★ Tersimpan':'☆ Simpan'}</button></div>
+    ${tr&&tr.toLowerCase()!==w?`<div style="margin:8px 0">🇮🇩 <b>${esc(tr)}</b> <span class="mut small">(terjemahan otomatis, cek ulang)</span></div>`:''}${defs||'<div class="mut small">Definisi tidak tersedia untuk bentuk kata ini.</div>'}
+    <button class="btn alt full" onclick="kAI('${esc(w)}')">🤖 Contoh kalimat & penjelasan</button><div id="kai"></div></div>${vf}`;
+  if(isVerb)kExamples(vb,f);
+}
+/* ---- kata tersimpan + flashcard ---- */
+let FC={list:[],i:0,show:false,ok:0};
+async function kSaved(){
+  $('kbody').innerHTML='<div class="card">⏳ Memuat...</div>';const ws=await loadWords();if(!$('kbody'))return;
+  $('kbody').innerHTML=`<div class="card"><h3>⭐ Kata tersimpan (${ws.length})</h3>${ws.length?`<button class="btn full" onclick="kFlash()">🃏 Flashcard (${ws.length} kata)</button>`:'<div class="mut small">Belum ada. Buka sebuah kata lalu klik ☆ Simpan.</div>'}
+    ${ws.map(x=>`<div class="item"><span style="cursor:pointer" onclick="kPick('${esc(x.w).replace(/'/g,'')}')"><b>${esc(x.w)}</b> <span class="mut small">${esc(x.arti||'')}</span></span><button class="x" onclick="delWord('${x.id}')">🗑</button></div>`).join('')}</div>`;
+}
+async function delWord(id){await db.collection('kata').doc(id).delete();S.kw=(S.kw||[]).filter(x=>x.id!==id);kSaved()}
+function kFlash(){FC={list:shuffle(S.kw||[]),i:0,show:false,ok:0};kFC()}
+function kFC(){
+  if(FC.i>=FC.list.length){$('kbody').innerHTML=`<div class="card"><div class="big">${Math.round(FC.ok/Math.max(1,FC.list.length)*100)}</div><div style="text-align:center" class="mut">Hafal ${FC.ok} dari ${FC.list.length}</div><button class="btn full" onclick="kFlash()">🔁 Ulangi</button><button class="btn alt full" onclick="kSaved()">Kembali</button></div>`;return}
+  const x=FC.list[FC.i];
+  $('kbody').innerHTML=`<div class="card" style="text-align:center"><div class="mut small">${FC.i+1}/${FC.list.length}</div><h2 style="margin:18px 0">${esc(x.w)}</h2><button class="x" style="background:#262b55;color:#eef0ff" onclick="speak('${esc(x.w).replace(/'/g,'')}')">🔊</button>
+    ${FC.show?`<div style="margin:16px 0;font-size:1.2rem"><b>${esc(x.arti||'(arti belum tersimpan)')}</b></div><div class="row"><button class="btn alt" onclick="FC.i++;FC.show=false;kFC()">Belum hafal</button><button class="btn" onclick="FC.ok++;FC.i++;FC.show=false;kFC()">Hafal ✔</button></div>`:`<button class="btn full" onclick="FC.show=true;kFC()">Tampilkan arti</button>`}<button class="btn alt full" onclick="kSaved()">Selesai</button></div>`;
+}
+/* ---- latihan verb V1-V2-V3 ---- */
+let VQ={n:0,ok:0,cur:null,done:false};
+function kVQ(){
+  if(!VQ.cur||VQ.done===null)VQ.cur=IRR[Math.floor(Math.random()*IRR.length)];VQ.done=false;const r=VQ.cur;
+  $('kbody').innerHTML=`<div class="card"><h3>🎯 Latihan Verb 1-2-3</h3><div id="vqs" class="mut small">Skor: ${VQ.ok}/${VQ.n}</div><div style="text-align:center;margin:14px 0"><div class="mut small">V1</div><h2 style="margin:4px 0">${r[0]}</h2></div>
+    <label>V2 (past simple)</label><input id="vq2" autocomplete="off" autocapitalize="off"><label>V3 (past participle)</label><input id="vq3" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')vqCheck()">
+    <button class="btn full" onclick="vqCheck()">Periksa</button><div id="vqr"></div></div>`;
+}
+function vqCheck(){
+  if(VQ.done)return;const r=VQ.cur,n=s=>String(s).toLowerCase().trim(),a2=n($('vq2').value),a3=n($('vq3').value),o2=r[1].split('/'),o3=r[2].split('/'),ok2=o2.includes(a2),ok3=o3.includes(a3);
+  VQ.done=true;VQ.n++;if(ok2&&ok3)VQ.ok++;if($('vqs'))$('vqs').textContent='Skor: '+VQ.ok+'/'+VQ.n;
+  $('vqr').innerHTML=`<div class="exp" style="color:var(--tx)">${ok2?'✅':'❌'} V2: <b>${r[1]}</b> ${ok2?'':'(jawabanmu: '+esc(a2||'kosong')+')'}<br>${ok3?'✅':'❌'} V3: <b>${r[2]}</b> ${ok3?'':'(jawabanmu: '+esc(a3||'kosong')+')'}</div><div class="row"><button class="btn" onclick="VQ.cur=null;kVQ()">Verb berikutnya ▶</button><button class="btn alt" onclick="kPick('${r[0]}')">Lihat contoh</button></div>`;
+}
+/* ===== END V7 ===== */
+</script>
 </body>
 </html>
