@@ -458,8 +458,10 @@ async function delJ(id){if(!confirm('Hapus trade ini?'))return;await db.collecti
 /* ===== UPDATE V4 ===== */
 async function ai(system,messages,big,search){
   const tk=await user.getIdToken();
-  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search})});
-  let j;try{j=await r.json()}catch(e){throw new Error('AI hanya aktif setelah web dibuka dari Vercel (bukan file lokal).')}
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi, atau matikan Google Search.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel (kemungkinan timeout atau fungsi error).')}
   if(!r.ok)throw new Error(j.error||'AI gagal');
   let t=j.text;
   if(search&&!big){
