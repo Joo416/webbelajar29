@@ -306,13 +306,13 @@ function tutorSys(){
 }
 function home(){
   ['sekolah','trading'].forEach(k=>$('t-'+k).classList.toggle('on',S.sec===k));
-  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['jurnal','📒 Jurnal']);
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['news','📰 News'],['jurnal','📒 Jurnal']);
   $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
     <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
   pane();
 }
-function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal})[S.tab]()}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews})[S.tab]()}
 
 /* ---- Latihan, ujian, review, statistik ---- */
 function pLatihan(){
@@ -1061,7 +1061,7 @@ function setSec(s){S.sec=s;if(MAPEL[s])S.mapel=MAPEL[s][0];S.tab='latihan';home(
 function home(){
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
-  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['jurnal','📒 Jurnal']);
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['news','📰 News'],['jurnal','📒 Jurnal']);
   $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
     <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
@@ -1247,6 +1247,53 @@ async function kLookup(w){
   if(vb)kExamples(vb,verbForms(vb));
 }
 /* ===== END V8 ===== */
+</script>
+<script>
+/* ===== UPDATE V9: tab News Trading (NFP / CPI / FOMC) ===== */
+document.head.insertAdjacentHTML('beforeend','<style>.stabs{overflow-x:auto}.stabs button{white-space:nowrap;padding:10px 12px}</style>');
+let NEWSF='all';
+const nfmt=(v,u='',s=false)=>v==null?'n/a':(s&&v>0?'+':'')+v+u;
+const fmtMd=t=>esc(t).replace(/^#{1,3}\s*(.+)$/gm,'<div style="font-weight:800;color:var(--b);margin-top:14px">$1</div>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^[-*]\s+/gm,'• ').replace(/\n/g,'<br>');
+function pNews(){
+  let c=null;try{c=JSON.parse(localStorage.getItem('news_'+NEWSF))}catch(e){}
+  $('pane').innerHTML=`<div class="card"><h3>📰 News Makro AS — NFP · CPI · FOMC</h3>
+    <div class="mut small" style="margin-bottom:10px">Angka resmi BLS + rilis Federal Reserve + berita dari Reuters, Bloomberg, WSJ, CNBC dan sejenisnya, lalu dianalisis AI. Hanya edukasi, bukan saran finansial.</div>
+    <div class="stabs" style="margin-bottom:10px">${[['all','Semua'],['nfp','NFP'],['cpi','CPI'],['fomc','FOMC']].map(([k,l])=>`<button class="${NEWSF===k?'on':''}" onclick="NEWSF='${k}';pNews()">${l}</button>`).join('')}</div>
+    <button class="btn full" id="nbtn" onclick="loadNews()">🔄 Ambil data terbaru & analisis</button><div id="nmsg" class="mut small" style="margin-top:8px"></div></div><div id="nres"></div>`;
+  if(c)renderNews(c,true);
+}
+async function loadNews(){
+  const f=NEWSF;$('nbtn').disabled=true;$('nmsg').textContent='⏳ Mengambil data BLS, rilis The Fed, dan berita tepercaya, lalu menganalisis (bisa 20-40 detik)...';
+  try{const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),95000);let r;
+    try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'news',focus:f})})}finally{clearTimeout(to)}
+    let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+' (kemungkinan timeout, coba lagi)')}
+    if(!r.ok)throw new Error(j.error||'Gagal mengambil news');
+    try{localStorage.setItem('news_'+f,JSON.stringify(j))}catch(e){}
+    if(NEWSF===f&&$('nres'))renderNews(j,false);
+    if($('nmsg'))$('nmsg').textContent=j.cached?'✅ Memakai data server yang masih baru (<5 menit)':'✅ Selesai';
+  }catch(e){if($('nmsg'))$('nmsg').textContent='⚠️ '+(e.name==='AbortError'?'Terlalu lama (timeout), coba lagi':e.message)}
+  if($('nbtn'))$('nbtn').disabled=false;
+}
+function renderNews(j,stale){
+  const d=j.data||{},cards=[];
+  if(d.nfp)cards.push(['NFP '+d.nfp.period,nfmt(d.nfp.change,'K',true),'sebelumnya '+nfmt(d.nfp.prevChange,'K',true)]);
+  if(d.ur)cards.push(['Pengangguran '+d.ur.period,d.ur.value+'%','sebelumnya '+d.ur.prev+'%']);
+  if(d.ahe)cards.push(['Upah per jam '+d.ahe.period,nfmt(d.ahe.mom,'%',true)+' MoM','YoY '+nfmt(d.ahe.yoy,'%',true)]);
+  if(d.cpi)cards.push(['CPI '+d.cpi.period,nfmt(d.cpi.yoy,'%')+' YoY','MoM '+nfmt(d.cpi.mom,'%',true)+' (sebelumnya '+nfmt(d.cpi.prevMom,'%',true)+')']);
+  if(d.core)cards.push(['Core CPI '+d.core.period,nfmt(d.core.yoy,'%')+' YoY','MoM '+nfmt(d.core.mom,'%',true)+' (sebelumnya '+nfmt(d.core.prevMom,'%',true)+')']);
+  const t=new Date(j.fetchedAt),srcs=j.sources||[];
+  $('nres').innerHTML=`<div class="card"><div class="mut small">${stale?'🗂 Tersimpan di browser • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>
+    ${cards.length?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.25rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="mut small" style="margin-top:6px">Angka dari BLS (api.bls.gov), dihitung dari angka yang diterbitkan dan bisa direvisi.</div>`:'<div class="warn" style="margin-top:10px">Angka BLS tidak tersedia saat ini.</div>'}</div>
+    <div class="card"><h3>🧠 Analisis AI</h3>${j.analysis?`<div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(j.analysis)}</div><button class="btn alt full" onclick="saveNews()">📝 Simpan ke Catatan</button>`:'<div class="warn">Analisis AI gagal. Data mentah tetap ditampilkan di atas dan bawah.</div>'}</div>
+    <div class="card"><h3>🔗 Sumber (${srcs.length})</h3>${srcs.map((s,i)=>`<div class="item"><span><b>[${i+1}]</b> <a href="${esc(s.uri)}" target="_blank" rel="noopener" style="color:var(--b)">${esc(s.title)}</a> <span class="mut small">${esc(s.domain)}${s.official?' ★resmi':''}${s.date?' • '+esc(s.date):''}</span></span></div>`).join('')||'<div class="mut small">Tidak ada sumber yang berhasil diambil.</div>'}</div>
+    ${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,400))}</div>`:''}<div class="mut small" style="margin-top:8px">Ini analisis edukasi berbasis data publik, bukan saran finansial. Rilis data bisa direvisi dan pasar bisa bergerak berbeda dari skenario.</div>`;
+}
+async function saveNews(){
+  const c=JSON.parse(localStorage.getItem('news_'+NEWSF)||'null');if(!c||!c.analysis)return;
+  await db.collection('catatan').add({uid:user.uid,teks:`[News ${NEWSF.toUpperCase()} • ${new Date(c.fetchedAt).toLocaleString('id-ID')}]\n${c.analysis}`,waktu:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('Analisis disimpan ke Catatan (tab Jurnal).');
+}
+/* ===== END V9 ===== */
 </script>
 </body>
 </html>
