@@ -281,14 +281,14 @@ async function seed(){
 }
 function loginView(){
   document.querySelector('.tabs').style.display='none';$('userbar').innerHTML='';
-  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 18px"><div style="font-size:2.4rem">🔐</div><h3 style="font-size:1.2rem">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:18px">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri.</div><button class="btn" onclick="login()">Masuk dengan Google</button><div id="lerr" class="mut small" style="margin-top:12px"></div></div>`;
+  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 18px"><div style="font-size:2.4rem">🔐</div><h3 style="font-size:1.2rem">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:18px">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri. Akses dibatasi: akunmu harus disetujui admin.</div><button class="btn" onclick="login()">Masuk dengan Google</button><div id="lerr" class="mut small" style="margin-top:12px"></div></div>`;
 }
 async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){$('lerr').textContent='Gagal masuk: '+e.message}}
 if(auth)auth.onAuthStateChanged(u=>{
-  user=u;if(!u)return loginView();
-  document.querySelector('.tabs').style.display='';
+  user=u;if(!u){S.admin=false;return loginView()}
+  document.querySelector('.tabs').style.display='none';
   $('userbar').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 14px">${u.photoURL?`<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" style="width:32px;height:32px;border-radius:50%">`:''}<span style="flex:1;font-size:.9rem">${esc(u.displayName||u.email||'Pengguna')}</span><button class="btn alt" style="padding:8px 12px" onclick="auth.signOut()">Keluar</button></div>`;
-  home();
+  gate(u);
 });
 </script>
 <script>
@@ -1059,6 +1059,7 @@ async function kAZ(pre,more){
 }
 function setSec(s){S.sec=s;if(MAPEL[s])S.mapel=MAPEL[s][0];S.tab='latihan';home()}
 function home(){
+  if(S.sec==='admin')return adminView();
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
   const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];if(S.sec==='trading')T.push(['news','📰 News'],['pro','🧠 Analisis'],['jurnal','📒 Jurnal']);
@@ -1407,6 +1408,87 @@ async function savePro(){
   await db.collection('catatan').add({uid:user.uid,teks:txt,waktu:firebase.firestore.FieldValue.serverTimestamp()});alert('Ringkasan disimpan ke Catatan (tab Jurnal).');
 }
 /* ===== END V10 ===== */
+</script>
+<script>
+/* ===== UPDATE V11: kontrol akses (izin / blokir pengguna) ===== */
+document.head.insertAdjacentHTML('beforeend','<style>.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:700}.b-aktif{background:#12352f;color:var(--b)}.b-menunggu{background:#3a2a10;color:#ffd48a}.b-diblokir{background:#3a1626;color:var(--bad)}</style>');
+const tsNow=()=>firebase.firestore.FieldValue.serverTimestamp();
+const tabsShow=v=>{document.querySelector('.tabs').style.display=v?'':'none'};
+async function gate(u){
+  tabsShow(false);S.admin=false;const em=String(u.email||'').toLowerCase();
+  $('app').innerHTML='<div class="card">⏳ Memeriksa izin akses...</div>';
+  if(!em)return deniedView('error','Akun Google ini tidak memiliki email.');
+  try{
+    const ref=db.collection('pengguna').doc(em),base={email:em,nama:u.displayName||'',foto:u.photoURL||'',uid:u.uid};
+    let admin=false;try{await db.collection('pengguna').limit(1).get();admin=true}catch(e){}
+    if(admin){await ref.set({...base,status:'aktif',admin:true,terakhir:tsNow()},{merge:true});S.admin=true;return enter()}
+    let d=await ref.get();
+    if(!d.exists){await ref.set({...base,status:'menunggu',dibuat:tsNow()});d=await ref.get()}
+    const st=(d.data()||{}).status;
+    if(st==='aktif')return enter();
+    deniedView(st==='diblokir'?'diblokir':'menunggu')
+  }catch(e){deniedView('error',e.message)}
+}
+async function enter(){
+  tabsShow(true);const tb=document.querySelector('.tabs');
+  if(S.admin&&!$('t-admin'))tb.insertAdjacentHTML('beforeend','<button id="t-admin" onclick="setSec(\'admin\')">👑 Admin</button>');
+  if(!S.admin&&$('t-admin'))$('t-admin').remove();
+  home();if(S.admin)adminBadge();
+}
+async function adminBadge(){try{const s=await db.collection('pengguna').where('status','==','menunggu').get();const b=$('t-admin');if(b)b.textContent='👑 Admin'+(s.size?' ('+s.size+')':'')}catch(e){}}
+function deniedView(st,msg){
+  tabsShow(false);const em=(user&&user.email)||'';
+  const T={menunggu:['⏳','Menunggu persetujuan admin','Akunmu sudah terdaftar, tetapi admin belum mengizinkan akses. Kamu bisa masuk setelah admin menyetujui.'],diblokir:['⛔','Akses diblokir','Admin memblokir akunmu. Hubungi admin bila ini keliru.'],error:['⚠️','Gagal memeriksa izin',msg||'']}[st];
+  $('app').innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:2.4rem">${T[0]}</div><h3 style="font-size:1.15rem">${T[1]}</h3><div class="mut small" style="margin-bottom:8px">${esc(T[2])}</div><div class="small" style="margin-bottom:14px">Akun: <b>${esc(em)}</b></div>${st==='diblokir'?'':'<button class="btn" onclick="gate(user)">🔄 Cek lagi</button>'}</div>`;
+}
+/* ---- panel admin ---- */
+let AD={f:'semua',q:'',list:[]};
+async function adminView(){
+  ['sekolah','trading','kamus','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',k==='admin')});
+  if(!S.admin){$('app').innerHTML='<div class="card">Halaman ini hanya untuk admin.</div>';return}
+  $('app').innerHTML='<div class="card">⏳ Memuat daftar pengguna...</div>';
+  try{const s=await db.collection('pengguna').limit(500).get();AD.list=s.docs.map(d=>({id:d.id,...d.data()}))}
+  catch(e){$('app').innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`;return}
+  drawAdmin();adminBadge();
+}
+const ST_ORD={menunggu:0,aktif:1,diblokir:2};
+function drawAdmin(){
+  const L=AD.list,c=k=>L.filter(x=>x.status===k).length;
+  $('app').innerHTML=`<div class="card"><h3>👑 Kelola pengguna</h3><div class="mut small">Hanya akun berstatus <b>aktif</b> yang bisa memakai web, data, dan AI. Pengguna baru otomatis masuk daftar <b>menunggu</b> sampai kamu menyetujuinya.</div>
+    <div class="row" style="margin-top:12px">${[['aktif','aktif'],['menunggu','menunggu'],['diblokir','diblokir']].map(([k,l])=>`<div class="exp" style="text-align:center;color:var(--tx)"><b style="font-size:1.3rem">${c(k)}</b><div class="small mut">${l}</div></div>`).join('')}</div>
+    <div class="stabs" style="margin-top:12px">${['semua','menunggu','aktif','diblokir'].map(k=>`<button class="${AD.f===k?'on':''}" onclick="AD.f='${k}';drawAdmin()">${k}</button>`).join('')}</div>
+    <input id="adq" placeholder="Cari email atau nama..." autocomplete="off" value="${esc(AD.q)}" oninput="adSearch(this.value)">
+    <div id="adlist"></div></div>
+    <div class="card"><h3>➕ Izinkan email tertentu</h3><div class="mut small" style="margin-bottom:8px">Daftarkan email sebelum orangnya login, langsung berstatus aktif.</div><input id="adem" type="email" placeholder="nama@gmail.com" autocomplete="off"><button class="btn full" onclick="adAdd()">Izinkan</button></div>`;
+  drawAdList();
+}
+function adSearch(v){AD.q=v;drawAdList()}
+function drawAdList(){
+  const me=String((user&&user.email)||'').toLowerCase(),q=AD.q.toLowerCase().trim();
+  const rows=AD.list.filter(x=>(AD.f==='semua'||x.status===AD.f)&&(!q||((x.email||'')+' '+(x.nama||'')).toLowerCase().includes(q))).sort((a,b)=>((ST_ORD[a.status]??3)-(ST_ORD[b.status]??3))||String(a.email).localeCompare(String(b.email)));
+  const box=$('adlist');if(!box)return;
+  box.innerHTML=rows.length?rows.map(x=>{const self=x.email===me,id=esc(x.id);
+    const acts=self?'<span class="mut small">(kamu)</span>':`${x.status!=='aktif'?`<button class="x" style="background:#12352f;color:var(--b)" data-id="${id}" onclick="adSet(this,'aktif')">✅ Izinkan</button>`:''}${x.status!=='diblokir'?`<button class="x" data-id="${id}" onclick="adSet(this,'diblokir')">⛔ Blokir</button>`:''}<button class="x" style="background:#262b55;color:#eef0ff" data-id="${id}" onclick="adDel(this)">🗑</button>`;
+    return `<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span style="display:flex;align-items:center;gap:8px">${x.foto?`<img src="${esc(x.foto)}" referrerpolicy="no-referrer" style="width:30px;height:30px;border-radius:50%">`:'👤'}<span><b>${esc(x.nama||'(belum ada nama)')}</b>${x.admin?' 👑':''}<div class="small mut">${esc(x.email||x.id)}</div></span></span><span class="badge b-${esc(x.status)}">${esc(x.status)}</span><span style="display:flex;gap:6px">${acts}</span></div>`}).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada pengguna yang cocok.</div>';
+}
+async function adSet(el,st){
+  const id=el.dataset.id,x=AD.list.find(v=>v.id===id);if(!x)return;
+  if(st==='diblokir'&&!confirm(`Blokir ${x.email||id}? Ia langsung tidak bisa memakai web dan AI.`))return;
+  try{await db.collection('pengguna').doc(id).update({status:st,diubah:tsNow()});x.status=st;drawAdmin();adminBadge()}catch(e){alert('Gagal: '+e.message)}
+}
+async function adDel(el){
+  const id=el.dataset.id,x=AD.list.find(v=>v.id===id);if(!x)return;
+  if(!confirm(`Hapus ${x.email||id} dari daftar? Jika orang ini login lagi, ia akan kembali berstatus menunggu.`))return;
+  try{await db.collection('pengguna').doc(id).delete();AD.list=AD.list.filter(v=>v.id!==id);drawAdmin();adminBadge()}catch(e){alert('Gagal: '+e.message)}
+}
+async function adAdd(){
+  const em=($('adem').value||'').trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return alert('Format email tidak valid');
+  try{await db.collection('pengguna').doc(em).set({email:em,status:'aktif',manual:true,dibuat:tsNow()},{merge:true});
+    const x=AD.list.find(v=>v.id===em);if(x)x.status='aktif';else AD.list.push({id:em,email:em,status:'aktif',manual:true});drawAdmin();adminBadge()}
+  catch(e){alert('Gagal: '+e.message)}
+}
+/* ===== END V11 ===== */
 </script>
 </body>
 </html>
