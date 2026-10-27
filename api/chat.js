@@ -155,7 +155,31 @@ async function verify(req) {
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + key, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: tk })
   });
-  return r.ok ? 'ok' : null;
+  if (!r.ok) return null;
+  const j = await r.json(), u = j.users && j.users[0];
+  return u && u.email ? { email: String(u.email).toLowerCase(), token: tk } : null;
+}
+
+/* kontrol akses: hanya akun berstatus 'aktif' di koleksi pengguna yang boleh memakai API */
+const accessCache = new Map();
+async function authorize(req) {
+  const u = await verify(req);
+  if (!u) return { ok: false, status: 401, error: 'Silakan login dulu' };
+  if (process.env.ACCESS_CONTROL === 'off') return { ok: true, email: u.email };
+  const c = accessCache.get(u.email);
+  if (c && Date.now() - c.t < 60000) return c.ok ? { ok: true, email: u.email } : { ok: false, status: 403, error: c.txt };
+  try {
+    const proj = process.env.FIREBASE_PROJECT_ID || 'ruangbelajar-8584c';
+    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${proj}/databases/(default)/documents/pengguna/${encodeURIComponent(u.email)}`, { headers: { Authorization: 'Bearer ' + u.token }, signal: AbortSignal.timeout(8000) });
+    if (r.status === 200) {
+      const j = await r.json(), st = j.fields && j.fields.status && j.fields.status.stringValue, ok = st === 'aktif';
+      const txt = st === 'diblokir' ? 'Akunmu diblokir oleh admin.' : 'Akunmu belum disetujui admin.';
+      accessCache.set(u.email, { t: Date.now(), ok, txt });
+      return ok ? { ok: true, email: u.email } : { ok: false, status: 403, error: txt };
+    }
+    if (r.status === 404 || r.status === 403) { const txt = 'Akunmu belum disetujui admin.'; accessCache.set(u.email, { t: Date.now(), ok: false, txt }); return { ok: false, status: 403, error: txt }; }
+    return { ok: false, status: 503, error: 'Tidak bisa memeriksa izin akses (Firestore membalas ' + r.status + '). Coba lagi.' };
+  } catch (e) { return { ok: false, status: 503, error: 'Tidak bisa memeriksa izin akses: ' + msg(e) }; }
 }
 
 /* ---------- TRADING: KALENDER RILIS, DATA RESMI, BERITA & ANALISIS PRO ---------- */
@@ -523,7 +547,8 @@ OUTPUT: HANYA JSON valid (tanpa markdown), semua teks Bahasa Indonesia, backslas
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Hanya POST' });
-  if (!(await verify(req))) return res.status(401).json({ error: 'Silakan login dulu' });
+  const au = await authorize(req);
+  if (!au.ok) return res.status(au.status).json({ error: au.error });
   if (req.body && req.body.action === 'news') return newsHandler(req, res);
   if (req.body && req.body.action === 'pro') return proHandler(req, res);
   const { system = '', messages = [], big = false, search: want = false, q = '', cat = 'sekolah' } = req.body || {};
