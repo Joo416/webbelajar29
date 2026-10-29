@@ -1058,7 +1058,7 @@ async function kAZ(pre,more){
   }catch(e){($('kaz')||{}).textContent='Gagal memuat daftar kata.'}
 }
 function setSec(s){S.sec=s;if(MAPEL[s])S.mapel=MAPEL[s][0];S.tab='latihan';home()}
-function home(){
+function homeBase(){
   if(S.sec==='admin')return adminView();
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
@@ -1363,7 +1363,7 @@ function pPro(){
   $('pane').innerHTML=`<div class="card"><h3>🧠 Analisis Pro — arah bias per pair</h3>
     <div class="mut small" style="margin-bottom:10px">AI membaca ulang SEMUA data terbaru setiap kali dijalankan (kalender terverifikasi, angka BLS, suku bunga NY Fed, yield Treasury, kurs harian ECB, dan berita tepercaya), lalu menyusun bias dengan kerangka trader profesional. AI tidak "mengingat" situs; hanya data yang tampil di bawah yang dipakai. Edukasi, bukan saran finansial.</div>
     <label>Pair yang dianalisis</label><div id="ppairs" style="display:flex;flex-wrap:wrap;gap:6px">${ALLP.map(p=>`<button class="x" style="background:${PRP.sel.includes(p)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${p}')">${p}</button>`).join('')}</div>
-    <label>Horizon</label><select onchange="PRP.hz=this.value">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
+    <label>Horizon</label><select onchange="PRP.hz=this.value;prpSave16()">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
     <button class="btn full" id="pbtn" onclick="runPro()">🧠 Analisis mendalam sekarang</button><div id="pmsg" class="mut small" style="margin-top:8px"></div></div><div id="pres"></div>`;
   if(c)renderPro(c,true);
 }
@@ -1795,7 +1795,7 @@ function pPro(){
   $('pane').innerHTML=`<div class="card"><h3>🧠 Analisis Pro — arah bias per pair</h3>
     <div class="mut small" style="margin-bottom:10px">AI membaca ulang SEMUA data terbaru setiap kali dijalankan (kalender terverifikasi, angka BLS, suku bunga NY Fed, yield Treasury, kurs harian ECB, dan berita tepercaya), lalu menyusun bias dengan kerangka trader profesional. AI tidak "mengingat" situs; hanya data yang tampil di bawah yang dipakai. Edukasi, bukan saran finansial.</div>
     <label>Pair yang dianalisis</label><div id="ppairs" style="display:flex;flex-wrap:wrap;gap:6px">${ALLP.map(p=>`<button class="x" style="background:${PRP.sel.includes(p)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${p}')">${p}</button>`).join('')}</div>
-    <label>Horizon</label><select onchange="PRP.hz=this.value">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
+    <label>Horizon</label><select onchange="PRP.hz=this.value;prpSave16()">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
     <button class="btn full" id="pbtn" onclick="runPro()">🧠 Analisis mendalam sekarang</button><div id="pmsg" class="mut small" style="margin-top:8px"></div></div><div id="pres"></div>`;
   if(c)renderPro2(c,true);
 }
@@ -2146,12 +2146,12 @@ function keyDataHtml(j){
 function renderPro(j,stale){
   renderProBase(j,stale);
   const c=document.querySelector('#pres .card');if(!c)return;
-  const x=ndHtml15(j)+directionHtml15(j)+intelHtml14(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j);if(x)c.insertAdjacentHTML('afterend',x);
+  window.LAST16=j;if(!stale)snapSave16(j);const x=cdHtml16(j)+ndHtml15(j)+directionHtml15(j)+intelHtml14(j)+trackHtml16(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'pro');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
 }
 function renderNews(j,stale){
   renderNewsBase(j,stale);
   const c=document.querySelector('#nres .card');if(!c)return;
-  const x=directionHtml15(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j);if(x)c.insertAdjacentHTML('afterend',x);
+  window.LASTN16=j;const x=cdHtml16(j)+directionHtml15(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'news');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
 }
 /* ===== END V14 ===== */
 </script>
@@ -2193,6 +2193,158 @@ function ndHtml15(j){
   return `<div class="card"><h3>🎯 Arah berita menurut AI (divalidasi terhadap mesin)</h3>${nd?`<div class="item"><span><b>Arah USD</b> ${B[nd.usd]||''} ${esc(nd.usd)}</span><span class="small">${nd.engine?'mesin: '+esc(nd.engine.bias)+' ('+sg15(nd.engine.score)+')':''}</span></div>${nd.conflict?'<div class="warn" style="margin:6px 0">⚠️ Bertentangan dengan mesin skor. Utamakan mesin; anggap arah AI tidak terkonfirmasi.</div>':''}<div class="exp" style="color:var(--tx);margin-top:6px">${fmt(nd.summary||'')}</div>${(nd.catalysts||[]).map(c=>`<div style="margin-top:10px"><b>${esc(c.event)}</b><div class="small" style="color:#9be7b0">Bull jika: ${esc(c.bull_if)}</div><div class="small" style="color:#ffb3b3">Bear jika: ${esc(c.bear_if)}</div>${c.pairs_effect?`<div class="small mut">${esc(c.pairs_effect)}</div>`:''}</div>`).join('')}`:''}${refs.length?`<div class="warn" style="margin-top:10px">Pemeriksaan otomatis atas jawaban AI:<br>${refs.map(r=>'• '+esc(r)).join('<br>')}</div>`:''}</div>`;
 }
 /* ===== END V15 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V16: Trading khusus admin (izin per pengguna) + peningkatan News/Analisis ===== */
+
+/* ---------- 1. AKSES: hanya admin, atau pengguna yang disetujui admin ---------- */
+function tabLabel16(){const b=$('t-trading');if(b)b.textContent=(S.trading?'📈 ':'🔒 ')+'Trading'}
+async function enter(){
+  const em=String((user&&user.email)||'').toLowerCase();S.trading=!!S.admin;S.tradeReq=null;S.tradeErr='';
+  if(!S.admin&&em){try{const d=await db.collection('izin_trading').doc(em).get();S.tradeReq=d.exists?{id:d.id,...d.data()}:null;S.trading=!!S.tradeReq&&S.tradeReq.status==='disetujui'}catch(e){S.tradeErr=e.message||String(e)}}
+  tabsShow(true);const tb=document.querySelector('.tabs');
+  if(S.admin&&!$('t-admin'))tb.insertAdjacentHTML('beforeend','<button id="t-admin" onclick="setSec(\'admin\')">👑 Admin</button>');
+  if(!S.admin&&$('t-admin'))$('t-admin').remove();
+  tabLabel16();home();if(S.admin)adminBadge();
+}
+function home(){if(S.sec==='trading'&&!S.admin&&!S.trading)return tradingLockView();return homeBase()}
+function tradingLockView(){
+  ['sekolah','trading','kamus','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',k==='trading')});
+  const st=S.tradeReq&&S.tradeReq.status;
+  const m={menunggu:['⏳','Permintaan izin sedang menunggu admin','Admin akan meninjau permintaanmu. Setelah disetujui, tekan "Cek status".'],ditolak:['⛔','Permintaan ditolak','Admin menolak permintaan sebelumnya. Kamu bisa mengajukan lagi dengan alasan yang lebih jelas.'],dicabut:['🚫','Izin dicabut','Admin mencabut izin Trading-mu. Ajukan lagi bila masih perlu.']}[st]||['🔒','Fitur Trading khusus admin','Tab ini (materi, news, analisis, jurnal) hanya untuk admin. Pengguna lain perlu izin dari admin.'];
+  const canAsk=!st||st==='ditolak'||st==='dicabut';
+  $('app').innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:2.4rem">${m[0]}</div><h3 style="font-size:1.15rem">${m[1]}</h3><div class="mut small" style="margin-bottom:12px">${esc(m[2])}</div>${S.tradeErr?`<div class="warn" style="margin-bottom:10px;text-align:left">Status izin belum bisa dibaca: ${esc(S.tradeErr)}. Kemungkinan aturan Firestore untuk izin Trading belum dipasang oleh admin.</div>`:''}${canAsk?`<textarea id="trmsg" placeholder="Alasan singkat kenapa butuh akses Trading (opsional)" maxlength="300" style="width:100%;min-height:70px;margin-bottom:8px"></textarea><button class="btn full" onclick="reqTrading()">📨 Ajukan izin ke admin</button>`:''}<button class="btn alt full" style="margin-top:8px" onclick="checkTrading()">🔄 Cek status</button><div id="trm" class="mut small" style="margin-top:8px"></div></div>`;
+}
+async function reqTrading(){
+  const em=String((user&&user.email)||'').toLowerCase(),pesan=(($('trmsg')||{}).value||'').trim().slice(0,300),ref=db.collection('izin_trading').doc(em);
+  setTxt('trm','⏳ Mengirim permintaan...');
+  try{
+    if(S.tradeReq)await ref.update({status:'menunggu',pesan,diminta:tsNow()});
+    else await ref.set({email:em,uid:user.uid,status:'menunggu',pesan,dibuat:tsNow()});
+    const d=await ref.get();S.tradeReq={id:d.id,...d.data()};S.tradeErr='';tradingLockView();setTxt('trm','✅ Permintaan terkirim. Hubungi admin agar segera ditinjau.');
+  }catch(e){setTxt('trm','⚠️ Gagal mengirim: '+(e.message||e)+' — beri tahu admin agar memasang aturan Firestore terbaru.')}
+}
+async function checkTrading(){
+  const em=String((user&&user.email)||'').toLowerCase();setTxt('trm','⏳ Memeriksa...');
+  try{const d=await db.collection('izin_trading').doc(em).get();S.tradeReq=d.exists?{id:d.id,...d.data()}:null;S.tradeErr='';S.trading=!!S.tradeReq&&S.tradeReq.status==='disetujui';tabLabel16();
+    if(S.trading)home();else{tradingLockView();setTxt('trm','Belum disetujui.')}}
+  catch(e){S.tradeErr=e.message||String(e);tradingLockView()}
+}
+
+/* ---------- 2. PANEL ADMIN: kelola izin Trading ---------- */
+async function adminView(){
+  ['sekolah','trading','kamus','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',k==='admin')});
+  if(!S.admin){$('app').innerHTML='<div class="card">Halaman ini hanya untuk admin.</div>';return}
+  $('app').innerHTML='<div class="card">⏳ Memuat daftar pengguna...</div>';
+  try{const s=await db.collection('pengguna').limit(500).get();AD.list=s.docs.map(d=>({id:d.id,...d.data()}))}
+  catch(e){$('app').innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`;return}
+  AD.tr={};AD.trErr='';
+  try{const t=await db.collection('izin_trading').limit(500).get();t.docs.forEach(d=>{AD.tr[d.id]={id:d.id,...d.data()}})}catch(e){AD.trErr=e.message||String(e)}
+  drawAdmin();adminBadge();
+}
+function trCard16(){
+  if(AD.trErr)return `<div class="card"><h3>📈 Izin Trading</h3><div class="warn">Koleksi "izin_trading" belum bisa dibaca (${esc(AD.trErr)}). Pasang aturan Firestore terbaru agar izin Trading bisa diberikan dan diminta.</div></div>`;
+  const L=Object.values(AD.tr||{}),pend=L.filter(x=>x.status==='menunggu'),okn=L.filter(x=>x.status==='disetujui').length;
+  return `<div class="card"><h3>📈 Izin Trading (${okn} disetujui${pend.length?' • '+pend.length+' menunggu':''})</h3><div class="mut small">Tab Trading hanya untuk admin. Pengguna lain butuh izin dari sini. Perubahan berlaku maksimal 1 menit.</div>${pend.length?pend.map(x=>`<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span><b>${esc(x.email||x.id)}</b><div class="small mut">${esc(x.pesan||'(tanpa pesan)')}</div></span><span style="display:flex;gap:6px"><button class="x" style="background:#12352f;color:var(--b)" data-id="${esc(x.id)}" onclick="adTrade(this,'disetujui')">✅ Setujui</button><button class="x" data-id="${esc(x.id)}" onclick="adTrade(this,'ditolak')">⛔ Tolak</button></span></div>`).join(''):'<div class="mut small" style="margin-top:8px">Tidak ada permintaan baru.</div>'}</div>`;
+}
+function drawAdmin(){
+  const L=AD.list,c=k=>L.filter(x=>x.status===k).length;
+  $('app').innerHTML=trCard16()+`<div class="card"><h3>👑 Kelola pengguna</h3><div class="mut small">Hanya akun berstatus <b>aktif</b> yang bisa memakai web, data, dan AI. Pengguna baru otomatis masuk daftar <b>menunggu</b> sampai kamu menyetujuinya. Izin Trading diberikan terpisah per pengguna.</div>
+    <div class="row" style="margin-top:12px">${[['aktif','aktif'],['menunggu','menunggu'],['diblokir','diblokir']].map(([k,l])=>`<div class="exp" style="text-align:center;color:var(--tx)"><b style="font-size:1.3rem">${c(k)}</b><div class="small mut">${l}</div></div>`).join('')}</div>
+    <div class="stabs" style="margin-top:12px">${['semua','menunggu','aktif','diblokir'].map(k=>`<button class="${AD.f===k?'on':''}" onclick="AD.f='${k}';drawAdmin()">${k}</button>`).join('')}</div>
+    <input id="adq" placeholder="Cari email atau nama..." autocomplete="off" value="${esc(AD.q)}" oninput="adSearch(this.value)">
+    <div id="adlist"></div></div>
+    <div class="card"><h3>➕ Izinkan email tertentu</h3><div class="mut small" style="margin-bottom:8px">Daftarkan email sebelum orangnya login, langsung berstatus aktif.</div><input id="adem" type="email" placeholder="nama@gmail.com" autocomplete="off"><button class="btn full" onclick="adAdd()">Izinkan</button></div>`;
+  drawAdList();
+}
+function drawAdList(){
+  const me=String((user&&user.email)||'').toLowerCase(),q=AD.q.toLowerCase().trim();
+  const rows=AD.list.filter(x=>(AD.f==='semua'||x.status===AD.f)&&(!q||((x.email||'')+' '+(x.nama||'')).toLowerCase().includes(q))).sort((a,b)=>((ST_ORD[a.status]??3)-(ST_ORD[b.status]??3))||String(a.email).localeCompare(String(b.email)));
+  const box=$('adlist');if(!box)return;
+  box.innerHTML=rows.length?rows.map(x=>{const self=x.email===me,id=esc(x.id),tr=(AD.tr&&AD.tr[x.id]||{}).status;
+    const tb=x.admin?'<span class="badge b-aktif">📈 admin</span>':`<span class="badge ${tr==='disetujui'?'b-aktif':tr==='menunggu'?'b-menunggu':'b-diblokir'}" title="izin Trading">📈 ${tr==='disetujui'?'diizinkan':tr==='menunggu'?'minta izin':'tidak ada'}</span>`;
+    const acts=self?'<span class="mut small">(kamu)</span>':`${x.status!=='aktif'?`<button class="x" style="background:#12352f;color:var(--b)" data-id="${id}" onclick="adSet(this,'aktif')">✅ Izinkan</button>`:''}${x.status!=='diblokir'?`<button class="x" data-id="${id}" onclick="adSet(this,'diblokir')">⛔ Blokir</button>`:''}${x.admin?'':tr==='disetujui'?`<button class="x" style="background:#3a1626;color:var(--bad)" data-id="${id}" onclick="adTrade(this,'dicabut')">🚫 Cabut Trading</button>`:`<button class="x" style="background:#262b55;color:#eef0ff" data-id="${id}" onclick="adTrade(this,'disetujui')">📈 Beri Trading</button>`}<button class="x" style="background:#262b55;color:#eef0ff" data-id="${id}" onclick="adDel(this)">🗑</button>`;
+    return `<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span style="display:flex;align-items:center;gap:8px">${x.foto?`<img src="${esc(x.foto)}" referrerpolicy="no-referrer" style="width:30px;height:30px;border-radius:50%">`:'👤'}<span><b>${esc(x.nama||'(belum ada nama)')}</b>${x.admin?' 👑':''}<div class="small mut">${esc(x.email||x.id)}</div></span></span><span class="badge b-${esc(x.status)}">${esc(x.status)}</span>${tb}<span style="display:flex;gap:6px;flex-wrap:wrap">${acts}</span></div>`}).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada pengguna yang cocok.</div>';
+}
+async function adTrade(el,st){
+  const id=el.dataset.id;if(!id)return;
+  if(st==='dicabut'&&!confirm(`Cabut izin Trading ${id}?`))return;
+  try{await db.collection('izin_trading').doc(id).set({email:id,status:st,diubah:tsNow(),oleh:String(user.email||'').toLowerCase()},{merge:true});
+    AD.tr=AD.tr||{};AD.tr[id]={...(AD.tr[id]||{}),id,email:id,status:st};drawAdmin();adminBadge()}
+  catch(e){alert('Gagal: '+(e.message||e)+'\nPastikan aturan Firestore untuk koleksi "izin_trading" sudah dipasang.')}
+}
+async function adminBadge(){
+  let n=0;
+  try{n+=(await db.collection('pengguna').where('status','==','menunggu').get()).size}catch(e){}
+  try{n+=(await db.collection('izin_trading').where('status','==','menunggu').get()).size}catch(e){}
+  const b=$('t-admin');if(b)b.textContent='👑 Admin'+(n?' ('+n+')':'');
+}
+
+/* ---------- 3. NEWS & ANALISIS: hitung mundur rilis, sesi pasar, grafik mini, rekam jejak, salin ringkasan ---------- */
+function sess16(){
+  const now=new Date(),hr=tz=>+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hour12:false,timeZone:tz}).format(now)%24;
+  const ny=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'})),dow=ny.getDay(),h=ny.getHours();
+  const closed=dow===6||(dow===5&&h>=17)||(dow===0&&h<17);
+  return{closed,open:[['Sydney','Australia/Sydney',7,16],['Tokyo','Asia/Tokyo',9,18],['London','Europe/London',8,17],['New York','America/New_York',8,17]].filter(([,tz,a,b])=>{const x=hr(tz);return x>=a&&x<b}).map(s=>s[0])};
+}
+let CD16=null;
+function fmtCd16(ms){if(ms<=0)return'sedang/baru rilis';const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;return(d?d+'h ':'')+(h||d?h+'j ':'')+m+'m '+String(x).padStart(2,'0')+'d'}
+function tickCd16(){const n=document.querySelectorAll('[data-cd]');if(!n.length){clearInterval(CD16);CD16=null;return}n.forEach(e=>{e.textContent=fmtCd16(+e.dataset.cd-Date.now())})}
+function startCd16(){tickCd16();if(!CD16&&document.querySelector('[data-cd]'))CD16=setInterval(tickCd16,1000)}
+function cdHtml16(j){
+  const now=Date.now(),ev=(j.calendar||[]).filter(e=>e.ts>now&&e.impact==='High'&&(e.cur==='USD'||e.tag)).sort((a,b)=>a.ts-b.ts).slice(0,4),s=sess16();
+  return `<div class="card"><h3>⏱ Rilis terdekat & sesi pasar</h3>${s.closed?'<div class="small" style="color:#ffd48a">🌙 Pasar forex tutup (akhir pekan).</div>':`<div class="small">🟢 Sesi aktif: <b>${s.open.length?s.open.map(esc).join(' • '):'jeda antar sesi'}</b></div>`}${ev.length?ev.map(e=>`<div class="item"><span>${esc(e.title)}${e.tag?' 📌':''}<div class="small mut">${esc(ldt(e.ts,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></span><b data-cd="${e.ts}">…</b></div>`).join(''):'<div class="mut small" style="margin-top:6px">Tidak ada rilis High-impact USD terdekat pada kalender.</div>'}</div>`;
+}
+function spark16(a){
+  if(!a||a.length<2)return'';const w=64,h=20,mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1,pts=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-2-(v-mn)/r*(h-4)).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${a[a.length-1]>=a[0]?'#6ee7b7':'#fca5a5'}" stroke-width="1.5"/></svg>`;
+}
+function priceHtml14(j){
+  const e=Object.entries((j.px&&j.px.pairs)||{});if(!e.length)return'';const f=v=>v==null?'-':v;
+  return `<div class="card"><h3>📈 Harga & teknikal harian</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Pair</th><th align="right">Harga</th><th align="center">30h</th><th align="right">1d</th><th align="right">5d</th><th align="right">20d</th><th align="right">RSI</th><th align="right">ATR%</th><th align="left">&nbsp;Tren</th><th align="right">Range20</th></tr>${e.map(([p,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(p)}</b></td><td align="right">${esc(v.last)}</td><td align="center">${spark16(v.spark)}</td><td align="right">${nfmt(v.chg1d,'%',true)}</td><td align="right">${nfmt(v.chg5d,'%',true)}</td><td align="right">${nfmt(v.chg20d,'%',true)}</td><td align="right">${f(v.rsi)}</td><td align="right">${f(v.atrPct)}</td><td>&nbsp;${esc(v.trend||(v.vsSma20?'harga '+v.vsSma20+' SMA20':'-'))}</td><td align="right">${v.pos20==null?'-':v.pos20+'%'}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Data HARIAN (bukan real-time; bar terakhir bisa belum final) per ${esc(j.px.asOf||'-')} ${ageTag14(j.px.asOf,5)} • sumber: ${esc([...new Set(e.map(([,v])=>v.src).filter(Boolean))].join(', '))}. Grafik mini = 30 penutupan harian terakhir.</div></div>`;
+}
+const HK16=()=>'prohist_'+((user&&user.uid)||'x');
+function histGet16(){try{return JSON.parse(localStorage.getItem(HK16())||'[]')}catch(e){return[]}}
+function snapSave16(j){
+  if(!j||!j.pro||!j.px||!j.px.pairs||!j.fetchedAt)return;
+  const h=histGet16();if(h.some(x=>x.id===j.fetchedAt))return;const pairs={};
+  (j.pro.pairs||[]).forEach(p=>{const px=j.px.pairs[p.pair];if(!px||!px.last)return;pairs[p.pair]={b:p.bias,c:p.confidence,e:((j.eng&&j.eng.pairs&&j.eng.pairs[p.pair])||{}).bias||null,p:px.last}});
+  if(!Object.keys(pairs).length)return;
+  h.unshift({id:j.fetchedAt,t:Date.parse(j.fetchedAt)||Date.now(),hz:j.horizon||'1-5 hari',pairs});
+  try{localStorage.setItem(HK16(),JSON.stringify(h.slice(0,80)))}catch(e){}
+}
+function trackHtml16(j){
+  const cur=j&&j.px&&j.px.pairs,h=histGet16();if(!cur||!h.length)return'';
+  const now=Date.now(),HZ={'hari ini':1,'1-5 hari':3,'1-2 minggu':7},st={ai:{n:0,ok:0},eng:{n:0,ok:0},per:{}};
+  h.forEach(s=>{if(s.id===j.fetchedAt||now-s.t<(HZ[s.hz]||3)*864e5)return;
+    Object.entries(s.pairs).forEach(([p,v])=>{const c=cur[p];if(!c||!c.last||!v.p)return;const ret=(c.last/v.p-1)*100;if(Math.abs(ret)<0.1)return;const dir=ret>0?'BULLISH':'BEARISH',pp=st.per[p]=st.per[p]||{n:0,ok:0};
+      if(v.b&&v.b!=='NETRAL'){st.ai.n++;pp.n++;if(v.b===dir){st.ai.ok++;pp.ok++}}
+      if(v.e&&v.e!=='NETRAL'){st.eng.n++;if(v.e===dir)st.eng.ok++}})});
+  const pc=o=>o.n?Math.round(o.ok/o.n*100)+'% ('+o.ok+'/'+o.n+')':'-';
+  return `<div class="card"><h3>📊 Rekam jejak sinyal (tersimpan di perangkat ini)</h3>${st.ai.n||st.eng.n?`<div class="item"><span>Akurasi arah AI</span><b>${pc(st.ai)}</b></div><div class="item"><span>Akurasi arah mesin skor</span><b>${pc(st.eng)}</b></div>${Object.entries(st.per).map(([p,o])=>`<div class="item"><span class="small">${esc(p)}</span><span class="small">${pc(o)}</span></div>`).join('')}`:`<div class="mut small">Belum ada sinyal lama yang bisa dievaluasi (${h.length} analisis tersimpan). Jalankan analisis secara berkala; evaluasi muncul setelah melewati horizonnya.</div>`}<div class="mut small" style="margin-top:6px">Dihitung: arah sinyal vs perubahan harga sampai data terbaru (gerak &lt;0,1% diabaikan). ${st.ai.n<20?'⚠️ Sampel masih kecil (&lt;20), belum bermakna statistik. ':''}Bukan jaminan hasil.</div></div>`;
+}
+function copyText16(t,btn){
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✅ Tersalin';setTimeout(()=>{btn.textContent=o},1800)}};
+  const fb=()=>{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch(e){}a.remove();done()};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,fb);else fb();
+}
+function copyPro16(btn){
+  const j=window.LAST16;if(!j||!j.pro)return;const p=j.pro,L=[`ANALISIS TRADING — ${new Date(j.fetchedAt).toLocaleString('id-ID')} • horizon ${j.horizon||'-'}`,`USD: ${p.usd_bias||'-'} — ${p.usd_reason||''}`,p.summary||'',''];
+  (p.pairs||[]).forEach(x=>{L.push(`${x.pair}: ${x.bias} (${x.confidence})${x.conflict?' [AI berbeda dari mesin]':''}`,'  '+(x.thesis||''));(x.drivers||[]).forEach(d=>L.push('  • '+d));if(x.invalidation)L.push('  ✖ '+x.invalidation)});
+  if(p.news_direction)L.push('','ARAH BERITA USD: '+p.news_direction.usd+' — '+(p.news_direction.summary||''));
+  L.push('','Edukasi, bukan saran finansial. Data: BLS, The Fed, Treasury, FRED, CFTC, Stooq/Yahoo.');copyText16(L.join('\n'),btn);
+}
+function copyNews16(btn){const j=window.LASTN16;if(!j||!j.analysis)return;copyText16(`NEWS TRADING — ${new Date(j.fetchedAt).toLocaleString('id-ID')}\n\n${String(j.analysis).replace(/\[\[([^|\]]*)\|[^\]]*\]\]/g,'$1')}\n\nEdukasi, bukan saran finansial.`,btn)}
+function exportHtml16(j,k){const ok=k==='pro'?!!j.pro:!!j.analysis;return ok?`<div class="card"><button class="btn alt full" onclick="${k==='pro'?'copyPro16(this)':'copyNews16(this)'}">📋 Salin ringkasan ${k==='pro'?'analisis':'news'}</button></div>`:''}
+/* simpan pilihan pair & horizon */
+function prpSave16(){try{localStorage.setItem('prp16',JSON.stringify({sel:PRP.sel,hz:PRP.hz}))}catch(e){}}
+(function(){try{const s=JSON.parse(localStorage.getItem('prp16')||'null');if(s){const v=(s.sel||[]).filter(p=>ALLP.includes(p));if(v.length)PRP.sel=v;if(['hari ini','1-5 hari','1-2 minggu'].includes(s.hz))PRP.hz=s.hz}}catch(e){}})();
+function ppToggle(p){
+  PRP.sel=PRP.sel.includes(p)?PRP.sel.filter(x=>x!==p):[...PRP.sel,p];prpSave16();
+  const b=$('ppairs');if(b)b.innerHTML=ALLP.map(q=>`<button class="x" style="background:${PRP.sel.includes(q)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${q}')">${q}</button>`).join('');
+}
+/* ===== END V16 ===== */
 </script>
 
 </body>
