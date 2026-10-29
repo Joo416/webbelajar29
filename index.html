@@ -2140,20 +2140,59 @@ function intelHtml14(j){return engineHtml14(j)+priceHtml14(j)+macroHtml14(j)+cot
 /* data kunci (dipakai saat AI masih berjalan/gagal): ditambah data baru */
 function keyDataHtml(j){
   const base=(j.effr||j.yields||(j.fx&&j.fx.pairs&&Object.keys(j.fx.pairs).length))?`<div class="card"><h3>🏦 Data kunci yang dikumpulkan</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)}) ${ageTag14(j.effr.date,6)}</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (${esc(j.yields.date)}) ${ageTag14(j.yields.date,6)}</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>${j.yields.y2c5!=null?`<div class="item"><span>Perubahan yield 2Y (5h / 20h)</span><b>${nfmt(j.yields.y2c5,'pp',true)} / ${nfmt(j.yields.y2c20,'pp',true)}</b></div>`:''}`:''}</div>`:'';
-  return base+intelHtml14(j)+surpriseHtml14(j)+checkHtml14(j);
+  return directionHtml15(j)+base+intelHtml14(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j);
 }
 /* pembungkus: tampilan lama + kartu baru disisipkan setelah kartu pertama */
 function renderPro(j,stale){
   renderProBase(j,stale);
   const c=document.querySelector('#pres .card');if(!c)return;
-  const x=intelHtml14(j)+surpriseHtml14(j)+checkHtml14(j);if(x)c.insertAdjacentHTML('afterend',x);
+  const x=ndHtml15(j)+directionHtml15(j)+intelHtml14(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j);if(x)c.insertAdjacentHTML('afterend',x);
 }
 function renderNews(j,stale){
   renderNewsBase(j,stale);
   const c=document.querySelector('#nres .card');if(!c)return;
-  const x=surpriseHtml14(j)+checkHtml14(j);if(x)c.insertAdjacentHTML('afterend',x);
+  const x=directionHtml15(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j);if(x)c.insertAdjacentHTML('afterend',x);
 }
 /* ===== END V14 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V15: Trading — arah berita (mesin + skenario), validasi lintas-sumber, konfirmasi berita ===== */
+const sg15=v=>v==null?'n/a':(v>0?'+':'')+v;
+function directionHtml15(j){
+  const e=j.eng;if(!e||!e.usd)return'';
+  const u=e.usd,tone=j.tone,fd=j.fdiff,sc=j.sc||[],B={BULLISH:'🟢',BEARISH:'🔴',NETRAL:'⚪'};
+  const toneTxt=tone?(tone.score==null?`belum cukup sumber bernada jelas (${esc(tone.n)})`:`${tone.score>=0?'hawkish':'dovish'} ${sg15(tone.score)} dari ${esc(tone.n)} sumber (${esc(tone.hawk)} hawkish • ${esc(tone.dove)} dovish)`):'tidak tersedia';
+  const parts=(u.parts||[]).map(x=>`<div class="small">${x.s>0?'🟢':x.s<0?'🔴':'⚪'} ${esc(x.label)} <span class="mut">→ ${sg15(x.s)} (bobot ${esc(x.w)})</span></div>`).join('');
+  const toneEv=tone&&tone.top&&tone.top.length?`<details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Berita yang membentuk nada</summary>${tone.top.map(t=>`<div class="small">${t.score>0?'🟢':'🔴'} ${esc(t.title)} <span class="mut">(${esc(t.domain)} • tingkat ${esc(t.tier)} • ${sg15(t.score)})</span></div>`).join('')}<div class="small mut">Heuristik leksikon kata kunci hawkish/dovish, dibobot tingkat sumber dan kesegaran. Bukan pemahaman penuh isi berita.</div></details>`:'';
+  const fdTxt=fd&&fd.latest?`<div class="item" style="align-items:flex-start"><span>Pernyataan FOMC: perubahan teks<div class="small mut">${esc(fd.latest.date)} vs ${esc(fd.prev.date)}</div></span><b>${fd.score>0?'hawkish':fd.score<0?'dovish':'netral'} ${sg15(fd.score)} <span class="small mut">(${esc(fd.n)} kalimat berubah)</span></b></div>${(fd.added.length||fd.removed.length)?`<details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Kalimat yang berubah</summary>${fd.added.map(x=>`<div class="small" style="color:#9be7b0">＋ ${esc(x)}</div>`).join('')}${fd.removed.map(x=>`<div class="small" style="color:#ffb3b3">－ ${esc(x)}</div>`).join('')}<div class="small mut">Sumber: federalreserve.gov (dua pernyataan FOMC terakhir).</div></details>`:''}`:'';
+  const scHtml=sc.length?sc.map(x=>`<div style="margin-top:12px"><div style="font-weight:700;color:var(--b)">${esc(x.event)} <span class="small mut">${esc(ldt(x.ts,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}${x.forecast?' • forecast '+esc(x.forecast):''}</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">${x.scenarios.map(c=>`<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:6px 2px"><b>${esc(c.name)}</b><div class="small mut">${esc(c.desc)}</div></td><td>${B[c.usd.bias]||''} USD ${esc(c.usd.bias)}<div class="small mut">skor ${sg15(c.usd.score)}</div></td><td class="small">${Object.entries(c.pairs).map(([p,v])=>`${B[v.bias]||''} ${esc(p)}`).join('<br>')}</td></tr>`).join('')}</table></div></div>`).join('')+'<div class="mut small" style="margin-top:8px">Skenario = mesin dihitung ulang bila rilis berbeda dari forecast (NFP ±100K, Core CPI ±0.1pp, yield 2Y ±0.15pp setelah FOMC). Ini simulasi aturan, bukan prediksi.</div>':'<div class="mut small" style="margin-top:8px">Tidak ada rilis NFP/CPI/FOMC dalam 14 hari ke depan pada kalender, jadi tidak ada skenario.</div>';
+  return `<div class="card"><h3>🧭 Arah berita & data (mesin, tanpa AI)</h3>
+  <div class="item"><span><b>Arah USD</b> ${B[u.bias]||''} ${esc(u.bias)}<div class="small mut">cakupan data ${Math.round((u.cov||0)*100)}%</div></span><b>${sg15(u.score)}</b></div>
+  <details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Apa yang membentuk skor</summary>${parts||'<div class="small mut">data belum cukup</div>'}</details>
+  <div class="item"><span>Nada berita</span><b style="text-align:right">${toneTxt}</b></div>${toneEv}${fdTxt}${scHtml}</div>`;
+}
+function validationHtml15(j){
+  const rows=[];let pass=0,warn=0;
+  (j.val||[]).forEach(v=>{warn++;rows.push(`<div class="item" style="align-items:flex-start"><span>⚠️ <b>${esc(v.src)}</b><div class="small mut">${esc(v.msg)}</div></span><span class="small" style="text-align:right;color:#ffd48a">${esc(v.act)}</span></div>`)});
+  (j.rc||[]).forEach(r=>{if(r.status==='COCOK')pass++;else warn++;rows.push(`<div class="item"><span>${r.status==='COCOK'?'✅':'⚠️'} Rilis ${esc(r.label)}<div class="small mut">kalender ${esc(r.calendar)} vs resmi ${esc(r.official)}</div></span><span class="small">${esc(r.status)}${r.status==='BEDA'?'<div class="mut">cek periode/revisi</div>':''}</span></div>`)});
+  const y=j.yields&&j.yields.check;if(y){if(y.ok)pass++;else warn++;rows.push(`<div class="item"><span>${y.ok?'✅':'⚠️'} Yield Treasury vs FRED<div class="small mut">${esc(y.date)}: 2Y ${esc(j.yields.y2)} vs ${esc(y.d2)} • 10Y ${esc(j.yields.y10)} vs ${esc(y.d10)}</div></span><span class="small">${y.ok?'cocok':'beda'}</span></div>`)}
+  Object.entries((j.px&&j.px.pairs)||{}).forEach(([p,v])=>{if(!v.check)return;if(v.check.ok)pass++;else warn++;rows.push(`<div class="item"><span>${v.check.ok?'✅':'⚠️'} Harga ${esc(p)}: ${esc(v.src)} vs ${esc(v.check.other)}<div class="small mut">penutupan ${esc(v.check.date)} beda ${esc(v.check.diffPct)}%</div></span><span class="small">${v.check.ok?'cocok':'beda → tren pair tidak dipakai mesin'}</span></div>`)});
+  ((j.data&&j.data.meta&&j.data.meta.check)||[]).forEach(c=>{if(c.ok===true)pass++;else if(c.ok===false)warn++});
+  if(!rows.length&&!pass&&!warn)return'';
+  return `<div class="card"><h3>🛡️ Validasi data</h3><div class="mut small" style="margin-bottom:8px">✅ ${pass} pemeriksaan lintas-sumber lolos • ⚠️ ${warn} temuan. Data di luar batas wajar otomatis dibuang sebelum dipakai mesin dan AI.</div>${rows.join('')||'<div class="small">Semua pemeriksaan batas wajar dan konsistensi lolos.</div>'}</div>`;
+}
+function corrHtml15(j){
+  const s=(j.sources||[]).filter(x=>x&&x.uri&&/^https:\/\//.test(x.uri));if(!s.length)return'';
+  const T={1:'🏛 resmi',2:'📰 kantor berita besar',3:'🗞 media lain'},L=[...s].sort((a,b)=>(b.corr||1)-(a.corr||1)||(a.tier||3)-(b.tier||3)).slice(0,10);
+  return `<div class="card"><h3>🔗 Konfirmasi lintas-sumber</h3>${L.map(x=>`<div class="item" style="align-items:flex-start"><span><a href="${esc(x.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(x.title)}</a><div class="small mut">${esc(x.domain)} • ${T[x.tier||3]}${x.ageH!=null?' • '+(x.ageH<48?x.ageH+' jam':Math.round(x.ageH/24)+' hari')+' lalu':''}</div></span><span class="small" style="text-align:right;white-space:nowrap;color:${(x.corr||1)>=2?'#9be7b0':'var(--mut)'}">${(x.corr||1)>=2?'✅ '+x.corr+' sumber':'1 sumber'}</span></div>`).join('')}<div class="mut small" style="margin-top:6px">"N sumber" = jumlah domain berbeda yang memuat judul serupa. Berita 1 sumber (apalagi tingkat 3) diperlakukan sebagai belum terkonfirmasi.</div></div>`;
+}
+function ndHtml15(j){
+  const nd=j.pro&&j.pro.news_direction,refs=j.refs||[];if(!nd&&!refs.length)return'';
+  const B={BULLISH:'🟢',BEARISH:'🔴',NETRAL:'⚪'};
+  return `<div class="card"><h3>🎯 Arah berita menurut AI (divalidasi terhadap mesin)</h3>${nd?`<div class="item"><span><b>Arah USD</b> ${B[nd.usd]||''} ${esc(nd.usd)}</span><span class="small">${nd.engine?'mesin: '+esc(nd.engine.bias)+' ('+sg15(nd.engine.score)+')':''}</span></div>${nd.conflict?'<div class="warn" style="margin:6px 0">⚠️ Bertentangan dengan mesin skor. Utamakan mesin; anggap arah AI tidak terkonfirmasi.</div>':''}<div class="exp" style="color:var(--tx);margin-top:6px">${fmt(nd.summary||'')}</div>${(nd.catalysts||[]).map(c=>`<div style="margin-top:10px"><b>${esc(c.event)}</b><div class="small" style="color:#9be7b0">Bull jika: ${esc(c.bull_if)}</div><div class="small" style="color:#ffb3b3">Bear jika: ${esc(c.bear_if)}</div>${c.pairs_effect?`<div class="small mut">${esc(c.pairs_effect)}</div>`:''}</div>`).join('')}`:''}${refs.length?`<div class="warn" style="margin-top:10px">Pemeriksaan otomatis atas jawaban AI:<br>${refs.map(r=>'• '+esc(r)).join('<br>')}</div>`:''}</div>`;
+}
+/* ===== END V15 ===== */
 </script>
 
 </body>
