@@ -1298,7 +1298,7 @@ async function saveNews(){
 </script>
 <script>
 /* ===== UPDATE V10: kalender rilis terverifikasi + tab Analisis Pro (arah bias per pair) ===== */
-const ALLP=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','XAUUSD'];
+const ALLP=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','XAUUSD','EURJPY','GBPJPY','EURGBP'];
 const NF={high:false,cur:'ALL',key:false},PRP={sel:[...ALLP],hz:'1-5 hari'};
 async function tcall(body){
   const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),95000);let r;
@@ -2140,18 +2140,18 @@ function intelHtml14(j){return engineHtml14(j)+priceHtml14(j)+macroHtml14(j)+cot
 /* data kunci (dipakai saat AI masih berjalan/gagal): ditambah data baru */
 function keyDataHtml(j){
   const base=(j.effr||j.yields||(j.fx&&j.fx.pairs&&Object.keys(j.fx.pairs).length))?`<div class="card"><h3>🏦 Data kunci yang dikumpulkan</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)}) ${ageTag14(j.effr.date,6)}</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (${esc(j.yields.date)}) ${ageTag14(j.yields.date,6)}</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>${j.yields.y2c5!=null?`<div class="item"><span>Perubahan yield 2Y (5h / 20h)</span><b>${nfmt(j.yields.y2c5,'pp',true)} / ${nfmt(j.yields.y2c20,'pp',true)}</b></div>`:''}`:''}</div>`:'';
-  return directionHtml15(j)+base+intelHtml14(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j);
+  return directionHtml15(j)+mapHtml17(j)+base+fundHtml17(j)+intelHtml14(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j);
 }
 /* pembungkus: tampilan lama + kartu baru disisipkan setelah kartu pertama */
 function renderPro(j,stale){
   renderProBase(j,stale);
   const c=document.querySelector('#pres .card');if(!c)return;
-  window.LAST16=j;if(!stale)snapSave16(j);const x=cdHtml16(j)+ndHtml15(j)+directionHtml15(j)+intelHtml14(j)+trackHtml16(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'pro');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
+  window.LAST16=j;if(!stale)snapSave16(j);const x=cdHtml16(j)+ndHtml15(j)+mapHtml17(j)+directionHtml15(j)+fundHtml17(j)+intelHtml14(j)+trackHtml16(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'pro');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
 }
 function renderNews(j,stale){
   renderNewsBase(j,stale);
   const c=document.querySelector('#nres .card');if(!c)return;
-  window.LASTN16=j;const x=cdHtml16(j)+directionHtml15(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'news');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
+  window.LASTN16=j;const x=cdHtml16(j)+directionHtml15(j)+cbHtml17(j)+surpriseHtml14(j)+validationHtml15(j)+checkHtml14(j)+corrHtml15(j)+exportHtml16(j,'news');if(x)c.insertAdjacentHTML('afterend',x);setTimeout(startCd16,0);
 }
 /* ===== END V14 ===== */
 </script>
@@ -2345,6 +2345,41 @@ function ppToggle(p){
   const b=$('ppairs');if(b)b.innerHTML=ALLP.map(q=>`<button class="x" style="background:${PRP.sel.includes(q)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${q}')">${q}</button>`).join('');
 }
 /* ===== END V16 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V17: peta arah per pair (dari → ke), fundamental global per mata uang, bank sentral global ===== */
+function mapHtml17(j){
+  const E=j.eng&&j.eng.pairs;if(!E)return'';
+  const ai={};((j.pro&&j.pro.pairs)||[]).forEach(p=>ai[p.pair]=p);
+  const D={BULLISH:'🟢 naik',BEARISH:'🔴 turun',NETRAL:'⚪ range/netral'};
+  const rows=Object.entries(E).filter(([,v])=>v.map).map(([p,v])=>{
+    const m=v.map,a=ai[p],bt=m.bt&&m.bt.hitNow&&m.bt.hitNow.rate!=null?`${m.bt.hitNow.rate}% searah (n=${m.bt.hitNow.n})`:'-';
+    const aiTxt=a?`<div class="small ${a.conflict?'':'mut'}" style="${a.conflict?'color:#ffb3b3':''}">AI: ${esc(a.bias)} (${esc(a.confidence)})${a.conflict?' ⚠️ beda dari mesin':''}</div>`:'';
+    return `<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:7px 2px"><b>${esc(p)}</b><div class="small mut">${esc(m.last)}<br>${esc(m.asOf)}</div></td><td>${D[v.bias]||''}<div class="small mut">${esc(v.conf)} • skor ${v.score==null?'n/a':(v.score>0?'+':'')+v.score}</div>${aiTxt}</td><td><b>${esc(m.zone[0])} – ${esc(m.zone[1])}</b><div class="small mut">gerak wajar ±${esc(m.expMove)} (${esc(m.hzD)} hari)</div></td><td class="small">▲ ${m.keyAbove==null?'-':esc(m.keyAbove)}<br>▼ ${m.keyBelow==null?'-':esc(m.keyBelow)}</td><td class="small">${m.invalidAt==null?'-':(v.bias==='BULLISH'?'tutup harian &lt; ':'tutup harian &gt; ')+esc(m.invalidAt)}</td><td class="small">${bt}</td></tr>`;
+  }).join('');
+  if(!rows)return'';
+  return `<div class="card"><h3>🗺️ Peta arah per pair: dari mana ke mana</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Pair</th><th align="left">Arah</th><th align="left">Area tuju</th><th align="left">Level kunci</th><th align="left">Batal jika</th><th align="left">Uji historis</th></tr>${rows}</table></div><div class="mut small" style="margin-top:8px">Arah dari mesin skor (USD + fundamental global + tren). Area tuju = harga terakhir ± 1×ATR×√hari searah arah; level kunci = hi20/SMA20/SMA50 terdekat. Uji historis = seberapa sering tren seperti sekarang diikuti arah searah 5 hari berikutnya pada riwayat harian pair itu (sampel tumpang-tindih, bukan jaminan). Ini peta referensi berbasis data, bukan titik entry/SL/TP.</div></div>`;
+}
+function fundHtml17(j){
+  const fv=j.fv;if(!fv||!Object.keys(fv).length)return'';
+  const c=(x,u)=>x?`<span title="${esc(x.date)}">${esc(x.v)}${u}</span>`:'<span class="mut">-</span>';
+  const t=v=>v==null?'<span class="mut">-</span>':(v>0?'🟢 ':v<0?'🔴 ':'')+(v>0?'+':'')+v;
+  return `<div class="card"><h3>🌍 Fundamental global per mata uang</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Mata uang</th><th align="right">Bunga</th><th align="right">Inflasi YoY</th><th align="right">Penganggur.</th><th align="right">Yield 10Y</th><th align="right">Bunga riil</th><th align="right">Nada CB</th></tr>${Object.entries(fv).map(([k,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(k)}</b></td><td align="right">${c(v.rate,'%')}</td><td align="right">${c(v.cpi,'%')}</td><td align="right">${c(v.ur,'%')}</td><td align="right">${c(v.y10,'%')}</td><td align="right">${v.real==null?'<span class="mut">-</span>':esc(v.real)+'pp'}</td><td align="right">${t(v.tone)}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Sumber: FRED/OECD (bulanan, bisa tertinggal 1-3 bulan), USD memakai EFFR & Treasury terbaru, EUR memakai suku bunga deposit ECB. Arahkan kursor ke angka untuk melihat tanggal data. Data yang usang atau tidak wajar otomatis tidak dipakai. Bunga riil = bunga kebijakan − inflasi YoY.</div></div>`;
+}
+function cbHtml17(j){
+  const h=j.cbHead||{},cb=j.cbt||{},k=Object.keys(h);if(!k.length)return'';
+  return `<div class="card"><h3>🏦 Bank sentral global (rilis resmi terbaru)</h3>${k.map(c=>{const x=h[c],t=cb[c];return `<div class="item" style="align-items:flex-start"><span><b>${esc(c)}</b> <span class="small mut">${esc(x.bank||'')}</span><div class="small">${/^https:\/\//.test(x.uri||'')?`<a href="${esc(x.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(x.title)}</a>`:esc(x.title)}</div></span><span class="small" style="text-align:right;white-space:nowrap">${t&&t.score!=null?(t.score>0?'🟢 hawkish ':t.score<0?'🔴 dovish ':'⚪ ')+(t.score>0?'+':'')+t.score:'<span class="mut">nada n/a</span>'}</span></div>`}).join('')}<div class="mut small" style="margin-top:6px">Sumber: feed resmi ECB, BoE, BoJ, RBA, BoC, SNB, RBNZ (yang berhasil dibaca). Nada = heuristik kata kunci hawkish/dovish pada judul dan ringkasan rilis, bukan analisis penuh isi.</div></div>`;
+}
+function copyPro16(btn){
+  const j=window.LAST16;if(!j||!j.pro)return;const p=j.pro,E=(j.eng&&j.eng.pairs)||{},L=[`ANALISIS TRADING — ${new Date(j.fetchedAt).toLocaleString('id-ID')} • horizon ${j.horizon||'-'}`,`USD: ${p.usd_bias||'-'} — ${p.usd_reason||''}`,p.summary||'',''];
+  (p.pairs||[]).forEach(x=>{const m=(E[x.pair]||{}).map;L.push(`${x.pair}: ${x.bias} (${x.confidence})${x.conflict?' [AI berbeda dari mesin]':''}`);
+    if(m)L.push(`  Dari ${m.last} (${m.asOf}) → area ${m.zone[0]}–${m.zone[1]}${m.invalidAt!=null?'; batal bila tutup harian '+(((E[x.pair]||{}).bias==='BULLISH')?'<':'>')+' '+m.invalidAt:''}`);
+    L.push('  '+(x.thesis||''));(x.drivers||[]).forEach(d=>L.push('  • '+d));if(x.invalidation)L.push('  ✖ '+x.invalidation)});
+  if(p.news_direction)L.push('','ARAH BERITA USD: '+p.news_direction.usd+' — '+(p.news_direction.summary||''));
+  L.push('','Edukasi, bukan saran finansial. Area/level = referensi berbasis data harian, bukan entry/SL/TP. Data: BLS, The Fed, Treasury, FRED/OECD, CFTC, Stooq/Yahoo, bank sentral.');copyText16(L.join('\n'),btn);
+}
+/* ===== END V17 ===== */
 </script>
 
 </body>
