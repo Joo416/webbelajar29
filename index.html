@@ -266,14 +266,14 @@ function drawBank(){
 async function del(id){if(!confirm('Hapus soal ini?'))return;await db.collection('soal').doc(id).delete();S.bank=S.bank.filter(x=>x.id!==id);drawBank()}
 async function delAll(){
   if(!confirm(`Hapus SEMUA ${S.bank.length} soal ${S.mapel}? Tidak bisa dibatalkan.`))return;
-  for(let i=0;i<S.bank.length;i+=400){const b=db.batch();S.bank.slice(i,i+400).forEach(x=>b.delete(db.collection('soal').doc(x.id)));await b.commit()}
+  for(let i=0;i<S.bank.length;i+=20){const b=db.batch();S.bank.slice(i,i+20).forEach(x=>b.delete(db.collection('soal').doc(x.id)));await b.commit()}
   S.bank=[];drawBank();
 }
 async function importQ(){
   let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
   if(!Array.isArray(arr))return alert('Harus berupa array');
   const ok=arr.filter(x=>x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length);
-  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  for(let i=0;i<ok.length;i+=20){const b=db.batch();ok.slice(i,i+20).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
   alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati)`);pBank();
 }
 async function seed(){
@@ -415,7 +415,7 @@ async function importQ(){
   let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
   if(!Array.isArray(arr))return alert('Harus berupa array');
   const ok=await dedupe(arr.filter(x=>x.q&&Array.isArray(x.o)&&x.o.length>=2&&Number.isInteger(x.a)&&x.a>=0&&x.a<x.o.length));
-  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',sub:x.sub||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  for(let i=0;i<ok.length;i+=20){const b=db.batch();ok.slice(i,i+20).forEach(x=>b.set(db.collection('soal').doc(),{q:x.q,o:x.o,a:x.a,e:x.e||'',sub:x.sub||'',uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
   alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati: tidak valid/duplikat)`);pBank();
 }
 
@@ -945,7 +945,7 @@ async function importQ(){
   let arr;try{arr=JSON.parse($('imp').value)}catch(e){return alert('JSON tidak valid')}
   if(!Array.isArray(arr))return alert('Harus berupa array');
   const ok=await dedupe(arr.map(x=>{const n=normQ(x);return n?{...n,sub:x.sub||''}:null}).filter(Boolean));
-  for(let i=0;i<ok.length;i+=400){const b=db.batch();ok.slice(i,i+400).forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
+  for(let i=0;i<ok.length;i+=20){const b=db.batch();ok.slice(i,i+20).forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel}));await b.commit()}
   alert(`${ok.length} soal tersimpan (${arr.length-ok.length} dilewati: tidak valid/duplikat)`);pBank();
 }
 
@@ -1335,7 +1335,7 @@ async function loadNews(){
   }catch(e){if($('nmsg'))($('nmsg')||{}).textContent='⚠️ '+e.message}
   if($('nbtn'))($('nbtn')||{}).disabled=false;
 }
-function renderNews(j,stale){
+function renderNewsBase(j,stale){
   NF.j=j;NF.stale=stale;
   const d=j.data||{},cards=[],nx=j.next||{};
   if(d.nfp)cards.push(['NFP '+d.nfp.period,nfmt(d.nfp.change,'K',true),'sebelumnya '+nfmt(d.nfp.prevChange,'K',true)]);
@@ -1351,10 +1351,10 @@ function renderNews(j,stale){
     <div class="row" style="margin-top:10px"><select onchange="nfSet('cur',this.value)">${['ALL','USD','EUR','GBP','JPY','AUD','CAD','NZD','CHF'].map(c=>`<option ${NF.cur===c?'selected':''}>${c}</option>`).join('')}</select>
     <label style="display:flex;gap:6px;align-items:center;color:var(--tx);margin:0"><input type="checkbox" style="width:18px" ${NF.high?'checked':''} onchange="nfSet('high',this.checked)"> High saja</label>
     <label style="display:flex;gap:6px;align-items:center;color:var(--tx);margin:0"><input type="checkbox" style="width:18px" ${NF.key?'checked':''} onchange="nfSet('key',this.checked)"> NFP/CPI/FOMC</label></div><div id="calbox">${calHtml(j)}</div></div>
-    <div class="card"><h3>📊 Data resmi terbaru</h3>${cards.length?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.25rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="mut small" style="margin-top:6px">Angka dari BLS (api.bls.gov), dihitung dari angka terbit dan bisa direvisi.</div>`:'<div class="warn">Angka BLS tidak tersedia saat ini.</div>'}</div>
+    <div class="card"><h3>📊 Data resmi terbaru</h3>${cards.length?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.25rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="mut small" style="margin-top:6px">Angka resmi (sumber: ${esc((d.meta&&d.meta.src)||'BLS')}), dihitung dari angka terbit dan bisa direvisi.</div>`:'<div class="warn">Angka BLS tidak tersedia saat ini.</div>'}</div>
     <div class="card"><h3>🧠 Analisis AI</h3>${j.analysis?`<div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(j.analysis)}</div><button class="btn alt full" onclick="saveNews()">📝 Simpan ke Catatan</button><div class="small mut" style="margin-top:8px">Untuk analisis arah per pair yang lebih dalam, buka tab 🧠 Analisis.</div>`:'<div class="warn">Analisis AI gagal. Data mentah tetap ditampilkan.</div>'}</div>
     ${qualityHtml(j.quality)}${sourcesHtml(j.sources)}
-    ${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,500))}</div>`:''}<div class="mut small" style="margin-top:8px">Analisis edukasi berbasis data publik, bukan saran finansial. Data bisa direvisi dan pasar bisa bergerak berbeda dari skenario mana pun.</div>`;
+    ${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}<div class="mut small" style="margin-top:8px">Analisis edukasi berbasis data publik, bukan saran finansial. Data bisa direvisi dan pasar bisa bergerak berbeda dari skenario mana pun.</div>`;
 }
 /* ---------- tab Analisis Pro ---------- */
 const BCOL={BULLISH:'var(--b)',BEARISH:'var(--bad)',NETRAL:'var(--mut)'},BARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
@@ -1377,10 +1377,10 @@ async function runPro(){
   }catch(e){if($('pmsg'))($('pmsg')||{}).textContent='⚠️ '+e.message}
   if($('pbtn'))($('pbtn')||{}).disabled=false;
 }
-function renderPro(j,stale){
+function renderProBase(j,stale){
   const p=j.pro,t=new Date(j.fetchedAt);
   const head=`<div class="mut small" style="margin:0 0 8px">${stale?'🗂 Hasil terakhir tersimpan • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • Horizon ${esc(j.horizon||'')} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>`;
-  if(!p){($('pres')||{}).innerHTML=`<div class="card">${head}<div class="warn">AI belum menghasilkan analisis yang valid.</div>${j.raw?`<div class="exp" style="color:var(--tx)">${fmtMd(j.raw)}</div>`:''}</div>${qualityHtml(j.quality)}${(j.notes||[]).length?`<div class="mut small">⚠️ ${esc(j.notes.join(' | ').slice(0,500))}</div>`:''}`;return}
+  if(!p){($('pres')||{}).innerHTML=`<div class="card">${head}<div class="warn">AI belum menghasilkan analisis yang valid.</div>${j.raw?`<div class="exp" style="color:var(--tx)">${fmtMd(j.raw)}</div>`:''}</div>${qualityHtml(j.quality)}${(j.notes||[]).length?`<div class="mut small">⚠️ ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}`;return}
   const fx=(j.fx&&j.fx.pairs)||{},cons=j.consistency;
   const matrix=p.pairs.map(x=>`<div class="item"><span style="font-weight:700">${esc(x.pair)}</span><span style="color:${BCOL[x.bias]};font-weight:800">${BARR[x.bias]} ${esc(x.bias)}</span><span class="mut small">keyakinan ${esc(x.confidence)}</span></div>`).join('');
   ($('pres')||{}).innerHTML=`<div class="card">${head}<h3>Ringkasan rezim pasar</h3><div style="margin-bottom:8px"><span style="color:${BCOL[p.usd_bias]};font-weight:800">USD: ${BARR[p.usd_bias]} ${esc(p.usd_bias)}</span></div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(p.regime)}<br>${fmtMd(p.usd_reason)}<br><br>${fmtMd(p.summary)}</div>
@@ -1399,7 +1399,7 @@ function renderPro(j,stale){
     ${p.data_quality.length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${p.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
     ${qualityHtml(j.quality)}
     ${j.yields||j.effr?`<div class="card"><h3>🏦 Data kunci yang dipakai</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)})</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (Treasury, ${esc(j.yields.date)})</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>`:''}<div class="mut small" style="margin-top:6px">Kurs harian dari referensi ECB (bukan harga real-time/intraday).</div></div>`:''}
-    ${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,500))}</div>`:''}
+    ${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}
     <button class="btn alt full" onclick="savePro()">📝 Simpan ringkasan ke Catatan</button><div class="mut small" style="margin-top:8px">Analisis edukasi berbasis data publik, bukan saran finansial dan bukan sinyal entry/SL/TP. Pasar bisa bergerak berbeda dari bias mana pun; selalu kelola risiko.</div>`;
 }
 async function savePro(){
@@ -1681,7 +1681,7 @@ async function delAttemptId(id){
   if(!confirm('Hapus riwayat latihan ini? Tidak bisa dibatalkan.'))return;
   try{await db.collection('hasil').doc(id).delete();S.att=(S.att||[]).filter(x=>x.id!==id);S.tab='latihan';home()}catch(e){alert('Gagal menghapus: '+e.message)}
 }
-async function delMany(list){for(let i=0;i<list.length;i+=400){const b=db.batch();list.slice(i,i+400).forEach(x=>b.delete(db.collection('hasil').doc(x.id)));await b.commit()}}
+async function delMany(list){for(let i=0;i<list.length;i+=20){const b=db.batch();list.slice(i,i+20).forEach(x=>b.delete(db.collection('hasil').doc(x.id)));await b.commit()}}
 async function delAllHist(mapel){
   const list=(S.att||[]).filter(x=>!mapel||x.mapel===mapel);if(!list.length)return;
   if(!confirm(`Hapus ${list.length} riwayat${mapel?' '+mapel:''}? Tidak bisa dibatalkan.`))return;
@@ -1739,7 +1739,7 @@ function bankDupes(){
 async function delDupes(){
   const ids=[...document.querySelectorAll('.dchk:checked')].map(e=>e.dataset.id);if(!ids.length)return;
   if(!confirm(`Hapus ${ids.length} soal mirip? Tidak bisa dibatalkan.`))return;
-  try{for(let i=0;i<ids.length;i+=400){const b=db.batch();ids.slice(i,i+400).forEach(id=>b.delete(db.collection('soal').doc(id)));await b.commit()}
+  try{for(let i=0;i<ids.length;i+=20){const b=db.batch();ids.slice(i,i+20).forEach(id=>b.delete(db.collection('soal').doc(id)));await b.commit()}
     const s=new Set(ids);S.bank=S.bank.filter(x=>!s.has(x.id));drawBank();bankDupes()}catch(e){alert('Gagal: '+e.message)}
 }
 
@@ -1788,7 +1788,7 @@ function keyDataHtml(j){
 function renderPro2(j,stale){
   if(j.pro)return renderPro(j,stale);
   const t=new Date(j.fetchedAt);
-  $('pres').innerHTML=`<div class="card"><div class="mut small" style="margin-bottom:8px">Diambil: ${esc(t.toLocaleString('id-ID'))} • Horizon ${esc(j.horizon||'')}</div>${j.pending?'<div class="exp">⏳ AI sedang menyusun analisis bias per pair. Data di bawah sudah dikumpulkan lebih dulu.</div>':`<div class="warn">AI belum menghasilkan analisis yang valid${j.aiError?': '+esc(j.aiError):''}. Data di bawah tetap valid.</div>${j.raw?`<div class="exp" style="color:var(--tx);margin-top:8px">${fmtMd(j.raw)}</div>`:''}<button class="btn full" onclick="retryProAI()">🔄 Ulangi analisis AI saja</button>`}</div>${keyDataHtml(j)}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,500))}</div>`:''}`;
+  $('pres').innerHTML=`<div class="card"><div class="mut small" style="margin-bottom:8px">Diambil: ${esc(t.toLocaleString('id-ID'))} • Horizon ${esc(j.horizon||'')}</div>${j.pending?'<div class="exp">⏳ AI sedang menyusun analisis bias per pair. Data di bawah sudah dikumpulkan lebih dulu.</div>':`<div class="warn">AI belum menghasilkan analisis yang valid${j.aiError?': '+esc(j.aiError):''}. Data di bawah tetap valid.</div>${j.raw?`<div class="exp" style="color:var(--tx);margin-top:8px">${fmtMd(j.raw)}</div>`:''}<button class="btn full" onclick="retryProAI()">🔄 Ulangi analisis AI saja</button>`}</div>${keyDataHtml(j)}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}`;
 }
 function pPro(){
   let c=null;try{c=JSON.parse(localStorage.getItem('pro_last'))}catch(e){}
@@ -1816,5 +1816,345 @@ async function proAI(base){
 function retryProAI(){if(!PR.g||!PR.cur)return;const base={...PR.cur};delete base.pro;delete base.aiError;delete base.raw;base.pending=true;busy('pbtn',true);PR.cur=base;renderPro2(base,false);setTxt('pmsg','⏳ Mengulang analisis AI...');proAI(base)}
 /* ===== END V12 ===== */
 </script>
+<script>
+/* ===== UPDATE V13: soal SELALU baru (anti-duplikat kuat) & sesuai kelas, riwayat bisa dihapus massal, perbaikan News/Analisis ===== */
+
+/* ---------- AI: suhu (variasi) & mode JSON ---------- */
+async function ai(system,messages,big,search,q,cat,opt){
+  opt=opt||{};const tk=await user.getIdToken();
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||'',cat:cat||catFor(),temp:opt.temp==null?null:opt.temp,json:opt.json||''})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
+  if(!r.ok)throw new Error(j.error||'AI gagal');
+  let t=j.text;
+  if(search){(j.sources||[]).forEach(s=>{if(!SRC.some(x=>x.uri===s.uri))SRC.push(s)});LT=Math.max(LT,j.trusted||0)}
+  if(search&&!big){
+    if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).replace(/[|\]]/g,' ')}|${s.uri}]]`).join('\n');
+    else if(j.grounded===false)t+='\n\n⚠️ Tidak ada sumber terpercaya yang ditemukan; jawaban ini dari pengetahuan AI, cek ulang sebelum dipakai.';
+  }
+  return t;
+}
+
+/* ---------- parser JSON soal: aman untuk LaTeX & jawaban terpotong ---------- */
+const TEXCMD13='frac|dfrac|tfrac|forall|times|text|textbf|theta|tan|tau|to|top|triangle|therefore|beta|bar|binom|begin|bigcup|bigcap|bigg|big|bmod|boldsymbol|boxed|bullet|bot|nabla|neq|ne|neg|not|notin|nu|ni|rightarrow|right|rho|rangle|rm|underline|upsilon|uparrow';
+const TEXRE13=new RegExp('(\\\\+)('+TEXCMD13+')(?![a-zA-Z])','g');
+function fixJ2(s){
+  s=s.replace(TEXRE13,(m,bs,cmd)=>bs.length%2?bs+'\\'+cmd:m);
+  return s.replace(/\\(["\\/bfnrtu])|\\/g,(a,g)=>g?a:'\\\\');
+}
+function salvageArr13(t){
+  const i=t.indexOf('[');if(i<0)return null;let s=t.slice(i);
+  for(let k=0;k<60;k++){
+    try{const a=JSON.parse(fixJ2(s));if(Array.isArray(a))return a}catch(e){}
+    const e=s.lastIndexOf('}');if(e<0)return null;s=s.slice(0,e+1)+']';
+    try{const a=JSON.parse(fixJ2(s));if(Array.isArray(a))return a}catch(e2){}
+    s=s.slice(0,e);
+  }
+  return null;
+}
+function parseQs(t){
+  t=String(t||'');
+  const mo=t.match(/\{[\s\S]*\}/),ma=t.match(/\[[\s\S]*\]/);
+  try{if(mo&&(!ma||mo.index<ma.index)){const o=JSON.parse(fixJ2(mo[0]));if(Array.isArray(o.soal))return o.soal.map(s=>normQ({...s,teks:o.teks||s.teks})).filter(Boolean)}}catch(e){}
+  try{if(ma){const a=JSON.parse(fixJ2(ma[0]));if(Array.isArray(a))return a.map(normQ).filter(Boolean)}}catch(e){}
+  const a=salvageArr13(t);return a?a.map(normQ).filter(Boolean):[];
+}
+
+/* ---------- mesin kemiripan soal ---------- */
+const tri13=s=>{s=String(s).replace(/\s+/g,'');const o=new Set();for(let i=0;i<s.length-2;i++)o.add(s.substr(i,3));return o};
+function dice13(A,B){if(!A.size||!B.size)return 0;let i=0;A.forEach(x=>{if(B.has(x))i++});return 2*i/(A.size+B.size)}
+const setEq13=(A,B)=>A.size===B.size&&[...A].every(x=>B.has(x));
+function fp13(x){
+  const q=String(x.q||''),o=(x.o||[]).map(String),ans=x.tipe==='essay'?String(x.k||''):Array.isArray(x.a)?x.a.map(i=>o[i]).join('|'):(o[x.a]||'');
+  const nq=normTxt(q),nums=nq.match(/\d+(?:[.,]\d+)?/g)||[];
+  return{t:nq,s:tset(q),tri:tri13(nq),os:tset(o.join(' ')),ans:normTxt(ans),nums:new Set(nums),nn:nums.length,full:tset(q+' '+o.join(' ')),hasO:o.length>0};
+}
+function dup13(a,b){
+  const jq=jac(a.s,b.s),len=Math.min(a.s.size,b.s.size),jo=(a.hasO&&b.hasO)?jac(a.os,b.os):0,sameAns=!!a.ans&&a.ans===b.ans;
+  if(a.t&&a.t===b.t&&(len>=6||sameAns||jo>=.5||!a.hasO||!b.hasO))return true;
+  if(jac(a.full,b.full)>=.7)return true;
+  if(len>=5){const d=dice13(a.tri,b.tri);if(jq>=.7||d>=.82)return true;if(jq>=.55&&(jo>=.5||sameAns))return true}
+  if(a.nn>=2&&a.nn===b.nn&&setEq13(a.nums,b.nums)&&jq>=.5&&len>=3)return true;
+  if(len<5&&jq>=.8&&(jo>=.5||sameAns))return true;
+  return false;
+}
+function isDupOf(q,pool,th){ /* kompatibel dengan kode lama: pool = hasil makePool */
+  const f=fp13(typeof q==='object'?q:{q});
+  return pool.some(p=>p.fp?dup13(p.fp,f):(p.t===f.t||jac(f.s,p.s)>=(th||.8)));
+}
+/* ---------- log soal yang pernah dibuat (termasuk yang dihapus / belum disimpan) ---------- */
+const logKey13=()=>'glog_'+user.uid+'_'+S.sec+'_'+S.mapel;
+function logGet13(){try{return JSON.parse(localStorage.getItem(logKey13())||'[]')}catch(e){return[]}}
+function logAdd13(list){
+  const c=list.map(x=>({q:String(x.q).slice(0,240),o:(x.o||[]).slice(0,5).map(s=>String(s).slice(0,80)),a:x.a,tipe:x.tipe,k:x.k?String(x.k).slice(0,120):undefined}));
+  const seen=new Set(),all=[...c,...logGet13()].filter(x=>{const k=normTxt(x.q);if(seen.has(k))return false;seen.add(k);return true}).slice(0,700);
+  try{localStorage.setItem(logKey13(),JSON.stringify(all))}catch(e){}
+}
+async function pool13(withLog){
+  let ex=[];try{ex=await existingQs()}catch(e){}
+  const items=[...ex,...(withLog?logGet13():[]),...(withLog?(S.gen||[]):[])].filter(x=>x&&x.q),fps=items.map(fp13);
+  return{raw:items,fps,dup:x=>{const f=fp13(x);return fps.some(p=>dup13(p,f))},add:x=>{fps.push(fp13(x));items.push(x)}};
+}
+async function dedupe(list){
+  const P=await pool13(false),out=[];
+  list.forEach(x=>{if(P.dup(x))return;P.add(x);out.push(x)});return out;
+}
+async function loadCount(){
+  try{const ex=await existingQs(),lg=logGet13().length;
+    if($('gcount'))$('gcount').innerHTML=`Bank: <b>${ex.length}</b> soal ${esc(S.mapel)} • riwayat pembuatan di perangkat ini: <b>${lg}</b>. Soal baru otomatis dibuat BERBEDA dari semuanya. ${lg?`<a href="#" style="color:var(--b)" onclick="logReset13();return false">lupakan riwayat pembuatan</a>`:''}`}
+  catch(e){setTxt('gcount','')}
+}
+function logReset13(){if(!confirm('Lupakan riwayat soal yang pernah dibuat di perangkat ini? Soal di bank tetap dicek agar tidak terulang.'))return;try{localStorage.removeItem(logKey13())}catch(e){}loadCount()}
+function bankDupes(){
+  const L=S.bank,F=L.map(fp13),par=L.map((_,i)=>i),f=i=>par[i]===i?i:(par[i]=f(par[i]));
+  for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++)if(dup13(F[i],F[j]))par[f(j)]=f(i);
+  const g={};L.forEach((_,i)=>{(g[f(i)]=g[f(i)]||[]).push(i)});const groups=Object.values(g).filter(a=>a.length>1);
+  const n=groups.reduce((s,a)=>s+a.length-1,0);
+  $('bdup').innerHTML=groups.length?`<div class="mut small" style="margin:10px 0">${groups.length} kelompok soal mirip. Soal pertama di tiap kelompok dipertahankan; yang dicentang akan dihapus (${n}).</div>${groups.map(a=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)">${a.map((i,k)=>`<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;color:var(--tx)"><input type="checkbox" class="dchk" data-id="${esc(L[i].id)}" style="width:18px" ${k?'checked':''}><span class="small">${k?'':'<b>(simpan)</b> '}${esc(L[i].q)}</span></label>`).join('')}</div>`).join('')}<button class="btn red full" onclick="delDupes()">🗑 Hapus yang dicentang</button>`:'<div class="small" style="margin-top:10px">✅ Tidak ada soal yang mirip. Bank kamu bersih.</div>';
+}
+
+/* ---------- kurikulum per kelas (Kurikulum Merdeka, ringkas) ---------- */
+const CURR13={
+ 'Matematika':{1:'bilangan sampai 100, penjumlahan dan pengurangan sampai 20, bangun datar dan ruang sederhana, pengukuran panjang tidak baku, pola gambar',2:'bilangan sampai 1000, penjumlahan dan pengurangan bersusun, perkalian dan pembagian dasar, panjang dan berat baku, waktu, uang',3:'bilangan sampai 10.000, perkalian dan pembagian, pecahan sederhana, keliling bangun datar, sudut, diagram gambar',4:'bilangan sampai 100.000, pecahan senilai dan operasi sederhana, faktor dan kelipatan, keliling dan luas persegi/persegi panjang, sudut, diagram batang',5:'pecahan desimal dan persen, operasi pecahan, KPK dan FPB, luas segitiga/jajargenjang/trapesium, volume kubus dan balok, skala, rata-rata',6:'bilangan bulat, perbandingan dan skala, keliling dan luas lingkaran, volume bangun ruang, mean median modus',7:'bilangan bulat dan pecahan, bentuk aljabar, persamaan dan pertidaksamaan linear satu variabel, perbandingan, himpunan, sudut dan garis, segiempat dan segitiga, data',8:'pola bilangan, koordinat kartesius, relasi dan fungsi, persamaan garis lurus, sistem persamaan linear dua variabel, teorema Pythagoras, lingkaran, bangun ruang sisi datar',9:'eksponen dan bentuk akar, persamaan dan fungsi kuadrat, transformasi geometri, kekongruenan dan kesebangunan, bangun ruang sisi lengkung, peluang, statistika',10:'eksponen dan logaritma, persamaan dan fungsi kuadrat, sistem persamaan linear tiga variabel, pertidaksamaan, trigonometri dasar, vektor dasar, statistika',11:'barisan dan deret, matriks, trigonometri lanjutan, program linear, limit fungsi, peluang, statistika data berkelompok',12:'limit dan turunan fungsi aljabar, penerapan turunan, integral tak tentu dan tentu, peluang, statistika, dimensi tiga'},
+ 'IPA':{1:'tubuh dan panca indera, hewan dan tumbuhan di sekitar, benda di sekitar, siang dan malam',2:'ciri makhluk hidup, bagian tumbuhan, wujud benda, sumber bunyi dan cahaya sederhana',3:'siklus hidup hewan, bagian tumbuhan dan fungsinya, sumber energi (panas, cahaya, bunyi), gaya dorong dan tarik',4:'perubahan wujud benda, gaya dan gerak, sumber energi, rantai makanan, daur air',5:'organ tubuh manusia (pencernaan, pernapasan, peredaran darah), rantai makanan, perubahan wujud, energi listrik sederhana, tata surya sederhana',6:'ekosistem, rangkaian listrik, perpindahan kalor, bumi dan tata surya, perubahan lingkungan',7:'besaran dan pengukuran, klasifikasi makhluk hidup, zat dan perubahannya, suhu dan kalor, ekosistem, bumi dan tata surya',8:'gerak dan gaya, tekanan zat, getaran dan gelombang, cahaya dan alat optik, sistem organ manusia',9:'listrik statis dan dinamis, kemagnetan, pewarisan sifat, bioteknologi, sistem reproduksi',10:'Biologi: keanekaragaman hayati, virus, ekosistem; Fisika: besaran, kinematika, hukum Newton, energi; Kimia: struktur atom, ikatan kimia, stoikiometri dasar',11:'Fisika: fluida, termodinamika, gelombang, listrik dinamis; Kimia: asam basa, termokimia, laju reaksi, kesetimbangan; Biologi: sel, metabolisme, sistem organ',12:'Fisika: medan listrik dan magnet, induksi, fisika modern; Kimia: redoks dan elektrokimia, kimia unsur, polimer; Biologi: genetika, evolusi, bioteknologi'},
+ 'IPS':{1:'keluarga dan lingkungan, aturan di rumah dan sekolah, kenampakan alam sederhana',2:'kegiatan ekonomi keluarga, kebutuhan dan keinginan, peta sederhana',3:'lingkungan sekitar, kegiatan ekonomi, keragaman budaya daerah, arah mata angin',4:'kenampakan alam dan keragaman budaya Indonesia, kegiatan ekonomi, pahlawan',5:'kerajaan Hindu-Buddha dan Islam di Indonesia, penjajahan, sumber daya alam, kegiatan ekonomi',6:'proklamasi dan perjuangan kemerdekaan, Indonesia dan ASEAN, globalisasi, kerja sama internasional',7:'interaksi sosial, kondisi geografis Indonesia, kelangkaan dan kebutuhan, perubahan sosial, sejarah awal Indonesia',8:'kerajaan Hindu-Buddha dan Islam, penjajahan, konflik sosial, kegiatan ekonomi',9:'perdagangan internasional, pergerakan nasional dan proklamasi, kependudukan, perubahan sosial',10:'Geografi: peta dan penginderaan jauh; Ekonomi: kelangkaan dan pasar; Sosiologi: interaksi dan sosialisasi; Sejarah: peradaban awal',11:'dinamika kependudukan, permintaan dan penawaran (elastisitas), pergerakan nasional, kelompok sosial dan konflik',12:'pendapatan nasional, kebijakan fiskal dan moneter, globalisasi, perubahan sosial, sejarah Indonesia modern'},
+ 'Bahasa Indonesia':{1:'huruf dan kata, kalimat sederhana, menyimak cerita pendek',2:'kosakata benda sekitar, kalimat sederhana dan tanda baca dasar, cerita bergambar',3:'ide pokok kalimat, sinonim dan antonim, puisi dan pantun sederhana, kalimat tanya',4:'ide pokok dan kalimat penjelas, kata baku dan tidak baku, teks narasi dan deskripsi, tanda baca',5:'teks eksplanasi, kalimat majemuk sederhana, pantun dan puisi, kata ulang, surat',6:'teks persuasi dan iklan, kalimat efektif sederhana, majas sederhana, berita sederhana, imbuhan',7:'teks deskripsi, narasi, prosedur, laporan hasil observasi, puisi, cerita rakyat',8:'teks berita, iklan dan poster, eksposisi, ulasan, pantun, drama',9:'teks argumentasi, proposal, cerpen, kritik dan esai, majas, kalimat efektif',10:'teks anekdot, hikayat, eksposisi, prosedur kompleks, laporan hasil observasi, ejaan (PUEBI)',11:'cerita sejarah, berita, ulasan, debat, novel, kritik dan esai',12:'teks editorial dan opini, argumentasi, resensi, kutipan dan parafrase, nilai karya sastra, karya ilmiah'},
+ 'Bahasa Inggris':{1:'greetings, colors, numbers 1-10, classroom objects, family',2:'animals, body parts, simple commands, this/that',3:'daily activities, food and drink, there is/there are, to be',4:'simple present, days and time, prepositions of place, can/can\'t',5:'simple present vs present continuous, simple comparison, simple descriptive text, hobbies',6:'simple past (regular), will for future, simple recount, asking and giving directions',7:'self-introduction, descriptive text, simple present, to be, there is/are, possessive adjectives, prepositions',8:'simple past, present continuous, comparison, recount, narrative, procedure, modal can/must/should',9:'passive voice, conditional type 1, narrative, announcement, present perfect',10:'conditional sentences, present perfect, passive voice, analytical exposition, narrative, recount',11:'relative clauses, reported speech, hortatory exposition, procedure, news item, report text',12:'conditional types 1-3, wish clauses, gerund and infinitive, text types review, reading comprehension (TOEFL style), inversion'}
+};
+function gradeOf13(lv){
+  lv=String(lv||'');let m;
+  if((m=lv.match(/^(?:SD|SMP|SMA) Kelas (\d+)/)))return[+m[1],+m[1]];
+  if(/^TKA SD/.test(lv))return[4,6];if(/^TKA SMP/.test(lv))return[7,9];if(/^TKA SMA|UTBK/.test(lv))return[10,12];
+  return null;
+}
+function scopeOf13(lv){
+  const g=gradeOf13(lv),c=CURR13[S.mapel];if(!g||!c)return'';
+  const top=g[1],here=[];for(let k=g[0];k<=top;k++)if(c[k])here.push((g[0]!==g[1]?'Kelas '+k+': ':'')+c[k]);
+  return here.length?`MATERI YANG BOLEH KELUAR (${S.mapel}, ${lv}): ${here.join(' | ')}. Materi kelas di atas ${top} DILARANG; materi kelas di bawahnya hanya sebagai prasyarat.`:'';
+}
+function levelGuide(lv){
+  const g=String(lv||''),m0=g.match(/^SD Kelas (\d)/),m1=g.match(/^SMP Kelas (\d)/),m2=g.match(/^SMA Kelas (\d+)/);let b;
+  if(m0){const n=+m0[1];b=`Siswa SD kelas ${n} (Kurikulum Merdeka fase ${n<=2?'A':n<=4?'B':'C'}). Bahasa sangat sederhana, kalimat pendek, konteks sehari-hari anak, tanpa istilah teknis berlebihan, soal 1-2 langkah. Hanya materi yang sudah diajarkan sampai kelas ${n}.`}
+  else if(m1)b=`Siswa SMP kelas ${m1[1]} (Kurikulum Merdeka fase D). Soal 2-3 langkah, istilah teknis dasar. Hanya materi sampai kelas ${m1[1]}.`;
+  else if(m2)b=`Siswa SMA kelas ${m2[1]} (Kurikulum Merdeka fase E/F). Penalaran multi-langkah, istilah formal, penerapan konsep. Hanya materi sampai kelas ${m2[1]}.`;
+  else if(/^TKA SD/.test(g))b='Tes Kemampuan Akademik tingkat SD (akhir kelas 6): literasi dan numerasi berbasis stimulus singkat (teks/data), penalaran sederhana, sesuai capaian SD.';
+  else if(/^TKA SMP/.test(g))b='Tes Kemampuan Akademik tingkat SMP (akhir kelas 9): literasi dan numerasi berbasis stimulus, penalaran 2-3 langkah, sesuai capaian SMP.';
+  else if(/^TKA SMA/.test(g))b='Tes Kemampuan Akademik tingkat SMA (akhir kelas 12): penalaran berbasis teks/data, analisis, sesuai capaian SMA.';
+  else if(/UTBK/.test(g))b='UTBK-SNBT: penalaran umum, pengetahuan dan pemahaman umum, pemahaman bacaan dan menulis, pengetahuan kuantitatif, literasi bahasa Indonesia dan Inggris, penalaran matematika. Soal HOTS berbasis teks/data, level tinggi.';
+  else if(/^A1/.test(g))b='CEFR A1: sekitar 500 kata paling umum, kalimat sangat pendek, present simple/be, topik diri sendiri, keluarga, benda sehari-hari.';
+  else if(/^A2/.test(g))b='CEFR A2: kosakata dasar sehari-hari, past simple, perbandingan, future dengan going to, teks pendek tentang rutinitas dan tempat.';
+  else if(/^B1/.test(g))b='CEFR B1: present perfect, conditional 0/1/2, passive dasar, reported speech dasar, teks tentang pengalaman, rencana, dan opini sederhana.';
+  else if(/^B2/.test(g))b='CEFR B2: struktur kompleks, conditional 3, passive lanjutan, idiom umum, topik abstrak, teks argumentatif.';
+  else if(/^C1/.test(g))b='CEFR C1: kosakata lanjutan dan nuansa, struktur inversi, discourse markers, teks akademik/profesional yang padat.';
+  else if(/^Pemula/.test(g))b='Trader pemula: konsep dasar dan istilah, tanpa asumsi pengetahuan sebelumnya.';
+  else if(/^Menengah/.test(g))b='Trader menengah: penerapan konsep, kombinasi beberapa konfirmasi, manajemen risiko praktis.';
+  else if(/^Lanjut/.test(g))b='Trader lanjutan: nuansa struktur pasar, skenario bersyarat, manajemen risiko tingkat lanjut.';
+  else b='Pengetahuan umum untuk pelajar dan dewasa, tingkat menengah.';
+  return b+' '+scopeOf13(lv);
+}
+function topicList(lv){
+  const g=gradeOf13(lv),c=CURR13[S.mapel];
+  if(g&&c){const o=[];for(let k=g[0];k<=g[1];k++)if(c[k])c[k].split(/,\s*(?![^()]*\))/).forEach(t=>{t=t.replace(/^[A-Za-z]+:\s*/,'').trim();if(t)o.push(t)});if(o.length)return o}
+  const t=TOPICS[S.mapel];return Array.isArray(t)?t:(t&&t[tierOf(lv)])||[];
+}
+
+/* ---------- rancangan (blueprint) tiap soal agar tidak seragam ---------- */
+const CTX13=['pasar tradisional','kantin sekolah','kebun dan pertanian','pertandingan olahraga','perjalanan dengan kendaraan','toko dan diskon','perpustakaan','dapur dan resep','taman kota','laboratorium sekolah','kegiatan pramuka','festival budaya daerah','pelabuhan dan kapal nelayan','puskesmas','kebun binatang','bengkel','kolam renang','penerbangan','pabrik','peternakan','pertunjukan musik','proyek bangunan','bank dan tabungan','cuaca dan musim','kerja kelompok di kelas','aplikasi ponsel','panen padi','lomba cerdas cermat','museum','stasiun kereta','gotong royong desa','toko online','klub robotik','wisata alam','percobaan sains sederhana','acara ulang tahun'];
+const CTXT13=['pair EURUSD','pair GBPUSD','pair USDJPY','XAUUSD','sesi London','sesi New York','akun $500','akun $5.000','timeframe M15','timeframe H1','timeframe H4','menjelang rilis NFP','trader swing','scalper','trader yang baru kena loss beruntun','pasar sedang trending','pasar sedang ranging'];
+const COG13=['mengingat konsep','memahami dan menjelaskan','menerapkan prosedur','menganalisis hubungan','mengevaluasi pernyataan','menalar secara logis'];
+function blueprint13(n,lv,topik){
+  const pool=S.sec==='trading'?CTXT13:CTX13,key='ctx_'+S.mapel;let used=[];try{used=JSON.parse(localStorage.getItem(key)||'[]')}catch(e){}
+  let fresh=shuffle(pool.filter(c=>!used.includes(c)));if(fresh.length<n)fresh=fresh.concat(shuffle(pool.filter(c=>used.includes(c))));
+  const an=shuffle(ANGLES),cg=shuffle(COG13),math=S.mapel==='Matematika',t=tierOf(lv),mx=t==='SD'?200:t==='SMP'?500:1000,items=[],ctxUsed=[];
+  for(let i=0;i<n;i++){
+    const c=fresh[i%fresh.length];ctxUsed.push(c);
+    items.push(`#${i+1} • gaya: ${an[i%an.length]} • konteks: ${c} • proses berpikir: ${cg[i%cg.length]}${math?` • angka yang dipakai kira-kira ${Math.floor(Math.random()*mx*.5)+2}–${Math.floor(mx*.5+Math.random()*mx*.5)+10} (hindari angka bulat 10/100)`:''}`);
+  }
+  try{localStorage.setItem(key,JSON.stringify([...ctxUsed,...used].slice(0,Math.max(12,pool.length-2))))}catch(e){}
+  return items;
+}
+function jt13(jn,L){return{'Pilihan ganda':'SEMUA soal pilihan ganda dengan 4 opsi (tanpa field tipe).','Benar/Salah':'SEMUA soal Benar/Salah: "q" berupa pernyataan, "o":["Benar","Salah"], "a" 0 jika pernyataan benar atau 1 jika salah, dan tambah "tipe":"bs".','Pilih semua yang benar':'SEMUA soal pilihan ganda kompleks: "tipe":"multi", 4-5 opsi, "a" berupa ARRAY indeks semua jawaban benar (2-3 jawaban benar).','Essay':'SEMUA soal essay/uraian: {"tipe":"essay","q":"...","k":"jawaban ideal 1-3 kalimat","kw":["kata kunci"],"e":"rubrik penilaian singkat"} tanpa field "o" dan "a".','Campuran':L?'Campuran pilihan ganda (4 opsi), Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), pilih semua yang benar ("tipe":"multi","a":[indeks...]), dan essay ("tipe":"essay","k","kw") dengan proporsi seimbang.':'Campuran pilihan ganda (4 opsi) dan Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), kira-kira setengah-setengah.'}[jn]}
+
+/* ---------- BUAT SOAL (V13) ---------- */
+async function gen(){
+  const topik=$('gt').value.trim();if(!topik){setTxt('gm','Isi topik dulu (atau klik 🎲 Acak).');return}
+  const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),bc=!!($('gb2')&&$('gb2').checked),sz=bc?5:8,L=isLang(),math=S.mapel==='Matematika';
+  S.glv=lv;SRC=[];LT=0;busy('gb',true);
+  const lang=isEng()?'Semua teks soal, opsi, pembahasan, kunci, dan teks bacaan HARUS dalam Bahasa Inggris penuh (full English, tanpa campuran Indonesia), tata bahasa sempurna.':S.mapel==='Bahasa Indonesia'?'Gunakan Bahasa Indonesia baku sesuai PUEBI/KBBI.':'Gunakan Bahasa Indonesia.';
+  const guide=levelGuide(lv);
+  const sys=`Kamu pembuat soal ${S.mapel} untuk ${S.sec==='trading'?'edukasi trading forex':'siswa Indonesia'}. ${bc?'Keluarkan HANYA JSON object {"teks":"teks bacaan informatif 120-200 kata yang berdasar sumber tepercaya","soal":[...]} dan semua soal harus bisa dijawab dari teks itu, tanpa teks lain dan tanpa markdown.':'Keluarkan HANYA JSON array valid tanpa teks lain dan tanpa markdown.'} Format item: {"q":"pertanyaan","o":["opsi1","opsi2","opsi3","opsi4"],"a":indeks_jawaban_benar,"e":"pembahasan singkat langkah demi langkah"}. ${jt13(jn,L)} ${lang}
+TINGKAT: ${lv}. PANDUAN: ${guide} SEMUA soal harus pas di tingkat ini: tidak lebih mudah dan tidak lebih sulit; istilah, angka, dan konteks lazim untuk tingkat itu.
+KEBARUAN (PENTING): kamu diberi daftar soal yang SUDAH ADA dan RANCANGAN per soal (gaya, konteks, proses berpikir). Ikuti rancangan nomor demi nomor. Dilarang mengulang, memparafrase, atau memakai kalimat pembuka, struktur, nama tokoh, konteks, atau angka yang sama dengan soal yang sudah ada maupun antar soal baru. Tiap soal menguji konsep/sub-topik yang berbeda.
+Aturan: soal jelas, tidak ambigu, tepat satu jawaban benar (kecuali jenis pilih-semua), ${math?'hitung ulang setiap perhitungan langkah demi langkah sebelum menetapkan kunci, ':'SETIAP fakta dan kunci jawaban harus didukung sumber tepercaya yang diberikan (utamakan ★resmi), jangan membuat soal dari fakta yang tidak bisa dipastikan, '}opsi tanpa awalan huruf, pengecoh masuk akal dan panjangnya seimbang. Rumus matematika ditulis LaTeX di antara \\\\( dan \\\\); semua backslash di dalam JSON wajib digandakan.`;
+  const vs=`Kamu pemeriksa soal ${S.mapel}. Periksa setiap soal terhadap ${math?'perhitungan ulang langkah demi langkah':'sumber tepercaya yang diberikan'} DAN tingkat ${lv} (${guide}). Perbaiki kunci jawaban, kata kunci, dan pembahasan yang salah; BUANG soal yang ambigu, punya lebih dari satu jawaban benar, tidak bisa dipastikan, atau tidak sesuai tingkat (terlalu mudah/sulit/materi di luar tingkat). Pertahankan field "teks", "tipe", "k", "kw" bila ada. ${lang} Keluarkan HANYA JSON array valid dengan format item yang sama, tanpa teks lain. Backslash di JSON wajib digandakan.`;
+  const opG={temp:1,json:bc?'object':'array'},opV={temp:.2,json:'array'};
+  const verified=[];let rej=0,unv=0,short=false;
+  try{
+    setTxt('gm','⏳ Membaca soal yang sudah ada & riwayat pembuatan...');
+    const P=await pool13(true),ts=tset(topik);
+    const exTxt=extra=>P.raw.concat(extra).map((x,i)=>({q:x.q,s:jac(tset(x.q),ts)+(x.sub&&normTxt(x.sub).includes(normTxt(topik))?.5:0)+(i>=P.raw.length-25?.3:0)+i*1e-6})).sort((a,b)=>b.s-a.s).slice(0,90).map(x=>'- '+String(x.q).replace(/\s+/g,' ').slice(0,90)).join('\n');
+    for(let att=0;att<3&&verified.length<n;att++){
+      const need=n-verified.length,want=Math.min(need+Math.ceil(need*.4),32),parts=[];for(let l=want;l>0;l-=sz)parts.push(Math.min(sz,l));
+      const bp=blueprint13(want,lv,topik),subs=shuffle(topicList(lv));let off=0;
+      setTxt('gm',`⏳ ${att?`Percobaan ${att+1}: melengkapi ${need} soal yang kurang... `:''}Membuat ${want} kandidat soal ${math?'':'dari sumber tepercaya '}untuk ${lv}...`);
+      const list=exTxt(verified);
+      const out=await Promise.all(parts.map((c,i)=>{const mine=bp.slice(off,off+c);off+=c;
+        return ai(sys,[{role:'user',content:`Buat ${c} soal BARU.\nMapel: ${S.mapel}\nTopik: ${topik}\nJenis: ${jn}\nTingkat: ${lv}\nKesulitan: ${df}\n${parts.length>1?`Ini bagian ${i+1} dari ${parts.length}; fokus sub-topik berbeda dari bagian lain${bc?' dan buat teks bacaan berbeda':''}.\n`:''}RANCANGAN PER SOAL (ikuti urutan):\n${mine.join('\n')}\nSeed variasi: ${Math.random().toString(36).slice(2,8)}${att?` (percobaan ke-${att+1}: hasil sebelumnya terlalu mirip yang sudah ada, buat JAUH berbeda)`:''}\n${ex?'Instruksi khusus: '+ex+'\n':''}\nSOAL YANG SUDAH ADA (dilarang diulang/diparafrase):\n${list||'(belum ada)'}`}],true,!math,S.mapel+' '+topik+(i&&subs[i%Math.max(1,subs.length)]?' '+subs[i%subs.length]:''),undefined,opG)
+          .catch(e=>{if(att===0&&parts.length===1)throw e;return''})}));
+      const cand=[],cf=[];
+      out.forEach(t=>parseQs(t).forEach(x=>{const f=fp13(x);if(P.dup(x)||cf.some(p=>dup13(p,f))){rej++;return}cf.push(f);cand.push(x)}));
+      if(!cand.length)continue;
+      setTxt('gm',`🔎 Memverifikasi ${cand.length} kandidat (kunci jawaban & kesesuaian ${lv})...`);
+      let ok=[],vOk=false;
+      try{const ch=[];for(let i=0;i<cand.length;i+=sz)ch.push(cand.slice(i,i+sz));
+        const vr=await Promise.all(ch.map(cc=>ai(vs,[{role:'user',content:JSON.stringify(cc)}],true,!math,S.mapel+' '+topik,undefined,opV).catch(()=>'')));
+        vr.forEach(t=>{ok=ok.concat(parseQs(t))});vOk=ok.length>0}catch(e){}
+      const src=vOk?ok:cand.map(x=>({...x,uv:1}));if(!vOk)unv+=cand.length;
+      src.forEach(x=>{if(verified.length>=want)return;const f=fp13(x);if(P.dup(x)||verified.some(v=>dup13(fp13(v),f))){rej++;return}P.add(x);verified.push(x)});
+    }
+    const fin=verified.slice(0,n);short=fin.length<n;
+    const src=SRC.filter(s=>/^https?:/.test(s.uri)).slice(0,4).map(s=>({title:String(s.title).slice(0,80),uri:s.uri}));
+    S.gen=fin.map(x=>({...x,src}));S.genMeta={tingkat:lv,kesulitan:df,jenis:jn};
+    if(fin.length)logAdd13(fin);
+    setTxt('gm',fin.length?`✅ ${fin.length} soal BARU untuk ${lv}${unv?` • ⚠️ ${unv} kandidat gagal diverifikasi (periksa manual)`:' • terverifikasi silang'}${math?' • dihitung ulang':(LT?` • ${LT} sumber resmi dipakai`:' • ⚠️ tidak ada sumber resmi ditemukan, periksa manual')}.${rej?` ${rej} soal mirip soal lama dibuang.`:''}${short?` ⚠️ Hanya ${fin.length} dari ${n} yang cukup berbeda; ganti topik/sub-topik atau klik Buat lagi.`:''} Hapus yang salah (✕), lalu simpan.`:`Tidak ada soal baru yang cukup berbeda${rej?` (${rej} dibuang karena mirip)`:''}. Coba sub-topik lain atau klik 🎲 Acak.`);
+  }catch(e){setTxt('gm','⚠️ '+e.message)}
+  busy('gb',false);drawGen();loadCount();
+}
+async function saveGen(){
+  const sel=S.gen.filter((x,i)=>$('g'+i)&&$('g'+i).checked);if(!sel.length)return alert('Tidak ada soal dicentang');
+  const sub=$('gt')?$('gt').value.trim():'',m=S.genMeta||{};let nw;
+  try{nw=await dedupe(sel)}catch(e){return alert('Gagal memeriksa duplikat: '+e.message)}
+  if(!nw.length){alert('Semua soal yang dicentang mirip dengan soal yang sudah ada di bank, jadi tidak disimpan.');return}
+  try{for(let i=0;i<nw.length;i+=20){const b=db.batch();nw.slice(i,i+20).forEach(x=>{const d=JSON.parse(JSON.stringify(x));delete d.uv;b.set(db.collection('soal').doc(),{...d,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,tingkat:m.tingkat||'',kesulitan:m.kesulitan||'',sumber:'ai',terverifikasi:!x.uv,dibuat:tsNow()})});await b.commit()}}
+  catch(e){return alert('Gagal menyimpan: '+e.message+'\n(cek aturan Firestore untuk koleksi "soal")')}
+  logAdd13(nw);
+  alert(`${nw.length} soal tersimpan`+(sel.length>nw.length?` (${sel.length-nw.length} dilewati karena mirip dengan soal yang sudah ada)`:''));S.gen=[];S.tab='bank';home();
+}
+function drawGen(){
+  if(!$('gres'))return;
+  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div>${x.teks&&(i===0||S.gen[i-1].teks!==x.teks)?`<div class="exp" style="margin-bottom:8px">📖 ${fmt(x.teks)}</div>`:''}<b>${i+1}. ${esc(x.q)}</b> ${TL[x.tipe]?`<span class="mut small">[${TL[x.tipe]}]</span>`:''}${x.uv?' <span class="small" style="color:#ffd48a">⚠️ belum terverifikasi</span>':''}<div class="mut">${x.tipe==='essay'?'✅ '+esc(x.k)+((x.kw||[]).length?'<br>🔑 '+esc(x.kw.join(', ')):''):x.o.map((o,k)=>((x.tipe==='multi'?x.a.includes(k):k===x.a)?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e||'')}</div>${i===0?srcLinks(x):''}</div><button class="x" onclick="dropGen13(${i})">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
+}
+function dropGen13(i){const ck=S.gen.map((_,k)=>!$('g'+k)||$('g'+k).checked);S.gen.splice(i,1);ck.splice(i,1);drawGen();ck.forEach((c,k)=>{if($('g'+k))$('g'+k).checked=c})}
+
+/* ---------- RIWAYAT: pilih banyak, hapus, tampilkan semua ---------- */
+const HS13={sel:new Set(),mode:false,all:false};
+function drawHist(){
+  const r=S.att||[],g={};r.forEach(x=>(g[x.mapel]=g[x.mapel]||[]).push(x.skor/x.total*100));S.gk=Object.keys(g);S.avg=g[S.mapel]?avg(g[S.mapel]):null;
+  if(!$('stat'))return;
+  $('stat').innerHTML=S.gk.length?S.gk.map((m,i)=>`<div style="margin-bottom:12px;cursor:pointer" onclick="showMapel(${i})"><div class="small" style="display:flex;justify-content:space-between"><span>${esc(m)} (${g[m].length}x) ›</span><b>${avg(g[m])}%</b></div><div class="bar" style="margin:4px 0 0"><i style="width:${avg(g[m])}%"></i></div></div>`).join(''):'Belum ada data.';
+  if(!$('hist'))return;
+  const ids=new Set(r.map(x=>x.id));[...HS13.sel].forEach(i=>{if(!ids.has(i))HS13.sel.delete(i)});
+  const vis=HS13.all?r:r.slice(0,10),m=HS13.mode;
+  $('hist').innerHTML=r.length?`<div class="row" style="margin-bottom:8px"><button class="btn alt" style="padding:9px" onclick="hMode13()">${m?'✖ Batal pilih':'☑ Pilih beberapa'}</button>${m?`<button class="btn alt" style="padding:9px" onclick="hAll13()">Pilih semua (${r.length})</button><button class="btn red" style="padding:9px" onclick="hDel13()" ${HS13.sel.size?'':'disabled'}>🗑 Hapus (${HS13.sel.size})</button>`:''}</div>`+
+    vis.map(x=>`<div class="item" style="cursor:pointer" onclick="${m?`hTog13('${x.id}')`:`showAttempt('${x.id}')`}"><span>${m?`<input type="checkbox" ${HS13.sel.has(x.id)?'checked':''} style="width:18px;pointer-events:none"> `:''}${esc(x.mapel)}${x.mode==='ujian'?' 📝':''} <span class="mut small">${dt(x)}</span></span><span style="white-space:nowrap"><b>${x.skor}/${x.total}${m?'':' ›'}</b>${m?'':` <button class="x" data-id="${x.id}" onclick="event.stopPropagation();delAttempt(this)">🗑</button>`}</span></div>`).join('')+
+    (r.length>10?`<button class="btn alt full" style="margin-top:8px" onclick="HS13.all=!HS13.all;drawHist()">${HS13.all?'Tampilkan 10 terbaru saja':'Tampilkan semua ('+r.length+')'}</button>`:'')+
+    `<button class="btn red full" onclick="delAllHist()">🗑 Hapus semua riwayat ${S.sec==='trading'?'Trading':'TKA & Sekolah'} (${r.length})</button>`:'Belum ada riwayat.';
+}
+function hMode13(){HS13.mode=!HS13.mode;HS13.sel.clear();drawHist()}
+function hTog13(id){HS13.sel.has(id)?HS13.sel.delete(id):HS13.sel.add(id);drawHist()}
+function hAll13(){const r=S.att||[];HS13.sel=HS13.sel.size===r.length?new Set():new Set(r.map(x=>x.id));drawHist()}
+async function hDel13(){
+  const list=(S.att||[]).filter(x=>HS13.sel.has(x.id));if(!list.length)return;
+  if(!confirm(`Hapus ${list.length} riwayat terpilih? Tidak bisa dibatalkan.`))return;
+  try{await delMany(list);const d=new Set(list.map(x=>x.id));S.att=S.att.filter(x=>!d.has(x.id));HS13.sel.clear();HS13.mode=false;drawHist()}
+  catch(e){alert('Gagal menghapus: '+e.message+'\nPastikan aturan Firestore mengizinkan delete pada koleksi "hasil" untuk pemilik datanya.')}
+}
+async function delAttemptM(el,i){
+  const id=el.dataset.id;if(!confirm('Hapus riwayat latihan ini?'))return;
+  try{await db.collection('hasil').doc(id).delete();S.att=(S.att||[]).filter(x=>x.id!==id);
+    const m=S.curMapel;S.gk=[...new Set(S.att.map(x=>x.mapel))];const k=S.gk.indexOf(m);
+    if(k<0){S.tab='latihan';home()}else showMapel(k)}
+  catch(e){alert('Gagal menghapus: '+e.message)}
+}
+
+/* ---------- TRADING: perbaikan tampilan News & Analisis ---------- */
+function calHtml(j){
+  const t0=Date.now()-6*3600000;
+  const ev=(j.calendar||[]).filter(e=>e.ts>=t0&&(!NF.high||e.impact==='High')&&(NF.cur==='ALL'||e.cur===NF.cur)&&(!NF.key||e.tag));
+  const by={};ev.forEach(e=>{const k=ldt(e.ts,{weekday:'long',day:'numeric',month:'long'});(by[k]=by[k]||[]).push(e)});
+  return Object.keys(by).length?Object.entries(by).map(([d,a])=>`<div style="margin-top:12px"><div style="font-weight:700;color:var(--b)">${esc(d)}</div>${a.map(e=>`<div class="item" style="align-items:flex-start"><span><b>${esc(ldt(e.ts,{hour:'2-digit',minute:'2-digit'}))}</b> <span class="x" style="background:#262b55;color:#eef0ff;padding:2px 6px">${esc(e.cur)}</span> ${e.impact==='High'?'🔴':'🟠'} ${e.tag?`<b style="color:var(--b)">${esc(e.title)}</b>`:esc(e.title)}${e.resmi?' <span class="small">📌 dari jadwal resmi (forecast tidak tersedia)</span>':e.verified==='official'?' <span class="small">✅ jadwal dikonfirmasi sumber resmi</span>':e.verified==='conflict'?` <span class="small" style="color:#ffd48a">⚠️ konflik dengan jadwal resmi${e.officialDate?' ('+esc(e.officialDate)+')':''}</span>`:''}</span><span class="small mut" style="text-align:right;white-space:nowrap">${e.actual?'Aktual <b>'+esc(e.actual)+'</b><br>':''}Forecast ${esc(e.forecast||'-')}<br>Prev ${esc(e.previous||'-')}</span></div>`).join('')}</div>`).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada event sesuai filter (atau kalender belum tersedia).</div>';
+}
+function nfSet(k,v){NF[k]=v;drawCal()} /* hanya kalender yang digambar ulang: hasil/analisis AI yang sedang berjalan tidak hilang */
+function ppToggle(p){
+  PRP.sel=PRP.sel.includes(p)?PRP.sel.filter(x=>x!==p):[...PRP.sel,p];
+  const b=$('ppairs');if(b)b.innerHTML=ALLP.map(q=>`<button class="x" style="background:${PRP.sel.includes(q)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${q}')">${q}</button>`).join('');
+}
+/* ===== END V13 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V14: Trading — data lebih lengkap & tervalidasi (mesin skor, harga OHLC, CFTC, yield riil, kejutan rilis, verifikasi silang) ===== */
+const BIASC14={BULLISH:'🟢',BEARISH:'🔴',NETRAL:'⚪'};
+function ageDays14(d){
+  d=String(d||'');const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d),iso=m?`${m[3]}-${m[1]}-${m[2]}`:d.slice(0,10),t=Date.parse(iso+'T00:00:00Z');
+  return isFinite(t)?Math.floor((Date.now()-t)/864e5):null;
+}
+function ageTag14(d,max){const a=ageDays14(d);if(a==null)return'';return `<span class="small" style="color:${a>max?'#ffd48a':'var(--mut)'}">${a>max?'⚠️ ':''}${a} hari lalu${a>max?' (usang)':''}</span>`}
+function engineHtml14(j){
+  const e=j.eng;if(!e||!e.pairs)return'';
+  const ai={};((j.pro&&j.pro.pairs)||[]).forEach(p=>ai[p.pair]=p);
+  const sg=v=>v==null?'n/a':(v>0?'+':'')+v;
+  const rows=Object.entries(e.pairs).map(([p,v])=>{
+    const a=ai[p];let st='<span class="mut small">menunggu AI</span>';
+    if(a)st=a.conflict?'<span class="small" style="color:#ffb3b3">⚠️ AI bertentangan dengan mesin → keyakinan diturunkan ke RENDAH</span>':a.engineNeutral?'<span class="small" style="color:#ffd48a">➖ mesin netral → keyakinan AI diturunkan</span>':a.bias===v.bias?'<span class="small" style="color:#9be7b0">✅ searah</span>':'<span class="small mut">➖ netral</span>';
+    return `<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:7px 2px"><b>${esc(p)}</b></td><td>${BIASC14[v.bias]||''} ${esc(v.bias)}<div class="small mut">skor ${sg(v.score)} • ${esc(v.conf)} • data ${Math.round((v.cov||0)*100)}%</div></td><td>${a?`${BIASC14[a.bias]||''} ${esc(a.bias)}<div class="small mut">${esc(a.confidence)}</div>`:'-'}</td><td>${st}${v.eventRisk?`<div class="small" style="color:#ffd48a">🗓 risiko: ${esc(v.eventRisk.title)}</div>`:''}</td></tr>`;
+  }).join('');
+  const parts=(arr)=>(arr||[]).map(x=>`<div class="small">${x.s>0?'🟢':x.s<0?'🔴':'⚪'} ${esc(x.label)} <span class="mut">→ ${sg(x.s)} (bobot ${x.w})</span></div>`).join('')||'<div class="small mut">tidak ada data</div>';
+  return `<div class="card"><h3>⚙️ Mesin skor (tanpa AI) vs analisis AI</h3><div class="mut small" style="margin-bottom:8px">Aturan tetap & transparan sebagai dasar validasi. Bila AI berbeda dari mesin, keyakinannya otomatis diturunkan. Ini bukan prediksi pasti.</div>
+  <div class="item"><span><b>Skor USD</b> ${BIASC14[e.usd.bias]||''} ${esc(e.usd.bias)}</span><b>${sg(e.usd.score)} <span class="small mut">(data ${Math.round((e.usd.cov||0)*100)}%)</span></b></div>
+  <details style="margin:6px 0 10px"><summary class="small" style="cursor:pointer;color:var(--b)">Rincian skor USD</summary>${parts(e.usd.parts)}</details>
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.85rem"><tr class="mut"><th align="left">Pair</th><th align="left">Mesin</th><th align="left">AI</th><th align="left">Status</th></tr>${rows}</table></div>
+  ${Object.entries(e.pairs).map(([p,v])=>`<details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--b)">Rincian ${esc(p)}</summary>${parts(v.parts)}</details>`).join('')}</div>`;
+}
+function priceHtml14(j){
+  const e=Object.entries((j.px&&j.px.pairs)||{});if(!e.length)return'';
+  const f=(v,d)=>v==null?'-':v;
+  return `<div class="card"><h3>📈 Harga & teknikal harian</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Pair</th><th align="right">Harga</th><th align="right">1d</th><th align="right">5d</th><th align="right">20d</th><th align="right">RSI</th><th align="right">ATR%</th><th align="left">&nbsp;Tren</th><th align="right">Range20</th></tr>${e.map(([p,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(p)}</b></td><td align="right">${esc(v.last)}</td><td align="right">${nfmt(v.chg1d,'%',true)}</td><td align="right">${nfmt(v.chg5d,'%',true)}</td><td align="right">${nfmt(v.chg20d,'%',true)}</td><td align="right">${f(v.rsi)}</td><td align="right">${f(v.atrPct)}</td><td>&nbsp;${esc(v.trend||(v.vsSma20?'harga '+v.vsSma20+' SMA20':'-'))}</td><td align="right">${v.pos20==null?'-':v.pos20+'%'}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Data HARIAN (bukan real-time; bar terakhir bisa belum final) per ${esc(j.px.asOf||'-')} ${ageTag14(j.px.asOf,5)} • sumber: ${esc([...new Set(e.map(([,v])=>v.src).filter(Boolean))].join(', '))}. RSI14 &amp; ATR14 dihitung Wilder/rata-rata; Range20 = posisi harga dalam rentang 20 hari.</div></div>`;
+}
+function macroHtml14(j){
+  const m=j.mr;if(!m)return'';const it=[];
+  if(m.ry)it.push(`<div class="item"><span>Yield riil 10Y (TIPS) ${ageTag14(m.ry.date,7)}</span><b>${esc(m.ry.v)}% <span class="small mut">5h ${nfmt(m.ry.chg5,'pp',true)}</span></b></div>`);
+  if(m.be)it.push(`<div class="item"><span>Breakeven inflasi 10Y ${ageTag14(m.be.date,7)}</span><b>${esc(m.be.v)}%</b></div>`);
+  if(m.dxy)it.push(`<div class="item"><span>Indeks dolar luas (Fed) ${ageTag14(m.dxy.date,12)}</span><b>${esc(m.dxy.v)} <span class="small mut">5h ${nfmt(m.dxy.chg5,'%',true)} • 20h ${nfmt(m.dxy.chg20,'%',true)}</span></b></div>`);
+  if(m.ecb)it.push(`<div class="item"><span>Suku bunga deposit ECB ${ageTag14(m.ecb.date,40)}</span><b>${esc(m.ecb.v)}%</b></div>`);
+  const r3=Object.entries(m.r3||{});
+  if(r3.length)it.push(`<div class="mut small" style="margin-top:8px">Bunga antarbank 3M (OECD via FRED; proksi bulanan, bisa tertinggal): ${r3.map(([k,v])=>`${esc(k)} ${esc(v.v)}%`).join(' • ')}</div>`);
+  return it.length?`<div class="card"><h3>💵 Yield riil, dolar & suku bunga</h3>${it.join('')}</div>`:'';
+}
+function cotHtml14(j){
+  const e=Object.entries(j.cot||{});if(!e.length)return'';
+  const n=v=>v==null?'-':(v>0?'+':'')+Number(v).toLocaleString('id-ID');
+  return `<div class="card"><h3>🧭 Posisi spekulan (CFTC)</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.84rem"><tr class="mut"><th align="left">Mata uang</th><th align="right">Net</th><th align="right">%OI</th><th align="right">Δ1 mgg</th><th align="right">Δ4 mgg</th></tr>${e.map(([k,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(k==='XAU'?'Emas':k)}</b></td><td align="right">${n(v.net)}</td><td align="right">${v.netPctOI==null?'-':v.netPctOI+'%'}</td><td align="right">${n(v.chg1w)}</td><td align="right">${n(v.chg4w)}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">CFTC Legacy, non-commercial (futures), per ${esc((e[0][1]||{}).asOf||'-')} ${ageTag14((e[0][1]||{}).asOf,12)}. Data mingguan (posisi hari Selasa, rilis Jumat): konteks, bukan sinyal timing.</div></div>`;
+}
+function surpriseHtml14(j){
+  const s=j.sp||[];if(!s.length)return'';
+  const c={'LEBIH KUAT':'#9be7b0','LEBIH LEMAH':'#ffb3b3','SESUAI':'var(--mut)'};
+  return `<div class="card"><h3>⚡ Kejutan rilis (aktual vs forecast, 72 jam)</h3>${s.map(x=>`<div class="item" style="align-items:flex-start"><span><b>${esc(x.cur)}</b> ${esc(x.title)}<div class="small mut">${esc(ldt(x.ts,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></span><span style="text-align:right"><b style="color:${c[x.dir]||'var(--tx)'}">${esc(x.dir)}</b><div class="small mut">aktual ${esc(x.actual)} vs forecast ${esc(x.forecast)}</div></span></div>`).join('')}<div class="mut small" style="margin-top:6px">"Lebih kuat/lemah" dinilai untuk mata uangnya (pengangguran &amp; klaim dibalik). Forecast berasal dari agregator, bukan data resmi.</div></div>`;
+}
+function checkHtml14(j){
+  const ch=j.data&&j.data.meta&&j.data.meta.check;if(!ch||!ch.length)return'';
+  return `<div class="card"><h3>🔁 Verifikasi silang angka resmi (BLS vs FRED)</h3>${ch.map(c=>`<div class="item"><span>${esc(c.k)} <span class="small mut">${esc(c.period||'')}</span></span><span>${c.ok===null?'<span class="small mut">periode berbeda</span>':`${esc(c.bls)} vs ${esc(c.fred)} ${c.ok?'✅':'⚠️ BEDA'}`}</span></div>`).join('')}<div class="mut small" style="margin-top:6px">Dua jalur independen (API BLS dan seri FRED). Selisih kecil bisa karena revisi/pembulatan.</div></div>`;
+}
+function intelHtml14(j){return engineHtml14(j)+priceHtml14(j)+macroHtml14(j)+cotHtml14(j)}
+/* data kunci (dipakai saat AI masih berjalan/gagal): ditambah data baru */
+function keyDataHtml(j){
+  const base=(j.effr||j.yields||(j.fx&&j.fx.pairs&&Object.keys(j.fx.pairs).length))?`<div class="card"><h3>🏦 Data kunci yang dikumpulkan</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)}) ${ageTag14(j.effr.date,6)}</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (${esc(j.yields.date)}) ${ageTag14(j.yields.date,6)}</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>${j.yields.y2c5!=null?`<div class="item"><span>Perubahan yield 2Y (5h / 20h)</span><b>${nfmt(j.yields.y2c5,'pp',true)} / ${nfmt(j.yields.y2c20,'pp',true)}</b></div>`:''}`:''}</div>`:'';
+  return base+intelHtml14(j)+surpriseHtml14(j)+checkHtml14(j);
+}
+/* pembungkus: tampilan lama + kartu baru disisipkan setelah kartu pertama */
+function renderPro(j,stale){
+  renderProBase(j,stale);
+  const c=document.querySelector('#pres .card');if(!c)return;
+  const x=intelHtml14(j)+surpriseHtml14(j)+checkHtml14(j);if(x)c.insertAdjacentHTML('afterend',x);
+}
+function renderNews(j,stale){
+  renderNewsBase(j,stale);
+  const c=document.querySelector('#nres .card');if(!c)return;
+  const x=surpriseHtml14(j)+checkHtml14(j);if(x)c.insertAdjacentHTML('afterend',x);
+}
+/* ===== END V14 ===== */
+</script>
+
 </body>
 </html>
