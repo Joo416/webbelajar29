@@ -176,23 +176,39 @@ const accessCache = new Map();
 async function authorize(req) {
   const u = await verify(req);
   if (!u) return { ok: false, status: 401, error: 'Silakan login dulu' };
-  if (process.env.ACCESS_CONTROL === 'off') return { ok: true, email: u.email };
+  if (process.env.ACCESS_CONTROL === 'off') return { ok: true, email: u.email, admin: true, token: u.token };
   const c = accessCache.get(u.email);
-  if (c && Date.now() - c.t < 60000) return c.ok ? { ok: true, email: u.email } : { ok: false, status: 403, error: c.txt };
+  if (c && Date.now() - c.t < 60000) return c.ok ? { ok: true, email: u.email, admin: !!c.admin, token: u.token } : { ok: false, status: 403, error: c.txt };
   try {
     const proj = process.env.FIREBASE_PROJECT_ID || 'ruangbelajar-8584c';
     const r = await fetch(`https://firestore.googleapis.com/v1/projects/${proj}/databases/(default)/documents/pengguna/${encodeURIComponent(u.email)}`, { headers: { Authorization: 'Bearer ' + u.token }, signal: AbortSignal.timeout(8000) });
     if (r.status === 200) {
       const j = await r.json(), st = j.fields && j.fields.status && j.fields.status.stringValue, ok = st === 'aktif';
       const txt = st === 'diblokir' ? 'Akunmu diblokir oleh admin.' : 'Akunmu belum disetujui admin.';
-      accessCache.set(u.email, { t: Date.now(), ok, txt });
-      return ok ? { ok: true, email: u.email } : { ok: false, status: 403, error: txt };
+      const adm = ok && !!(j.fields && j.fields.admin && j.fields.admin.booleanValue === true);
+      accessCache.set(u.email, { t: Date.now(), ok, txt, admin: adm });
+      return ok ? { ok: true, email: u.email, admin: adm, token: u.token } : { ok: false, status: 403, error: txt };
     }
     if (r.status === 404 || r.status === 403) { const txt = 'Akunmu belum disetujui admin.'; accessCache.set(u.email, { t: Date.now(), ok: false, txt }); return { ok: false, status: 403, error: txt }; }
     return { ok: false, status: 503, error: 'Tidak bisa memeriksa izin akses (Firestore membalas ' + r.status + '). Coba lagi.' };
   } catch (e) { return { ok: false, status: 503, error: 'Tidak bisa memeriksa izin akses: ' + msg(e) }; }
 }
 
+/* izin fitur Trading: admin, atau dokumen izin_trading/{email} berstatus 'disetujui' (hanya admin yang boleh menulisnya) */
+const tradeCache = new Map();
+async function tradingAllowed(au) {
+  if (au.admin) return true;
+  const c = tradeCache.get(au.email);
+  if (c && Date.now() - c.t < 60000) return c.ok;
+  let ok = false;
+  try {
+    const proj = process.env.FIREBASE_PROJECT_ID || 'ruangbelajar-8584c';
+    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${proj}/databases/(default)/documents/izin_trading/${encodeURIComponent(au.email)}`, { headers: { Authorization: 'Bearer ' + au.token }, signal: AbortSignal.timeout(8000) });
+    if (r.status === 200) { const j = await r.json(); ok = !!(j.fields && j.fields.status && j.fields.status.stringValue === 'disetujui'); }
+  } catch (e) { ok = false; }
+  tradeCache.set(au.email, { t: Date.now(), ok });
+  return ok;
+}
 /* ---------- TRADING: KALENDER RILIS, DATA RESMI, BERITA & ANALISIS PRO ---------- */
 const UA = 'Mozilla/5.0 (compatible; RuangBelajar/1.0; +https://belajarforme29.vercel.app)';
 const OFF_DOM = ['bls.gov', 'federalreserve.gov', 'bea.gov', 'treasury.gov', 'stlouisfed.org', 'newyorkfed.org', 'ecb.europa.eu', 'bankofengland.co.uk', 'boj.or.jp', 'rba.gov.au', 'bankofcanada.ca', 'snb.ch', 'imf.org', 'bis.org'];
@@ -493,7 +509,7 @@ function ohlcStats(rows, dp) {
   const tr = []; for (let i = 1; i < n; i++) tr.push(Math.max(rows[i].h - rows[i].l, Math.abs(rows[i].h - C[i - 1]), Math.abs(rows[i].l - C[i - 1])));
   const atr = tr.slice(-14).reduce((a, b) => a + b, 0) / 14, w = rows.slice(-20), hi = Math.max(...w.map(r => r.h)), lo = Math.min(...w.map(r => r.l));
   const s20 = sma(20), s50 = n >= 50 ? sma(50) : null, f = v => (v == null ? null : +v.toFixed(dp));
-  return { last: f(last), asOf: rows[n - 1].d, chg1d: chg(1), chg5d: chg(5), chg20d: chg(20), sma20: f(s20), sma50: f(s50), vsSma20: last > s20 ? 'di atas' : 'di bawah', vsSma50: s50 == null ? null : (last > s50 ? 'di atas' : 'di bawah'), rsi: r2(rsi), atr: f(atr), atrPct: r2(atr / last * 100), hi20: f(hi), lo20: f(lo), pos20: hi > lo ? Math.round((last - lo) / (hi - lo) * 100) : null, trend: s50 == null ? null : (last > s20 && s20 > s50 ? 'naik' : last < s20 && s20 < s50 ? 'turun' : 'campuran'), bars: n };
+  return { last: f(last), asOf: rows[n - 1].d, chg1d: chg(1), chg5d: chg(5), chg20d: chg(20), sma20: f(s20), sma50: f(s50), vsSma20: last > s20 ? 'di atas' : 'di bawah', vsSma50: s50 == null ? null : (last > s50 ? 'di atas' : 'di bawah'), rsi: r2(rsi), atr: f(atr), atrPct: r2(atr / last * 100), hi20: f(hi), lo20: f(lo), pos20: hi > lo ? Math.round((last - lo) / (hi - lo) * 100) : null, trend: s50 == null ? null : (last > s20 && s20 > s50 ? 'naik' : last < s20 && s20 < s50 ? 'turun' : 'campuran'), bars: n, spark: C.slice(-30).map(v => +v.toFixed(dp)) };
 }
 async function pxStooq(s) {
   const t = (await getT(`https://stooq.com/q/d/l/?s=${s}&d1=${ymd(new Date(Date.now() - 140 * 86400000))}&d2=${ymd(new Date())}&i=d`, 9000)).trim();
@@ -1095,6 +1111,9 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Hanya POST' });
   const au = await authorize(req);
   if (!au.ok) return res.status(au.status).json({ error: au.error });
+  const bd0 = req.body || {};
+  if ((bd0.action === 'news' || bd0.action === 'pro' || bd0.cat === 'trading') && !(await tradingAllowed(au)))
+    return res.status(403).json({ error: 'Fitur Trading khusus admin. Ajukan izin ke admin lewat tab Trading.', code: 'trading_locked' });
   if (req.body && req.body.action === 'news') return newsHandler(req, res);
   if (req.body && req.body.action === 'pro') return proHandler(req, res);
   const { system = '', messages = [], big = false, search: want = false, q = '', cat = 'sekolah' } = req.body || {};
