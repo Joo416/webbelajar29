@@ -2478,5 +2478,89 @@ async function loadQs(n){
 /* ===== END V18 ===== */
 </script>
 
+<script>
+/* ===== UPDATE V19: tutor Trading (tanpa tingkat siswa, berbasis data pasar tervalidasi) + uji status semua AI di panel Admin ===== */
+Object.assign(STARTERS18,{
+ 'SMC / ICT':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Jelaskan order block dan fair value gap dengan contoh','Bagaimana membaca likuiditas sebelum rilis NFP?'],
+ 'Price Action':['Bagaimana arah USD berdasarkan data terbaru?','Jelaskan pola engulfing dan batasannya','Apa beda support/resistance statis dan dinamis?'],
+ 'Risk Management':['Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip','Apa risiko trading menjelang rilis CPI?','Jelaskan risk-reward dan ekspektasi (expectancy)'],
+ 'Psikologi Trading':['Bagaimana mengelola emosi saat berita besar rilis?','Cara menyusun jurnal trading yang efektif','Kenapa overtrading terjadi dan cara mencegahnya?']
+});
+async function tutorCall18(mapel,messages,o){
+  o=o||{};const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),95000);let r;
+  const level=S.sec==='trading'?'Umum':(o.level||tutorLevel18());
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'tutor',mapel,level,mode:o.mode||'chat',verify:o.verify!==false,messages:messages.slice(-12).map(m=>({role:m.role,content:m.content}))})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab. Coba lagi.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
+  if(!r.ok)throw new Error(j.error||'Tutor gagal');return j;
+}
+function metaOf18(j){
+  if(!j||j.intent==='off_topic')return null;
+  return{c:j.confidence||null,p:j.provider||'',cons:j.consensus||null,v:j.verified?{by:j.verified.by,verdict:j.verified.verdict}:null,
+    mk:j.market?{t:new Date(j.market.fetchedAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}),i:j.market.issues||0}:null,
+    src:(j.sources||[]).slice(0,10).map(s=>({n:s.n,title:String(s.title).slice(0,90),uri:s.uri,official:!!s.official,cited:(j.cited||[]).includes(s.n)}))};
+}
+function metaHtml18(m){
+  if(!m)return'';const L=[];
+  if(m.c&&CONF18[m.c])L.push(CONF18[m.c][0]+' '+CONF18[m.c][1]);
+  if(m.mk)L.push('📊 data pasar tervalidasi ('+esc(m.mk.t)+(m.mk.i?', '+esc(m.mk.i)+' temuan validasi':'')+')');
+  if(m.cons==='sama')L.push('🧮 dua solusi independen cocok');else if(m.cons==='beda-direkonsiliasi')L.push('🧮 dua solusi berbeda → direkonsiliasi');
+  if(m.v)L.push(m.v.verdict==='fix'?'🔍 dikoreksi model kedua ('+esc(m.v.by)+')':'🔍 diperiksa silang ('+esc(m.v.by)+')');
+  if(m.p)L.push('⚙️ '+esc(m.p));
+  const src=m.src||[];
+  return `<div class="small mut" style="margin-top:8px">${L.join(' • ')}</div>${src.length?`<details style="margin-top:4px"><summary class="small" style="cursor:pointer;color:var(--b)">Sumber (${src.length})</summary>${src.map(s=>`<div class="small">[${esc(s.n)}] ${/^https?:\/\//.test(s.uri)?`<a href="${esc(s.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(s.title)}</a>`:esc(s.title)}${s.official?' ★':''}${s.cited?' ✔':''}</div>`).join('')}<div class="small mut">★ = sumber resmi/data • ✔ = dipakai dalam jawaban</div></details>`:''}`;
+}
+async function pTutor(){
+  const trade=S.sec==='trading',lv=tutorLevel18(),vf=tutorVerify18();
+  const verSel=`<div><label>Pemeriksaan jawaban</label><select onchange="tverSet18(this.value)"><option value="1" ${vf?'selected':''}>Teliti (periksa silang)</option><option value="0" ${vf?'':'selected'}>Cepat</option></select></div>`;
+  const lvSel=trade?'':`<div><label>Tingkat penjelasan</label><select onchange="tlvSet18(this.value)">${LV18.map(x=>`<option ${x===lv?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`;
+  $('pane').innerHTML=`<div class="card"><h3>🤖 Tutor ${esc(S.mapel)}</h3>
+    <div class="row">${lvSel}${verSel}</div>
+    <div id="chat" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:12px"><input id="ci" placeholder="${trade?'Tanya konsep trading, rilis berita mendatang, atau kondisi pasar...':'Tanya materi, minta contoh, atau minta dijelaskan...'}" onkeydown="if(event.key==='Enter')send2()"><button class="btn" style="flex:0 0 auto" onclick="send2()">Kirim</button></div>
+    <button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat();saveChat()">Hapus percakapan</button>
+    <div class="mut small" style="margin-top:8px">${trade?'Tutor Trading menjawab dari data global tervalidasi (kalender rilis, jadwal resmi BLS/The Fed, yield Treasury, harga harian, fundamental dunia) bila pertanyaannya soal pasar atau berita mendatang. Edukasi, bukan saran finansial.':`Tutor fokus pada ${esc(S.mapel)}. Jawaban memakai sumber resmi bila ada dan diberi tingkat keyakinan; mode Teliti memakai model kedua untuk memeriksa.`}</div></div>`;
+  if(!S.chat[S.mapel]){S.chat[S.mapel]=[];try{const d=await db.collection('chat').doc(chatId()).get();if(d.exists)S.chat[S.mapel]=d.data().msgs||[]}catch(e){}}
+  if($('chat'))drawChat();
+}
+/* ---------- Admin: uji semua AI & pencarian ---------- */
+function aiCard19(){
+  return `<div class="card"><h3>🧪 Status AI & pencarian</h3><div class="mut small" style="margin-bottom:8px">Menguji setiap key di Vercel dengan permintaan kecil: Gemini, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, SambaNova, Serper, dan Tavily.</div><button class="btn full" onclick="aiTest19()">🔍 Uji semua key sekarang</button><div id="aistat" style="margin-top:10px"></div></div>`;
+}
+function hint19(x){
+  if(!x.keys||x.ok)return'';
+  const st=new Set(x.results.map(r=>r.status)),er=x.results.map(r=>r.error||'').join(' ');
+  if(st.has(401)||st.has(403))return'Key ditolak: periksa kembali key atau aktivasi akun penyedia.';
+  if((st.has(404)||st.has(400))&&/model/i.test(er))return`Nama model tidak dikenali: isi variabel ${String(x.id).toUpperCase()}_MODELS dengan ID model yang benar dari dashboard penyedia.`;
+  if(st.has(429)||/quota|rate|limit/i.test(er))return'Terkena batas kuota (wajar untuk paket gratis); coba lagi nanti atau tambah key.';
+  return'Lihat pesan error di atas.';
+}
+function aiRow19(x,isProv){
+  const bad=x.results.filter(r=>!r.ok),errs=[...new Set(bad.map(r=>r.error).filter(Boolean))].slice(0,2),ms=x.results.filter(r=>r.ok).map(r=>r.ms).sort((a,b)=>a-b),med=ms.length?ms[Math.floor(ms.length/2)]+' ms':'';
+  const st=!x.keys?'<span class="mut">tidak ada key</span>':x.ok===x.keys?'✅ '+x.ok+'/'+x.keys:x.ok?'🟡 '+x.ok+'/'+x.keys:'❌ 0/'+x.keys;
+  const h=hint19(x);
+  return `<div class="item" style="align-items:flex-start"><span><b>${esc(x.id)}</b>${isProv?`<div class="small mut">${esc((x.models||[]).join(', '))}</div>`:''}${errs.map(e=>`<div class="small" style="color:#ffb3b3">${esc(e)}</div>`).join('')}${h?`<div class="small" style="color:#ffd48a">💡 ${esc(h)}</div>`:''}</span><span style="text-align:right;white-space:nowrap">${st}<div class="small mut">${med}</div></span></div>`;
+}
+function aiStatusHtml19(j){
+  const act=(j.order||[]).length?j.order.join(' → '):'(belum ada penyedia aktif)',b=j.bls||{};
+  return `<div class="small" style="margin-bottom:8px">Urutan yang dipakai saat ini: <b>${esc(act)}</b></div>${(j.providers||[]).map(x=>aiRow19(x,true)).join('')}<div style="font-weight:700;margin-top:10px">Pencarian</div>${(j.search||[]).map(x=>aiRow19(x,false)).join('')}<div class="item"><span><b>BLS_API_KEY</b><div class="small mut">${b.keySet?(b.keyRejected?'key ditolak BLS: sistem memakai akses tanpa key (aman)':'terpasang'):'tidak dipasang (memakai akses tanpa key dan FRED)'}</div></span><span>${b.keySet&&!b.keyRejected?'✅':'🟡'}</span></div><div class="mut small" style="margin-top:8px">Penyedia tanpa key otomatis dilewati. Diuji ${esc(new Date(j.checkedAt).toLocaleTimeString('id-ID'))}.</div>`;
+}
+async function aiTest19(){
+  const box=$('aistat');if(!box)return;box.innerHTML='<div class="mut small">⏳ Menguji setiap key (bisa sampai 40 detik)...</div>';
+  try{const tk=await user.getIdToken(),r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'ai_status'})}),j=await r.json();if(!r.ok)throw new Error(j.error||'Gagal');box.innerHTML=aiStatusHtml19(j)}
+  catch(e){box.innerHTML=`<div class="warn">⚠️ ${esc(e.message)}</div>`}
+}
+function trCard16(){
+  let body;
+  if(AD.trErr)body=`<div class="card"><h3>📈 Izin Trading</h3><div class="warn">Koleksi "izin_trading" belum bisa dibaca (${esc(AD.trErr)}). Pasang aturan Firestore terbaru agar izin Trading bisa diberikan dan diminta.</div></div>`;
+  else{
+    const L=Object.values(AD.tr||{}),pend=L.filter(x=>x.status==='menunggu'),okn=L.filter(x=>x.status==='disetujui').length;
+    body=`<div class="card"><h3>📈 Izin Trading (${okn} disetujui${pend.length?' • '+pend.length+' menunggu':''})</h3><div class="mut small">Tab Trading hanya untuk admin. Pengguna lain butuh izin dari sini. Perubahan berlaku maksimal 1 menit.</div>${pend.length?pend.map(x=>`<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span><b>${esc(x.email||x.id)}</b><div class="small mut">${esc(x.pesan||'(tanpa pesan)')}</div></span><span style="display:flex;gap:6px"><button class="x" style="background:#12352f;color:var(--b)" data-id="${esc(x.id)}" onclick="adTrade(this,'disetujui')">✅ Setujui</button><button class="x" data-id="${esc(x.id)}" onclick="adTrade(this,'ditolak')">⛔ Tolak</button></span></div>`).join(''):'<div class="mut small" style="margin-top:8px">Tidak ada permintaan baru.</div>'}</div>`;
+  }
+  return aiCard19()+body;
+}
+/* ===== END V19 ===== */
+</script>
+
 </body>
 </html>
