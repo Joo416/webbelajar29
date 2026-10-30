@@ -487,7 +487,7 @@ async function send(){
 }
 async function explain(k){
   const q=S.qs[S.i];($('aiexp')||{}).innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
-  try{const t=await ai(tutorSys(),[{role:'user',content:`Jelaskan langkah demi langkah kenapa jawaban soal ini benar, dan kenapa pilihan saya (${String.fromCharCode(65+k)}) ${k===q.a?'sudah benar':'salah'}.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>String.fromCharCode(65+i)+'. '+o).join(' | ')}\nJawaban benar: ${String.fromCharCode(65+q.a)}`}],false,false);
+  try{const t=await explainAI(`Jelaskan langkah demi langkah kenapa jawaban soal ini benar, dan kenapa pilihan saya (${String.fromCharCode(65+k)}) ${k===q.a?'sudah benar':'salah'}.\nSoal: ${q.q}\nPilihan: ${q.o.map((o,i)=>String.fromCharCode(65+i)+'. '+o).join(' | ')}\nJawaban benar: ${String.fromCharCode(65+q.a)}`);
     ($('aiexp')||{}).innerHTML=`<div class="exp">${fmt(t)}</div>`;
   }catch(e){($('aiexp')||{}).innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
 }
@@ -641,12 +641,12 @@ const whyPrompt=(q,k)=>`${k===q.a?'Siswa menjawab BENAR. Jelaskan singkat konsep
 async function explainAuto(force){
   const q=S.qs[S.i],k=S.sel[S.i];if(k==null||(q.aiw&&!force))return;const b=()=>$('aiexp');
   if(b())b().innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
-  try{const t=await ai(tutorSys(),[{role:'user',content:whyPrompt(q,k)}],false,false);q.aiw=t;if(S.qs[S.i]===q&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
+  try{const t=await explainAI(whyPrompt(q,k));q.aiw=t;if(S.qs[S.i]===q&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
   catch(e){if(b())b().innerHTML=`<div class="exp">⚠️ ${esc(e.message)} <button class="x" onclick="explainAuto(true)">Coba lagi</button></div>`}
 }
 async function whyReview(id){
   const o=RV[id],x=o.x,b=$('w_'+id);if(b)b.innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
-  try{x.aiw=await ai(tutorSys(),[{role:'user',content:whyPrompt(x,x.pick)}],false,false);if(b)b.innerHTML=`<div class="exp">🤖 ${fmt(x.aiw)}</div>`;if(o.save)o.save()}
+  try{x.aiw=await explainAI(whyPrompt(x,x.pick));if(b)b.innerHTML=`<div class="exp">🤖 ${fmt(x.aiw)}</div>`;if(o.save)o.save()}
   catch(e){if(b)b.innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
 }
 async function explainAll(){const ids=Object.keys(RV).filter(i=>!RV[i].x.aiw&&RV[i].x.pick!==RV[i].x.a).slice(0,10);for(const i of ids)await whyReview(i)}
@@ -809,7 +809,7 @@ function whyP(x){const ok=isOK(x),en=isEng();
   return `${ok?'Siswa menjawab BENAR. Jelaskan singkat konsep di balik jawaban ini dan jebakan pengecohnya.':unans(x)?'Siswa TIDAK menjawab. Jelaskan cara berpikirnya dan kenapa kunci benar.':'Siswa menjawab SALAH. Jelaskan: (1) kenapa jawaban siswa salah, (2) kenapa kunci benar, (3) tips agar tidak keliru lagi.'} ${en?'Explain in simple English (add short Indonesian hints for hard words).':''} Jangan mengubah kunci jawaban.\n${x.teks?'Teks: '+x.teks.slice(0,1500)+'\n':''}Soal: ${x.q}\nPilihan: ${x.o.map((o,i)=>optL(i)+'. '+o).join(' | ')}\nKunci: ${letters(x.a)}\nJawaban siswa: ${letters(x.pick)}\nPembahasan awal: ${x.e||'-'}`}
 async function gradeEssay(q,text){
   if(!String(text||'').trim())return{sc:0,fb:'Tidak ada jawaban.'};
-  const t=await ai(`Kamu penilai essay ${S.mapel}. ${isEng()?'Write the feedback in English.':'Tulis umpan balik dalam Bahasa Indonesia.'} Nilai jawaban siswa terhadap kunci dan kata kunci; jawaban yang benar dengan kata berbeda tetap diterima. Format WAJIB:\nSKOR: <angka 0-100>\nSudah tepat: ...\nKurang/keliru: ...\nSaran: ...`,[{role:'user',content:`Soal: ${q.q}\n${q.teks?'Teks: '+q.teks.slice(0,1500)+'\n':''}Kunci jawaban: ${q.k}\nKata kunci: ${(q.kw||[]).join(', ')}\nRubrik: ${q.e||'-'}\nJawaban siswa: ${text}`}],false,false);
+  const t=await ai(`Kamu penilai essay ${S.mapel}. ${isEng()?'Write the feedback in English.':'Tulis umpan balik dalam Bahasa Indonesia.'} Nilai jawaban siswa terhadap kunci dan kata kunci; jawaban yang benar dengan kata berbeda tetap diterima. Format WAJIB:\nSKOR: <angka 0-100>\nSudah tepat: ...\nKurang/keliru: ...\nSaran: ...`,[{role:'user',content:`Soal: ${q.q}\n${q.teks?'Teks: '+q.teks.slice(0,1500)+'\n':''}Kunci jawaban: ${q.k}\nKata kunci: ${(q.kw||[]).join(', ')}\nRubrik: ${q.e||'-'}\nJawaban siswa: ${text}`}],false,false,'',undefined,{temp:0.2});
   const m=t.match(/SKOR:\s*(\d{1,3})/i);return{sc:m?Math.min(100,+m[1]):0,fb:t.replace(/SKOR:\s*\d{1,3}/i,'').trim()};
 }
 const essayFb=g=>`**Skor: ${g.sc}/100**\n${g.fb}`;
@@ -821,12 +821,12 @@ async function gradeNow(i){
 async function explainAuto(force){
   const i=S.i,q=S.qs[i];if(!S.dn[i]||q.tipe==='essay'||(q.aiw&&!force))return;const b=()=>$('aiexp');
   if(b())b().innerHTML='<div class="exp">⏳ Tutor AI menjelaskan...</div>';
-  try{const t=await ai(tutorSys(),[{role:'user',content:whyP(entry(q,i))}],false,false);q.aiw=t;if(S.i===i&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
+  try{const t=await explainAI(whyP(entry(q,i)));q.aiw=t;if(S.i===i&&b())b().innerHTML=`<div class="exp">🤖 ${fmt(t)}</div>`}
   catch(e){if(b())b().innerHTML=`<div class="exp">⚠️ ${esc(e.message)} <button class="x" onclick="explainAuto(true)">Coba lagi</button></div>`}
 }
 async function whyReview(id){
   const o=RV[id],x=o.x,b=$('w_'+id);if(b)b.innerHTML='<div class="exp">⏳ AI bekerja...</div>';
-  try{if(x.tipe==='essay'){const g=await gradeEssay(x,x.pick);x.sc=g.sc;x.aiw=essayFb(g)}else x.aiw=await ai(tutorSys(),[{role:'user',content:whyP(x)}],false,false);
+  try{if(x.tipe==='essay'){const g=await gradeEssay(x,x.pick);x.sc=g.sc;x.aiw=essayFb(g)}else x.aiw=await explainAI(whyP(x));
     if(b)b.innerHTML=`<div class="exp">🤖 ${fmt(x.aiw)}</div>`;if(o.save)o.save()}
   catch(e){if(b)b.innerHTML=`<div class="exp">⚠️ ${esc(e.message)}</div>`}
 }
@@ -2380,6 +2380,102 @@ function copyPro16(btn){
   L.push('','Edukasi, bukan saran finansial. Area/level = referensi berbasis data harian, bukan entry/SL/TP. Data: BLS, The Fed, Treasury, FRED/OECD, CFTC, Stooq/Yahoo, bank sentral.');copyText16(L.join('\n'),btn);
 }
 /* ===== END V17 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V18: AI tutor pintar & bersumber untuk semua mapel + Umum dari data global ===== */
+function catFor(){
+  if(S.sec==='trading')return'trading';
+  return({'Matematika':'matematika','IPA':'sains','IPS':'ips','Bahasa Inggris':'inggris','Bahasa Indonesia':'indonesia'}[S.mapel])||(isUmum()?'umum':'sekolah');
+}
+const LV18=['SD','SMP','SMA','TKA / UTBK','Umum'];
+const tutorLevel18=()=>{try{const v=localStorage.getItem('tlv18');return LV18.includes(v)?v:'SMA'}catch(e){return'SMA'}};
+const tutorVerify18=()=>{try{return localStorage.getItem('tver18')!=='0'}catch(e){return true}};
+function tlvSet18(v){try{localStorage.setItem('tlv18',v)}catch(e){}}
+function tverSet18(v){try{localStorage.setItem('tver18',v)}catch(e){}}
+async function tutorCall18(mapel,messages,o){
+  o=o||{};const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),95000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'tutor',mapel,level:o.level||tutorLevel18(),mode:o.mode||'chat',verify:o.verify!==false,messages:messages.slice(-12).map(m=>({role:m.role,content:m.content}))})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab. Coba lagi.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
+  if(!r.ok)throw new Error(j.error||'Tutor gagal');return j;
+}
+const CONF18={tinggi:['✅','Keyakinan tinggi'],sedang:['🟡','Keyakinan sedang'],rendah:['🔴','Keyakinan rendah']};
+function metaOf18(j){
+  if(!j||j.intent==='off_topic')return null;
+  return{c:j.confidence||null,p:j.provider||'',cons:j.consensus||null,v:j.verified?{by:j.verified.by,verdict:j.verified.verdict}:null,
+    src:(j.sources||[]).slice(0,8).map(s=>({n:s.n,title:String(s.title).slice(0,90),uri:s.uri,official:!!s.official,cited:(j.cited||[]).includes(s.n)}))};
+}
+function metaHtml18(m){
+  if(!m)return'';const L=[];
+  if(m.c&&CONF18[m.c])L.push(CONF18[m.c][0]+' '+CONF18[m.c][1]);
+  if(m.cons==='sama')L.push('🧮 dua solusi independen cocok');else if(m.cons==='beda-direkonsiliasi')L.push('🧮 dua solusi berbeda → direkonsiliasi');
+  if(m.v)L.push(m.v.verdict==='fix'?'🔍 dikoreksi model kedua ('+esc(m.v.by)+')':'🔍 diperiksa silang ('+esc(m.v.by)+')');
+  if(m.p)L.push('⚙️ '+esc(m.p));
+  const src=m.src||[];
+  return `<div class="small mut" style="margin-top:8px">${L.join(' • ')}</div>${src.length?`<details style="margin-top:4px"><summary class="small" style="cursor:pointer;color:var(--b)">Sumber (${src.length})</summary>${src.map(s=>`<div class="small">[${esc(s.n)}] ${/^https?:\/\//.test(s.uri)?`<a href="${esc(s.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(s.title)}</a>`:esc(s.title)}${s.official?' ★':''}${s.cited?' ✔':''}</div>`).join('')}<div class="small mut">★ = sumber resmi/data • ✔ = dipakai dalam jawaban</div></details>`:''}`;
+}
+const STARTERS18={
+ 'Matematika':['Jelaskan cara menyelesaikan persamaan kuadrat dengan 3 metode','Hitung (3/4 + 5/6) × 12 dan tunjukkan langkahnya','Kasih trik cepat soal peluang untuk TKA'],
+ 'IPA':['Kenapa langit berwarna biru?','Jelaskan hukum Newton dengan contoh sehari-hari','Bagaimana proses fotosintesis dan persamaan reaksinya?'],
+ 'IPS':['Apa penyebab dan dampak Perang Dunia II?','Jelaskan perbedaan inflasi dan deflasi','Bagaimana kondisi kependudukan Indonesia menurut data terbaru?'],
+ 'Bahasa Indonesia':['Apa beda kata baku dan tidak baku? Beri contoh','Jelaskan struktur teks eksposisi','Kapan "di" ditulis serangkai dan kapan dipisah?'],
+ 'Bahasa Inggris':['Explain the difference between present perfect and simple past','Bagaimana memakai conditional sentences type 2?','Give me tips to improve TOEFL reading'],
+ 'Umum (Trivia Dunia)':['Berapa penduduk dan PDB per kapita Jepang menurut data terbaru?','Bagaimana gunung berapi terbentuk?','Negara apa saja yang berbatasan darat dengan Brasil?']
+};
+function drawChat(){
+  const box=$('chat');if(!box)return;const c=S.chat[S.mapel]||[],st=STARTERS18[S.mapel]||['Jelaskan konsep dasar materi ini dengan contoh'];
+  box.innerHTML=c.length?c.map(m=>`<div class="msg ${m.role}">${fmt(m.content)}${m.role==='assistant'&&m.meta?metaHtml18(m.meta):''}</div>`).join(''):`<div class="mut small">Tanyakan apa saja tentang <b>${esc(S.mapel)}</b>. Tutor menjawab dengan sumber tepercaya dan memeriksa jawabannya.</div><div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${st.map((t,i)=>`<button class="x" style="background:#262b55;color:#eef0ff;text-align:left" onclick="starter18(${i})">${esc(t)}</button>`).join('')}</div>`;
+  box.scrollTop=1e9;
+}
+function starter18(i){const t=(STARTERS18[S.mapel]||[])[i];if(t&&$('ci')){$('ci').value=t;send2()}}
+async function send(){
+  const v=(($('ci')||{}).value||'').trim();if(!v)return;$('ci').value='';
+  const c=S.chat[S.mapel]=S.chat[S.mapel]||[];c.push({role:'user',content:v},{role:'assistant',content:'⏳ Memahami pertanyaan, mencari sumber tepercaya, dan memeriksa jawaban...'});drawChat();
+  let h=c.slice(0,-1).filter(m=>!/^(⚠️|⏳)/.test(m.content)).slice(-12);while(h.length&&h[0].role!=='user')h.shift();
+  const slot=c[c.length-1];
+  try{const j=await tutorCall18(S.mapel,h,{verify:tutorVerify18()});slot.content=j.text;slot.meta=metaOf18(j)}
+  catch(e){slot.content='⚠️ '+e.message}
+  if($('chat'))drawChat();
+}
+async function pTutor(){
+  const lv=tutorLevel18(),vf=tutorVerify18();
+  $('pane').innerHTML=`<div class="card"><h3>🤖 Tutor ${esc(S.mapel)}</h3>
+    <div class="row"><div><label>Tingkat penjelasan</label><select onchange="tlvSet18(this.value)">${LV18.map(x=>`<option ${x===lv?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div><label>Pemeriksaan jawaban</label><select onchange="tverSet18(this.value)"><option value="1" ${vf?'selected':''}>Teliti (periksa silang)</option><option value="0" ${vf?'':'selected'}>Cepat</option></select></div></div>
+    <div id="chat" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:12px"><input id="ci" placeholder="Tanya materi, minta contoh, atau minta dijelaskan..." onkeydown="if(event.key==='Enter')send2()"><button class="btn" style="flex:0 0 auto" onclick="send2()">Kirim</button></div>
+    <button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat();saveChat()">Hapus percakapan</button>
+    <div class="mut small" style="margin-top:8px">Tutor fokus pada ${esc(S.mapel)}. Jawaban memakai sumber resmi bila ada dan diberi tingkat keyakinan; mode Teliti memakai model kedua untuk memeriksa.</div></div>`;
+  if(!S.chat[S.mapel]){S.chat[S.mapel]=[];try{const d=await db.collection('chat').doc(chatId()).get();if(d.exists)S.chat[S.mapel]=d.data().msgs||[]}catch(e){}}
+  if($('chat'))drawChat();
+}
+/* penjelasan soal (benar/salah) juga bersumber & diperiksa */
+async function explainAI(prompt){
+  const j=await tutorCall18(S.mapel,[{role:'user',content:String(prompt)}],{mode:'explain',verify:true});let t=j.text;
+  const cs=(j.sources||[]).filter(s=>(j.cited||[]).includes(s.n)&&/^https?:\/\//.test(s.uri)).slice(0,3);
+  if(cs.length)t+='\n\n🔎 Sumber: '+cs.map(s=>`[[${String(s.title).replace(/[|\]]/g,' ').slice(0,60)}|${s.uri}]]`).join(' • ');
+  if(j.confidence&&CONF18[j.confidence])t+=`\n${CONF18[j.confidence][0]} ${CONF18[j.confidence][1]}${j.verified?' • diperiksa silang':''}`;
+  return t;
+}
+function tutorSys(){
+  return `Kamu tutor ${S.sec==='trading'?'edukasi trading forex ('+S.mapel+')':isUmum()?'pengetahuan umum dunia':S.mapel} untuk siswa Indonesia. Tetap fokus pada mapel ini. Jawab ${isEng()?'dalam English sederhana dengan petunjuk singkat Bahasa Indonesia':'dalam Bahasa Indonesia baku yang ramah'}, bertahap, dengan contoh. Fakta harus berdasar sumber tepercaya; jangan mengarang angka, tahun, nama, atau tautan; bila tidak yakin katakan terus terang. Koreksi kekeliruan siswa dengan sopan. Tulis rumus dengan LaTeX di antara \\( dan \\).`+(S.sec==='trading'?' Ini edukasi, bukan saran finansial.':'')+(S.avg!=null?` Rata-rata nilai latihan siswa ${S.avg}%; sesuaikan penjelasan.`:'');
+}
+/* soal Mapel Umum: data global terverifikasi (data negara PBB/Bank Dunia + kutipan sumber ensiklopedia) */
+async function worldQs18(n){
+  const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),95000);let r;
+  try{if($('msg'))$('msg').textContent='⏳ Menyusun soal dari data global (PBB, Bank Dunia, ensiklopedia)... bisa sampai 30 detik';
+    r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'world',n})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status)}
+  if(!r.ok)throw new Error(j.error||'Soal dunia gagal dimuat');
+  return j.questions.map(q=>({q:q.q,o:q.o,a:q.a,e:q.e+(q.src&&q.src[0]?` [[${String(q.src[0].title).replace(/[|\]]/g,' ').slice(0,60)}|${q.src[0].uri}]]`:''),src:q.src,tipe:undefined}));
+}
+async function loadQs(n){
+  if(isUmum())return worldQs18(Math.min(n,20));
+  const s=await db.collection('soal').where('uid','==',user.uid).where('kategori','==',S.sec).where('mapel','==',S.mapel).limit(600).get();
+  return shuffle(s.docs.map(d=>d.data())).slice(0,n);
+}
+/* ===== END V18 ===== */
 </script>
 
 </body>
