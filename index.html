@@ -1619,7 +1619,7 @@ Aturan: soal jelas dan tidak ambigu, tepat satu jawaban benar (kecuali jenis pil
 async function saveGen(){
   const sel=S.gen.filter((x,i)=>$('g'+i)&&$('g'+i).checked);if(!sel.length)return alert('Tidak ada soal dicentang');
   const sub=$('gt')?$('gt').value.trim():'',nw=await dedupe(sel),b=db.batch(),m=S.genMeta||{};
-  nw.forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,tingkat:m.tingkat||'',kesulitan:m.kesulitan||'',sumber:'ai',dibuat:tsNow()}));await b.commit();
+  nw.forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,tingkat:m.tingkat||'',kesulitan:m.kesulitan||'',kurikulum:m.kurikulum||'',mode:m.mode||'',sumber:'ai',dibuat:tsNow()}));await b.commit();
   alert(`${nw.length} soal tersimpan`+(sel.length>nw.length?` (${sel.length-nw.length} dilewati karena mirip dengan soal yang sudah ada)`:''));S.gen=[];S.tab='bank';home();
 }
 
@@ -1977,7 +1977,7 @@ function blueprint13(n,lv,topik){
 function jt13(jn,L){return{'Pilihan ganda':'SEMUA soal pilihan ganda dengan 4 opsi (tanpa field tipe).','Benar/Salah':'SEMUA soal Benar/Salah: "q" berupa pernyataan, "o":["Benar","Salah"], "a" 0 jika pernyataan benar atau 1 jika salah, dan tambah "tipe":"bs".','Pilih semua yang benar':'SEMUA soal pilihan ganda kompleks: "tipe":"multi", 4-5 opsi, "a" berupa ARRAY indeks semua jawaban benar (2-3 jawaban benar).','Essay':'SEMUA soal essay/uraian: {"tipe":"essay","q":"...","k":"jawaban ideal 1-3 kalimat","kw":["kata kunci"],"e":"rubrik penilaian singkat"} tanpa field "o" dan "a".','Campuran':L?'Campuran pilihan ganda (4 opsi), Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), pilih semua yang benar ("tipe":"multi","a":[indeks...]), dan essay ("tipe":"essay","k","kw") dengan proporsi seimbang.':'Campuran pilihan ganda (4 opsi) dan Benar/Salah ("o":["Benar","Salah"],"a":0/1,"tipe":"bs"), kira-kira setengah-setengah.'}[jn]}
 
 /* ---------- BUAT SOAL (V13) ---------- */
-async function gen(){
+async function genBase(){
   const topik=$('gt').value.trim();if(!topik){setTxt('gm','Isi topik dulu (atau klik 🎲 Acak).');return}
   const n=+$('gn').value,lv=$('gl').value,df=$('gd').value,jn=$('gj').value,ex=$('gx').value.trim(),bc=!!($('gb2')&&$('gb2').checked),sz=bc?5:8,L=isLang(),math=S.mapel==='Matematika';
   S.glv=lv;SRC=[];LT=0;busy('gb',true);
@@ -2026,7 +2026,7 @@ async function saveGen(){
   const sub=$('gt')?$('gt').value.trim():'',m=S.genMeta||{};let nw;
   try{nw=await dedupe(sel)}catch(e){return alert('Gagal memeriksa duplikat: '+e.message)}
   if(!nw.length){alert('Semua soal yang dicentang mirip dengan soal yang sudah ada di bank, jadi tidak disimpan.');return}
-  try{for(let i=0;i<nw.length;i+=20){const b=db.batch();nw.slice(i,i+20).forEach(x=>{const d=JSON.parse(JSON.stringify(x));delete d.uv;b.set(db.collection('soal').doc(),{...d,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,tingkat:m.tingkat||'',kesulitan:m.kesulitan||'',sumber:'ai',terverifikasi:!x.uv,dibuat:tsNow()})});await b.commit()}}
+  try{for(let i=0;i<nw.length;i+=20){const b=db.batch();nw.slice(i,i+20).forEach(x=>{const d=JSON.parse(JSON.stringify(x));delete d.uv;b.set(db.collection('soal').doc(),{...d,uid:user.uid,kategori:S.sec,mapel:S.mapel,sub,tingkat:m.tingkat||'',kesulitan:m.kesulitan||'',kurikulum:m.kurikulum||'',mode:m.mode||'',sumber:'ai',terverifikasi:!x.uv,dibuat:tsNow()})});await b.commit()}}
   catch(e){return alert('Gagal menyimpan: '+e.message+'\n(cek aturan Firestore untuk koleksi "soal")')}
   logAdd13(nw);
   alert(`${nw.length} soal tersimpan`+(sel.length>nw.length?` (${sel.length-nw.length} dilewati karena mirip dengan soal yang sudah ada)`:''));S.gen=[];S.tab='bank';home();
@@ -2560,6 +2560,168 @@ function trCard16(){
   return aiCard19()+body;
 }
 /* ===== END V19 ===== */
+</script>
+
+<script>
+/* ===== UPDATE V20: Kurikulum Indonesia real time + soal Kurikulum/Umum, tab Trading dirapikan, kamus bersumber global ===== */
+const KS20={},KT20={};
+function applyKur20(mapel,lv,k){const key=mapel+'|'+lv;if(k&&k.ok!==false&&k.scopeText){KS20[key]=k.scopeText;KT20[key]=(k.live&&k.inti&&k.inti.length)?k.inti:null}else{delete KS20[key];delete KT20[key]}}
+function baselineOf20(level){
+  const g=gradeOf13(level),c=CURR13[S.mapel];if(!g||!c)return'';
+  const o=[];for(let k=g[0];k<=g[1];k++)if(c[k])o.push((g[0]!==g[1]?'Kelas '+k+': ':'')+c[k]);return o.join(' | ').slice(0,1700);
+}
+async function kurFetch20(mapel,level,force){
+  const key='kur20_'+mapel+'_'+level;
+  if(!force){try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c&&Date.now()-c.t<12*3600e3)return c.v}catch(e){}}
+  const tk=await user.getIdToken(),ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),70000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({action:'kurikulum',mapel,level,baseline:baselineOf20(level),force:!!force})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status)}
+  if(!r.ok)throw new Error(j.error||'Gagal memeriksa kurikulum');
+  if(j.ok!==false){try{localStorage.setItem(key,JSON.stringify({t:Date.now(),v:j}))}catch(e){}}
+  return j;
+}
+function renderKur20(k,err){
+  const b=$('kurbox');if(!b)return;
+  if(!k){b.innerHTML=`<div class="warn" style="margin-top:10px">⚠️ ${esc(err||'Kurikulum belum bisa diperiksa')}. Soal memakai baseline internal Kurikulum Merdeka.</div>`;return}
+  if(k.ok===false){b.innerHTML=`<div class="mut small" style="margin-top:10px">${esc(k.reason||'')}</div>`;return}
+  const C={tinggi:'✅ keyakinan tinggi',sedang:'🟡 keyakinan sedang',rendah:'🔴 keyakinan rendah'},src=(k.sources||[]).filter(s=>/^https?:\/\//.test(s.uri)).slice(0,5);
+  b.innerHTML=`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>📚 Kurikulum acuan (real time)</b><div class="small mut" style="margin:4px 0">${esc(k.live&&k.kurikulum&&k.kurikulum!=='tidak tertera'?k.kurikulum:'Kurikulum Merdeka')} • ${esc(k.level)} • Fase ${esc(k.fase)} • ${k.live?(C[k.keyakinan]||''):'🟠 baseline internal (sumber resmi belum terbaca)'}${k.cached?' • dari cache':''}</div>${k.inti&&k.inti.length?`<div class="small"><b>Materi inti resmi:</b> ${k.inti.slice(0,8).map(esc).join('; ')}</div>`:''}${k.perubahan?`<div class="small" style="margin-top:4px"><b>Perubahan/penekanan terbaru:</b> ${esc(k.perubahan)}</div>`:''}${src.length?`<details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--b)">Sumber (${src.length})</summary>${src.map(s=>`<div class="small"><a href="${esc(s.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(s.title)}</a>${s.official?' ★':''}</div>`).join('')}</details>`:''}<div class="small mut" style="margin-top:6px">Diperiksa ${esc(new Date(k.fetchedAt).toLocaleString('id-ID'))} dari situs resmi Kemendikdasmen/BSKAP/TKA/SNPMB. <a href="#" style="color:var(--b)" onclick="kurRefresh20();return false">🔄 Periksa ulang</a></div></div>`;
+}
+let KURT20=null;
+function kurPreview20(){
+  const mode=($('gmode')||{}).value||'kur',sel=$('gl');if(mode!=='kur'||!sel)return;
+  clearTimeout(KURT20);KURT20=setTimeout(async()=>{
+    const lv=sel.value;if(($('gmode')||{}).value!=='kur')return;
+    const b=$('kurbox');if(b)b.innerHTML='<div class="mut small" style="margin-top:10px">📚 Memeriksa kurikulum resmi terbaru...</div>';
+    try{const k=await kurFetch20(S.mapel,lv);if(sel.value!==lv)return;applyKur20(S.mapel,lv,k);renderKur20(k)}catch(e){if(sel.value===lv)renderKur20(null,e.message)}
+  },700);
+}
+async function kurRefresh20(){
+  const sel=$('gl');if(!sel)return;const lv=sel.value,b=$('kurbox');if(b)b.innerHTML='<div class="mut small" style="margin-top:10px">📚 Memeriksa ulang kurikulum...</div>';
+  try{const k=await kurFetch20(S.mapel,lv,true);applyKur20(S.mapel,lv,k);renderKur20(k)}catch(e){renderKur20(null,e.message)}
+}
+function gmodeSet20(m){
+  try{localStorage.setItem('gmode20',m)}catch(e){}
+  const h=$('gmode');if(h)h.value=m;
+  document.querySelectorAll('#gmodes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  const w=$('glw');if(w)w.style.display=m==='kur'?'':'none';
+  const k=$('kurbox');if(k)k.style.display=m==='kur'?'':'none';
+  setTxt('gmhint',m==='kur'?'Soal mengikuti kurikulum Indonesia terbaru untuk tingkat yang dipilih (dicek ke situs resmi).':`Soal pengetahuan umum tentang ${S.mapel} dari sumber global tepercaya (PBB, Bank Dunia, WHO, NASA, ensiklopedia), tidak terikat jenjang kurikulum.`);
+  if(m==='kur')kurPreview20();
+}
+function pBuat(){
+  if(isUmum()){$('pane').innerHTML='<div class="card mut">Soal mapel <b>Umum (Trivia Dunia)</b> dibuat otomatis setiap kali Latihan dari data global tervalidasi (data negara PBB/Bank Dunia dan kutipan ensiklopedia), jadi tidak perlu dibuat manual. Pilih pelajaran lain untuk membuat soal dengan pilihan Kurikulum atau Umum.</div>';return}
+  const L=isLang(),lvs=lvOptions().filter(l=>l!=='Umum'),cur=S.glv&&lvs.includes(S.glv)?S.glv:lvs[3];
+  let m0='kur';try{m0=localStorage.getItem('gmode20')==='umum'?'umum':'kur'}catch(e){}
+  $('pane').innerHTML=`<div class="card"><h3>✨ Buat soal ${esc(S.mapel)} dengan AI</h3><div id="gcount" class="mut small" style="margin-bottom:8px">Memuat...</div>
+    <div class="stabs" id="gmodes"><button class="${m0==='kur'?'on':''}" data-m="kur" onclick="gmodeSet20('kur')">📚 Kurikulum Indonesia</button><button class="${m0==='umum'?'on':''}" data-m="umum" onclick="gmodeSet20('umum')">🌍 Umum (data global)</button></div><input type="hidden" id="gmode" value="${m0}"><div id="gmhint" class="mut small" style="margin:6px 0 4px"></div>
+    <label>Topik / materi spesifik</label><div class="row"><input id="gt" placeholder="${isEng()?'e.g. past tense, climate change':'contoh: pecahan, kalimat efektif, hukum Newton'}"><button class="btn alt" style="flex:0 0 auto" onclick="randTopic()">🎲 Acak</button></div><div id="gchips" style="margin-top:4px">${chipsHtml()}</div>
+    <div class="row"><div><label>Jumlah</label><select id="gn"><option>5</option><option selected>10</option><option>20</option><option>25</option></select></div>
+    <div><label>Jenis soal</label><select id="gj"><option>Pilihan ganda</option><option>Benar/Salah</option>${L?'<option>Pilih semua yang benar</option><option>Essay</option>':''}<option>Campuran</option></select></div></div>
+    ${L?`<label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="gb2" style="width:18px"> Dengan teks bacaan (soal dari sebuah teks, uji pemahaman)</label>`:''}
+    <div class="row"><div id="glw"><label>Tingkat</label><select id="gl" onchange="refreshChips();kurPreview20()">${lvs.map(l=>`<option ${l===cur?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label>Kesulitan</label><select id="gd"><option>Mudah</option><option selected>Sedang</option><option>Sulit</option><option>Campuran</option></select></div></div>
+    <div id="kurbox"></div>
+    <label>Instruksi khusus (opsional)</label><textarea id="gx" placeholder="contoh: soal cerita sehari-hari, pengecoh masuk akal"></textarea>
+    <div class="mut small" style="margin-top:10px">🆕 Soal dibuat dari sumber tepercaya, harus <b>berbeda</b> dari semua soal yang sudah ada (yang mirip dibuang otomatis), <b>sesuai tingkat/kurikulum</b> yang dipilih, lalu diverifikasi silang.${isEng()?' Semua soal 100% bahasa Inggris.':''}</div>
+    <button class="btn full" id="gb" onclick="gen()">Buat soal ✨</button><div id="gm" class="mut small" style="margin-top:10px"></div></div><div id="gres"></div>`;
+  drawGen();loadCount();gmodeSet20(m0);
+}
+async function gen(){
+  const mode=($('gmode')||{}).value||'kur',sel=$('gl');if(!sel)return genBase();
+  if(mode==='kur'){
+    const lv=sel.value;
+    try{setTxt('gm','📚 Memeriksa kurikulum resmi terbaru ('+lv+')...');const k=await kurFetch20(S.mapel,lv);applyKur20(S.mapel,lv,k);renderKur20(k);window.KMETA20=(k.live&&k.kurikulum&&k.kurikulum!=='tidak tertera')?k.kurikulum:(k.live?'Kurikulum Merdeka':'baseline')}
+    catch(e){applyKur20(S.mapel,lv,null);renderKur20(null,e.message);window.KMETA20='baseline'}
+    await genBase();if(S.genMeta){S.genMeta.mode='kurikulum';S.genMeta.kurikulum=window.KMETA20||''}
+    return;
+  }
+  const prev=sel.innerHTML,prevVal=sel.value;sel.innerHTML='<option selected>Umum</option>';sel.value='Umum';
+  try{await genBase()}finally{sel.innerHTML=prev;sel.value=prevVal}
+  if(S.genMeta){S.genMeta.mode='umum';S.genMeta.kurikulum=''}
+}
+function levelGuide(lv){
+  const g=String(lv||''),m0=g.match(/^SD Kelas (\d)/),m1=g.match(/^SMP Kelas (\d)/),m2=g.match(/^SMA Kelas (\d+)/);let b;
+  if(m0){const n=+m0[1];b=`Siswa SD kelas ${n} (Kurikulum Merdeka fase ${n<=2?'A':n<=4?'B':'C'}). Bahasa sangat sederhana, kalimat pendek, konteks sehari-hari anak, tanpa istilah teknis berlebihan, soal 1-2 langkah. Hanya materi yang sudah diajarkan sampai kelas ${n}.`}
+  else if(m1)b=`Siswa SMP kelas ${m1[1]} (Kurikulum Merdeka fase D). Soal 2-3 langkah, istilah teknis dasar. Hanya materi sampai kelas ${m1[1]}.`;
+  else if(m2)b=`Siswa SMA kelas ${m2[1]} (Kurikulum Merdeka fase E/F). Penalaran multi-langkah, istilah formal, penerapan konsep. Hanya materi sampai kelas ${m2[1]}.`;
+  else if(/^TKA SD/.test(g))b='Tes Kemampuan Akademik tingkat SD (akhir kelas 6): literasi dan numerasi berbasis stimulus singkat (teks/data), penalaran sederhana, sesuai capaian SD.';
+  else if(/^TKA SMP/.test(g))b='Tes Kemampuan Akademik tingkat SMP (akhir kelas 9): literasi dan numerasi berbasis stimulus, penalaran 2-3 langkah, sesuai capaian SMP.';
+  else if(/^TKA SMA/.test(g))b='Tes Kemampuan Akademik tingkat SMA (akhir kelas 12): penalaran berbasis teks/data, analisis, sesuai capaian SMA.';
+  else if(/UTBK/.test(g))b='UTBK-SNBT: penalaran umum, pengetahuan dan pemahaman umum, pemahaman bacaan dan menulis, pengetahuan kuantitatif, literasi bahasa Indonesia dan Inggris, penalaran matematika. Soal HOTS berbasis teks/data, level tinggi.';
+  else if(/^A1/.test(g))b='CEFR A1: sekitar 500 kata paling umum, kalimat sangat pendek, present simple/be, topik diri sendiri, keluarga, benda sehari-hari.';
+  else if(/^A2/.test(g))b='CEFR A2: kosakata dasar sehari-hari, past simple, perbandingan, future dengan going to, teks pendek tentang rutinitas dan tempat.';
+  else if(/^B1/.test(g))b='CEFR B1: present perfect, conditional 0/1/2, passive dasar, reported speech dasar, teks tentang pengalaman, rencana, dan opini sederhana.';
+  else if(/^B2/.test(g))b='CEFR B2: struktur kompleks, conditional 3, passive lanjutan, idiom umum, topik abstrak, teks argumentatif.';
+  else if(/^C1/.test(g))b='CEFR C1: kosakata lanjutan dan nuansa, struktur inversi, discourse markers, teks akademik/profesional yang padat.';
+  else if(/^Pemula/.test(g))b='Trader pemula: konsep dasar dan istilah, tanpa asumsi pengetahuan sebelumnya.';
+  else if(/^Menengah/.test(g))b='Trader menengah: penerapan konsep, kombinasi beberapa konfirmasi, manajemen risiko praktis.';
+  else if(/^Lanjut/.test(g))b='Trader lanjutan: nuansa struktur pasar, skenario bersyarat, manajemen risiko tingkat lanjut.';
+  else b='Pengetahuan umum untuk pelajar dan dewasa, tingkat menengah.';
+  return b+' '+(KS20[S.mapel+'|'+lv]||scopeOf13(lv));
+}
+function topicList(lv){
+  const live=KT20[S.mapel+'|'+lv];if(live&&live.length)return live;
+  const g=gradeOf13(lv),c=CURR13[S.mapel];
+  if(g&&c){const o=[];for(let k=g[0];k<=g[1];k++)if(c[k])c[k].split(/,\s*(?![^()]*\))/).forEach(t=>{t=t.replace(/^[A-Za-z]+:\s*/,'').trim();if(t)o.push(t)});if(o.length)return o}
+  const t=TOPICS[S.mapel];return Array.isArray(t)?t:(t&&t[tierOf(lv)])||[];
+}
+/* ---------- tab Trading: hanya News, Analisis, Tutor, Jurnal, Catatan ---------- */
+function setSec(s){S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'news':'latihan';home()}
+function homeBase(){
+  if(S.sec==='admin')return adminView();
+  if(S.sec==='kamus')return kamusView();
+  ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
+  if(S.sec==='trading'){
+    S.mapel='Trading';if(!['news','pro','tutor','jurnal','catatan'].includes(S.tab))S.tab='news';
+    const T=[['news','📰 News'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
+    $('app').innerHTML=`<div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
+    return pane();
+  }
+  if(['news','pro','jurnal','catatan'].includes(S.tab))S.tab='latihan';
+  const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];
+  $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
+    <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${MAPEL[S.sec].map(m=>`<option ${m===S.mapel?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
+  pane();
+}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,pro:pPro,catatan:pCatatan})[S.tab]()}
+function pCatatan(){
+  $('pane').innerHTML=`<div class="card"><h3>📝 Catatan trading</h3><textarea id="cat" placeholder="Catatan setup, pelajaran, evaluasi..."></textarea><button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes" style="margin-top:10px"></div></div>`;
+  loadNotes();
+}
+Object.assign(STARTERS18,{'Trading':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Bagaimana arah USD dan pair utama berdasarkan data terbaru?','Jelaskan order block dan fair value gap dengan contoh','Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip']});
+/* ---------- kamus: definisi dibantu sumber kamus global ---------- */
+async function ai(system,messages,big,search,q,cat,opt){
+  if(!search&&!big&&/^You are an English dictionary assistant/i.test(String(system))){
+    const w=(/Word:\s*"([^"]{1,40})"/i.exec(String((messages[messages.length-1]||{}).content||''))||[])[1];
+    if(w){search=true;q=w+' definition meaning usage';cat='inggris'}
+  }
+  opt=opt||{};const tk=await user.getIdToken();
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),85000);let r;
+  try{r=await fetch('/api/chat',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({system,messages,big:!!big,search:!!search,q:q||'',cat:cat||catFor(),temp:opt.temp==null?null:opt.temp,json:opt.json||''})})}
+  catch(e){throw new Error(e.name==='AbortError'?'Server terlalu lama menjawab (timeout). Coba lagi.':e.message)}finally{clearTimeout(to)}
+  let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
+  if(!r.ok)throw new Error(j.error||'AI gagal');
+  let t=j.text;
+  if(search){(j.sources||[]).forEach(s=>{if(!SRC.some(x=>x.uri===s.uri))SRC.push(s)});LT=Math.max(LT,j.trusted||0)}
+  if(search&&!big){
+    if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).replace(/[|\]]/g,' ')}|${s.uri}]]`).join('\n');
+    else if(j.grounded===false)t+='\n\n⚠️ Tidak ada sumber terpercaya yang ditemukan; jawaban ini dari pengetahuan AI, cek ulang sebelum dipakai.';
+  }
+  return t;
+}
+/* ---------- kartu status AI: penyedia baru + catatan ---------- */
+function aiCard19(){
+  return `<div class="card"><h3>🧪 Status AI & pencarian</h3><div class="mut small" style="margin-bottom:8px">Menguji setiap key di Vercel dengan permintaan kecil: Gemini, Groq, NVIDIA, Mistral, GitHub Models, Cloudflare, Cohere, Cerebras, OpenRouter, SambaNova, Serper, dan Tavily. Model dipilih otomatis dari daftar yang benar-benar tersedia.</div><button class="btn full" onclick="aiTest19()">🔍 Uji semua key sekarang</button><div id="aistat" style="margin-top:10px"></div></div>`;
+}
+function aiRow19(x,isProv){
+  const bad=x.results.filter(r=>!r.ok),errs=[...new Set(bad.map(r=>r.error).filter(Boolean))].slice(0,2),ms=x.results.filter(r=>r.ok).map(r=>r.ms).sort((a,b)=>a-b),med=ms.length?ms[Math.floor(ms.length/2)]+' ms':'';
+  const st=!x.keys?'<span class="mut">tidak ada key</span>':x.ok===x.keys?'✅ '+x.ok+'/'+x.keys:x.ok?'🟡 '+x.ok+'/'+x.keys:'❌ 0/'+x.keys,h=hint19(x),used=[...new Set(x.results.filter(r=>r.ok&&r.model).map(r=>r.model))].slice(0,2);
+  return `<div class="item" style="align-items:flex-start"><span><b>${esc(x.id)}</b>${isProv?`<div class="small mut">${used.length?'dipakai: '+esc(used.join(', ')):esc((x.models||[]).join(', '))}</div>`:''}${x.note?`<div class="small" style="color:#ffd48a">${esc(x.note)}</div>`:''}${errs.map(e=>`<div class="small" style="color:#ffb3b3">${esc(e)}</div>`).join('')}${h?`<div class="small" style="color:#ffd48a">💡 ${esc(h)}</div>`:''}</span><span style="text-align:right;white-space:nowrap">${st}<div class="small mut">${med}</div></span></div>`;
+}
+/* ===== END V20 ===== */
 </script>
 
 </body>
