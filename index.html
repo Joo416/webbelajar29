@@ -2714,7 +2714,7 @@ async function ai(system,messages,big,search,q,cat,opt){
 }
 /* ---------- kartu status AI: penyedia baru + catatan ---------- */
 function aiCard19(){
-  return `<div class="card"><h3>🧪 Status AI & pencarian</h3><div class="mut small" style="margin-bottom:8px">Menguji setiap key di Vercel dengan permintaan kecil: Gemini, Groq, NVIDIA, Mistral, GitHub Models, Cloudflare, Cohere, Cerebras, OpenRouter, SambaNova, Serper, dan Tavily. Model dipilih otomatis dari daftar yang benar-benar tersedia.</div><button class="btn full" onclick="aiTest19()">🔍 Uji semua key sekarang</button><div id="aistat" style="margin-top:10px"></div></div>`;
+  return `<div class="card"><h3>🧪 Status AI & pencarian</h3><div class="mut small" style="margin-bottom:8px">Menguji setiap key di Vercel dengan permintaan kecil: Gemini, Groq, Cerebras, NVIDIA, Z.AI, Mistral, GitHub Models, Cloudflare, OpenRouter, SambaNova, Cohere, Serper, dan Tavily. Model dipilih otomatis dari daftar yang benar-benar tersedia.</div><button class="btn full" onclick="aiTest19()">🔍 Uji semua key sekarang</button><div id="aistat" style="margin-top:10px"></div></div>`;
 }
 function aiRow19(x,isProv){
   const bad=x.results.filter(r=>!r.ok),errs=[...new Set(bad.map(r=>r.error).filter(Boolean))].slice(0,2),ms=x.results.filter(r=>r.ok).map(r=>r.ms).sort((a,b)=>a-b),med=ms.length?ms[Math.floor(ms.length/2)]+' ms':'';
