@@ -1218,12 +1218,13 @@ async function proHandler(req, res) {
    ===================================================================== */
 const OAI = [
   { id: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', list: 'https://openrouter.ai/api/v1/models', env: 'OPENROUTER', models: 'OPENROUTER_MODELS', def: 'openai/gpt-oss-120b:free,meta-llama/llama-3.3-70b-instruct:free,openrouter/free', headers: { 'HTTP-Referer': 'https://belajarforme29.vercel.app', 'X-Title': 'Ruang Belajar' } },
-  { id: 'cerebras', url: 'https://api.cerebras.ai/v1/chat/completions', list: 'https://api.cerebras.ai/v1/models', env: 'CEREBRAS', models: 'CEREBRAS_MODELS', def: 'gpt-oss-120b,llama-3.3-70b' },
+  { id: 'cerebras', url: 'https://api.cerebras.ai/v1/chat/completions', list: 'https://api.cerebras.ai/v1/models', env: 'CEREBRAS', models: 'CEREBRAS_MODELS', def: 'gpt-oss-120b,llama-3.3-70b', maxChars: 22000 },
   { id: 'mistral', url: 'https://api.mistral.ai/v1/chat/completions', list: 'https://api.mistral.ai/v1/models', env: 'MISTRAL', models: 'MISTRAL_MODELS', def: 'mistral-medium-latest,mistral-small-latest' },
   { id: 'sambanova', url: 'https://api.sambanova.ai/v1/chat/completions', list: 'https://api.sambanova.ai/v1/models', env: 'SAMBANOVA', models: 'SAMBANOVA_MODELS', def: 'Meta-Llama-3.3-70B-Instruct,gpt-oss-120b' },
   { id: 'nvidia', url: 'https://integrate.api.nvidia.com/v1/chat/completions', list: 'https://integrate.api.nvidia.com/v1/models', env: 'NVIDIA', models: 'NVIDIA_MODELS', def: 'openai/gpt-oss-120b,meta/llama-3.3-70b-instruct' },
   { id: 'github', url: 'https://models.github.ai/inference/chat/completions', list: 'https://models.github.ai/catalog/models', env: 'GITHUB', models: 'GITHUB_MODELS', def: 'openai/gpt-4.1,openai/gpt-4.1-mini,meta/Llama-3.3-70B-Instruct,deepseek/DeepSeek-V3-0324', maxChars: 22000, headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } },
   { id: 'cloudflare', urlFor: acct => `https://api.cloudflare.com/client/v4/accounts/${acct}/ai/v1/chat/completions`, env: 'CLOUDFLARE', models: 'CLOUDFLARE_MODELS', def: '@cf/openai/gpt-oss-120b,@cf/meta/llama-3.3-70b-instruct-fp8-fast', needsAcct: true },
+  { id: 'zai', url: 'https://api.z.ai/api/paas/v4/chat/completions', env: 'ZAI', models: 'ZAI_MODELS', def: 'glm-4.7-flash,glm-4.5-flash', extra: { thinking: { type: 'disabled' } }, maxChars: 60000 },
   { id: 'cohere', url: 'https://api.cohere.ai/compatibility/v1/chat/completions', env: 'COHERE', models: 'COHERE_MODELS', def: 'command-a-03-2025,command-r-plus-08-2024' }
 ];
 // kunci per penyedia (Cloudflare butuh ACCOUNT_ID yang cocok: CLOUDFLARE_ACCOUNT_ID_1..5 atau CLOUDFLARE_ACCOUNT_ID)
@@ -1272,6 +1273,7 @@ async function callOAI(p, ent, model, system, messages, max, dl, opt) {
   const body = { model, max_tokens: max, messages: [{ role: 'system', content: system }, ...messages.map(m => ({ role: m.role, content: String(m.content) }))] };
   if (opt && opt.temp != null) body.temperature = opt.temp;
   if (opt && opt.json === 'object') body.response_format = { type: 'json_object' };
+  if (p.extra) Object.assign(body, JSON.parse(JSON.stringify(p.extra)));
   const url = p.urlFor ? p.urlFor(ent.acct) : p.url;
   const call = async b => {
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ent.key, ...(p.headers || {}) }, body: JSON.stringify(b), signal: AbortSignal.timeout(Math.max(6000, Math.min(35000, (dl || Date.now() + 35000) - Date.now() - 1500))) });
@@ -1286,7 +1288,11 @@ async function callOAI(p, ent, model, system, messages, max, dl, opt) {
     return { text: String(t).replace(/<think>[\s\S]*?<\/think>/g, '').trim(), provider: p.id, model: b.model };
   };
   try { return await call(body); }
-  catch (e) { if (body.response_format && /response_format|json/i.test(e.message)) { delete body.response_format; return await call(body); } throw e; }
+  catch (e) {
+    if (body.response_format && /response_format|json/i.test(e.message)) { delete body.response_format; return await call(body); }
+    if (body.thinking && /thinking/i.test(e.message)) { delete body.thinking; return await call(body); }
+    throw e;
+  }
 }
 async function oai(p, system, messages, max, errs, dl, opt) {
   const ents = entriesOf(p);
@@ -1306,7 +1312,7 @@ const PROV = {
   groq: a => groq(a.system, a.messages, a.max, a.errs, a.dl, a.opt)
 };
 OAI.forEach(p => { PROV[p.id] = a => oai(p, a.system, a.messages, a.max, a.errs, a.dl, a.opt); });
-const PROV_ORDER = (process.env.AI_ORDER || 'gemini,groq,nvidia,mistral,github,cloudflare,cohere,cerebras,openrouter,sambanova').split(/[\s,]+/).filter(x => PROV[x]);
+const PROV_ORDER = (process.env.AI_ORDER || 'gemini,groq,cerebras,nvidia,zai,mistral,github,cloudflare,openrouter,sambanova,cohere').split(/[\s,]+/).filter(x => PROV[x]);
 const hasKeys = id => (id === 'gemini' || id === 'groq' ? keysOf(id.toUpperCase()).length : (OAI.find(p => p.id === id) ? entriesOf(OAI.find(p => p.id === id)).length : 0)) > 0;
 const availProv = () => PROV_ORDER.filter(hasKeys);
 // pengatur urutan penyedia: coba satu per satu sampai ada yang menjawab
