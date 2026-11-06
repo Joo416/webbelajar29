@@ -49,11 +49,11 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
 <!-- ✏️ [TEKS BISA DIUBAH] Judul besar halaman / nama web (ikon 📖 + nama) -->
   <h1>📖 Ruang Belajar</h1>
 <!-- ✏️ [TEKS BISA DIUBAH] Kalimat kecil di bawah judul -->
-  <div class="sub">PELAJARAN UMUM,SEKOLAH,TKA & TRADING</div>
+  <div class="sub">Pelajaran umum · sekolah · TKA · trading</div>
   <div id="warn"></div>
   <div id="userbar"></div>
   <div class="tabs">
-<!-- ✏️ [TEKS BISA DIUBAH] Tulisan dua tombol tab utama: TKA & Sekolah, Trading (jangan ubah onclick/id) -->
+<!-- ✏️ [TEKS BISA DIUBAH] Tulisan tiga tombol tab utama: Beranda, Belajar, Trading (jangan ubah onclick/id) -->
     <button id="t-beranda" onclick="v21Home()">🏠 Beranda</button>
     <button id="t-sekolah" onclick="setSec('sekolah')">🎓 Belajar</button>
     <button id="t-trading" onclick="setSec('trading')">📈 Trading</button>
@@ -604,7 +604,7 @@ function renderNewsBase(j,stale){
   if(d.core)cards.push(['Core CPI '+d.core.period,nfmt(d.core.yoy,'%')+' YoY','MoM '+nfmt(d.core.mom,'%',true)+' (sebelumnya '+nfmt(d.core.prevMom,'%',true)+')']);
   const nxt=['NFP','CPI','FOMC'].filter(k=>nx[k]).map(k=>{const n=daysTo(nx[k].date);return `<div class="exp" style="color:var(--tx)"><div class="small mut">${k} • ${esc(nx[k].source)}</div><div style="font-weight:800">${esc(nx[k].date)}</div><div class="small mut">${esc(nx[k].time||'')} ${n>=0?'• '+(n===0?'HARI INI':n+' hari lagi'):''}</div></div>`}).join('');
   const t=new Date(j.fetchedAt);
-  ($('nres')||{}).innerHTML=`<div class="card"><div class="mut small">${stale?'🗂 Tersimpan di browser • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>
+  ($('nres')||{}).innerHTML=`<div class="card"><div class="mut small">${stale?'🗂 TERSIMPAN (bukan data baru) • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>
     ${nxt?`<h3 style="margin-top:12px">📌 Jadwal resmi berikutnya <span class="mut small">(tanggal ET dari bls.gov / federalreserve.gov)</span></h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">${nxt}</div>`:'<div class="warn" style="margin-top:10px">Jadwal resmi tidak terbaca dari BLS/The Fed saat ini; hanya kalender agregator yang tersedia.</div>'}</div>
     <div class="card"><h3>📅 Kalender rilis mendatang (14 hari)</h3><div class="mut small">Waktu sesuai zona waktu perangkatmu. Forecast/Previous berasal dari agregator (Forex Factory/FairEconomy), bukan data resmi.</div>
     <div class="row" style="margin-top:10px"><select onchange="nfSet('cur',this.value)">${['ALL','USD','EUR','GBP','JPY','AUD','CAD','NZD','CHF'].map(c=>`<option ${NF.cur===c?'selected':''}>${c}</option>`).join('')}</select>
@@ -620,26 +620,26 @@ const BCOL={BULLISH:'var(--b)',BEARISH:'var(--bad)',NETRAL:'var(--mut)'},BARR={B
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi renderProBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function renderProBase(j,stale){
   const p=j.pro,t=new Date(j.fetchedAt);
-  const head=`<div class="mut small" style="margin:0 0 8px">${stale?'🗂 Hasil terakhir tersimpan • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • Horizon ${esc(j.horizon||'')} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>`;
+  const head=`<div class="mut small" style="margin:0 0 8px">${stale?'🗂 TERSIMPAN (bukan data baru) • ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} • Horizon ${esc(j.horizon||'')} • AI: ${esc(j.provider||'-')} ${esc(j.model||'')}</div>`;
   if(!p){($('pres')||{}).innerHTML=`<div class="card">${head}<div class="warn">AI belum menghasilkan analisis yang valid.</div>${j.raw?`<div class="exp" style="color:var(--tx)">${fmtMd(j.raw)}</div>`:''}</div>${qualityHtml(j.quality)}${(j.notes||[]).length?`<div class="mut small">⚠️ ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}`;return}
   const fx=(j.fx&&j.fx.pairs)||{},cons=j.consistency;
-  const matrix=p.pairs.map(x=>`<div class="item"><span style="font-weight:700">${esc(x.pair)}</span><span style="color:${BCOL[x.bias]};font-weight:800">${BARR[x.bias]} ${esc(x.bias)}</span><span class="mut small">keyakinan ${esc(x.confidence)}</span></div>`).join('');
+  const matrix=(p.pairs||[]).map(x=>`<div class="item"><span style="font-weight:700">${esc(x.pair)}</span><span style="color:${BCOL[x.bias]};font-weight:800">${BARR[x.bias]} ${esc(x.bias)}</span><span class="mut small">keyakinan ${esc(x.confidence)}</span></div>`).join('');
   ($('pres')||{}).innerHTML=`<div class="card">${head}<h3>Ringkasan rezim pasar</h3><div style="margin-bottom:8px"><span style="color:${BCOL[p.usd_bias]};font-weight:800">USD: ${BARR[p.usd_bias]} ${esc(p.usd_bias)}</span></div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(p.regime)}<br>${fmtMd(p.usd_reason)}<br><br>${fmtMd(p.summary)}</div>
     <h3 style="margin-top:14px">Matriks arah</h3>${matrix||'<div class="mut small">Tidak ada pair.</div>'}
     ${cons&&cons.mixed?`<div class="mut small" style="margin-top:8px">ℹ️ Bias antar pair tidak semuanya searah USD (${cons.usdPlus} pair mendukung USD kuat, ${cons.usdMinus} mendukung USD lemah). Ini wajar bila ada faktor non-USD; baca alasan tiap pair.</div>`:''}
     ${(j.flags||[]).length?`<div class="warn" style="margin-top:10px">⚠️ AI menyebut angka yang TIDAK ditemukan di data yang dikumpulkan: <b>${esc(j.flags.join(', '))}</b>. Anggap angka itu belum valid dan periksa sendiri.</div>`:'<div class="mut small" style="margin-top:8px">✅ Tidak ada angka bernilai harga/level di jawaban AI yang berada di luar data yang dikumpulkan.</div>'}</div>
-    ${p.pairs.map(x=>{const f=fx[x.pair];return `<div class="card" style="border-left:4px solid ${BCOL[x.bias]}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0">${esc(x.pair)}</h3><span style="color:${BCOL[x.bias]};font-weight:800">${BARR[x.bias]} ${esc(x.bias)}</span></div>
+    ${(p.pairs||[]).map(x=>{const f=fx[x.pair];return `<div class="card" style="border-left:4px solid ${BCOL[x.bias]}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0">${esc(x.pair)}</h3><span style="color:${BCOL[x.bias]};font-weight:800">${BARR[x.bias]} ${esc(x.bias)}</span></div>
       <div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(x.confidence)}</b>${x.horizon?' • '+esc(x.horizon):''}${f?` • kurs harian ${f.last} (5d ${nfmt(f.chg5d,'%',true)}, ${esc(f.vsSma20)} SMA20)`:x.pair==='XAUUSD'?' • tanpa data harga resmi':''}</div>
       <div style="line-height:1.5">${fmtMd(x.thesis)}</div>
-      ${x.drivers.length?`<div style="margin-top:8px"><b>Pendorong</b>${x.drivers.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
-      ${x.risks.length?`<div style="margin-top:8px"><b>Risiko</b>${x.risks.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
+      ${(x.drivers||[]).length?`<div style="margin-top:8px"><b>Pendorong</b>${x.drivers.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
+      ${(x.risks||[]).length?`<div style="margin-top:8px"><b>Risiko</b>${x.risks.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
       ${x.invalidation?`<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(x.invalidation)}</div>`:''}
-      ${x.watch.length?`<div class="small mut" style="margin-top:6px">Pantau: ${esc(x.watch.join(' • '))}</div>`:''}</div>`}).join('')}
-    ${p.scenarios.length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${p.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:''}
-    ${p.calendar_risk.length?`<div class="card"><h3>📅 Risiko kalender dalam horizon</h3>${p.calendar_risk.map(s=>`<div class="item"><span><b>${esc(s.event)}</b><div class="small mut">${esc(s.why)}</div></span></div>`).join('')}</div>`:''}
-    ${p.data_quality.length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${p.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
+      ${(x.watch||[]).length?`<div class="small mut" style="margin-top:6px">Pantau: ${esc(x.watch.join(' • '))}</div>`:''}</div>`}).join('')}
+    ${(p.scenarios||[]).length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${p.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:''}
+    ${(p.calendar_risk||[]).length?`<div class="card"><h3>📅 Risiko kalender dalam horizon</h3>${p.calendar_risk.map(s=>`<div class="item"><span><b>${esc(s.event)}</b><div class="small mut">${esc(s.why)}</div></span></div>`).join('')}</div>`:''}
+    ${(p.data_quality||[]).length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${p.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}
     ${qualityHtml(j.quality)}
-    ${j.yields||j.effr?`<div class="card"><h3>🏦 Data kunci yang dipakai</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)})</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (Treasury, ${esc(j.yields.date)})</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>`:''}<div class="mut small" style="margin-top:6px">Kurs harian dari referensi ECB (bukan harga real-time/intraday).</div></div>`:''}
+    ${j.yields||j.effr?`<div class="card"><h3>🏦 Data kunci yang dipakai</h3>${j.effr?`<div class="item"><span>EFFR (NY Fed, ${esc(j.effr.date)})</span><b>${esc(j.effr.rate)}%</b></div>`:''}${j.yields?`<div class="item"><span>Yield 2Y / 10Y (Treasury, ${esc(j.yields.date)})</span><b>${esc(j.yields.y2)}% / ${esc(j.yields.y10)}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(j.yields.spread)}</b></div>`:''}<div class="mut small" style="margin-top:6px">Harga harian dari Stooq/Yahoo Finance; bila keduanya gagal dipakai kurs referensi ECB. Semua bukan harga intraday/real-time.</div></div>`:''}
     ${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}
     <button class="btn alt full" onclick="savePro()">📝 Simpan ringkasan ke Catatan</button><div class="mut small" style="margin-top:8px">Analisis edukasi berbasis data publik, bukan saran finansial dan bukan sinyal entry/SL/TP. Pasar bisa bergerak berbeda dari bias mana pun; selalu kelola risiko.</div>`;
 }
@@ -886,7 +886,7 @@ function renderNews2(j,stale){
 function pNews(){
   let c=null;try{c=JSON.parse(localStorage.getItem('news_'+NEWSF))}catch(e){}
   $('pane').innerHTML=`<div class="card"><h3>📰 News Makro AS — NFP · CPI · FOMC</h3>
-    <div class="mut small" style="margin-bottom:10px">Kalender rilis mendatang (diverifikasi ke jadwal resmi BLS &amp; The Fed), angka resmi BLS, rilis Federal Reserve, dan berita Reuters/Bloomberg/WSJ/CNBC dan sejenisnya, lalu dianalisis AI. Edukasi, bukan saran finansial.</div>
+    <div class="mut small" style="margin-bottom:10px">Setiap klik "Ambil data terbaru" mengambil ULANG data tanpa cache: kalender rilis mendatang (diverifikasi ke jadwal resmi BLS &amp; The Fed), angka resmi BLS, rilis Federal Reserve, dan berita Reuters/Bloomberg/WSJ/CNBC dan sejenisnya, lalu dianalisis AI. Edukasi, bukan saran finansial.</div>
     <div class="stabs" style="margin-bottom:10px">${[['all','Semua'],['nfp','NFP'],['cpi','CPI'],['fomc','FOMC']].map(([k,l])=>`<button class="${NEWSF===k?'on':''}" onclick="NEWSF='${k}';pNews()">${l}</button>`).join('')}</div>
     <button class="btn full" id="nbtn" onclick="loadNews()">🔄 Ambil data terbaru & analisis</button><div id="nmsg" class="mut small" style="margin-top:8px"></div></div><div id="nres"></div>`;
   if(c)renderNews2(c,true);
@@ -894,14 +894,14 @@ function pNews(){
 // ✏️ [TEKS BISA DIUBAH] 📰 Trading → News — fungsi loadNews(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function loadNews(){
   const f=NEWSF;busy('nbtn',true);setTxt('nmsg','⏳ Tahap 1/2: mengumpulkan kalender, jadwal resmi, data BLS, rilis The Fed & berita tepercaya...');
-  let d;try{d=await tcall({action:'news',focus:f,phase:'data'})}catch(e){setTxt('nmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('nbtn',false);return}
+  let d;try{d=await tcall({action:'news',focus:f,phase:'data',fresh:true})}catch(e){setTxt('nmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('nbtn',false);return}
   NF.g=d.g;const base={...d};delete base.g;delete base.phase;base.pending=true;NF.last=base;
   if(NEWSF===f&&$('nres'))renderNews2(base,false);
   setTxt('nmsg','⏳ Tahap 2/2: AI menganalisis (data sudah tampil di bawah)...');await newsAI(f,base);
 }
 // ✏️ [TEKS BISA DIUBAH] 📰 Trading → News — fungsi newsAI(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function newsAI(f,base){
-  try{const a=await tcall({action:'news',focus:f,phase:'ai',g:NF.g});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;NF.last=j;
+  try{const a=await tcall({action:'news',focus:f,phase:'ai',g:NF.g,fresh:true});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;NF.last=j;
     if(j.analysis){try{localStorage.setItem('news_'+f,JSON.stringify(j))}catch(e){}}
     if(NEWSF===f&&$('nres'))renderNews2(j,false);setTxt('nmsg',j.analysis?'✅ Selesai':'⚠️ AI tidak memberi analisis (lihat catatan teknis di bawah)');
   }catch(e){const j={...base,pending:false,aiError:e.message};NF.last=j;if(NEWSF===f&&$('nres'))renderNews2(j,false);setTxt('nmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
@@ -923,7 +923,7 @@ function renderPro2(j,stale){
 function pPro(){
   let c=null;try{c=JSON.parse(localStorage.getItem('pro_last'))}catch(e){}
   $('pane').innerHTML=`<div class="card"><h3>🧠 Analisis Pro — arah bias per pair</h3>
-    <div class="mut small" style="margin-bottom:10px">AI membaca ulang SEMUA data terbaru setiap kali dijalankan (kalender terverifikasi, angka BLS, suku bunga NY Fed, yield Treasury, kurs harian ECB, dan berita tepercaya), lalu menyusun bias dengan kerangka trader profesional. AI tidak "mengingat" situs; hanya data yang tampil di bawah yang dipakai. Edukasi, bukan saran finansial.</div>
+    <div class="mut small" style="margin-bottom:10px">Setiap klik "Analisis mendalam sekarang" mengambil ULANG semua data dari sumbernya tanpa cache (kalender terverifikasi, angka BLS, suku bunga NY Fed, yield Treasury, harga harian Stooq/Yahoo, posisi spekulan CFTC, fundamental FRED/OECD, dan berita tepercaya), lalu menyusun bias dengan kerangka trader profesional. AI tidak "mengingat" situs; hanya data yang tampil di bawah yang dipakai. Edukasi, bukan saran finansial.</div>
     <label>Pair yang dianalisis</label><div id="ppairs" style="display:flex;flex-wrap:wrap;gap:6px">${ALLP.map(p=>`<button class="x" style="background:${PRP.sel.includes(p)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${p}')">${p}</button>`).join('')}</div>
     <label>Horizon</label><select onchange="PRP.hz=this.value;prpSave16()">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
     <button class="btn full" id="pbtn" onclick="runPro()">🧠 Analisis mendalam sekarang</button><div id="pmsg" class="mut small" style="margin-top:8px"></div></div><div id="pres"></div>`;
@@ -933,13 +933,13 @@ function pPro(){
 async function runPro(){
   if(!PRP.sel.length){setTxt('pmsg','Pilih minimal satu pair.');return}
   const sel=[...PRP.sel],hz=PRP.hz;busy('pbtn',true);setTxt('pmsg','⏳ Tahap 1/2: mengumpulkan kalender, BLS, NY Fed, Treasury, ECB & berita...');
-  let d;try{d=await tcall({action:'pro',phase:'data',pairs:sel,horizon:hz})}catch(e){setTxt('pmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('pbtn',false);return}
+  let d;try{d=await tcall({action:'pro',phase:'data',pairs:sel,horizon:hz,fresh:true})}catch(e){setTxt('pmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('pbtn',false);return}
   PR.g=d.g;PR.req={pairs:sel,horizon:hz};const base={...d};delete base.g;delete base.phase;base.pending=true;PR.cur=base;
   if($('pres'))renderPro2(base,false);setTxt('pmsg','⏳ Tahap 2/2: AI menyusun analisis (data sudah tampil)...');await proAI(base);
 }
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi proAI(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function proAI(base){
-  try{const a=await tcall({action:'pro',phase:'ai',pairs:PR.req.pairs,horizon:PR.req.horizon,g:PR.g});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;PR.cur=j;
+  try{const a=await tcall({action:'pro',phase:'ai',pairs:PR.req.pairs,horizon:PR.req.horizon,g:PR.g,fresh:true});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;PR.cur=j;
     if(j.pro){try{localStorage.setItem('pro_last',JSON.stringify(j))}catch(e){}}
     if($('pres'))renderPro2(j,false);setTxt('pmsg',j.pro?'✅ Selesai':'⚠️ AI belum memberi format yang valid (lihat catatan)');
   }catch(e){const j={...base,pending:false,aiError:e.message};PR.cur=j;if($('pres'))renderPro2(j,false);setTxt('pmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
@@ -1408,7 +1408,7 @@ function spark16(a){
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi priceHtml14(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function priceHtml14(j){
   const e=Object.entries((j.px&&j.px.pairs)||{});if(!e.length)return'';const f=v=>v==null?'-':v;
-  return `<div class="card"><h3>📈 Harga & teknikal harian</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Pair</th><th align="right">Harga</th><th align="center">30h</th><th align="right">1d</th><th align="right">5d</th><th align="right">20d</th><th align="right">RSI</th><th align="right">ATR%</th><th align="left">&nbsp;Tren</th><th align="right">Range20</th></tr>${e.map(([p,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(p)}</b></td><td align="right">${esc(v.last)}</td><td align="center">${spark16(v.spark)}</td><td align="right">${nfmt(v.chg1d,'%',true)}</td><td align="right">${nfmt(v.chg5d,'%',true)}</td><td align="right">${nfmt(v.chg20d,'%',true)}</td><td align="right">${f(v.rsi)}</td><td align="right">${f(v.atrPct)}</td><td>&nbsp;${esc(v.trend||(v.vsSma20?'harga '+v.vsSma20+' SMA20':'-'))}</td><td align="right">${v.pos20==null?'-':v.pos20+'%'}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Data HARIAN (bukan real-time; bar terakhir bisa belum final) per ${esc(j.px.asOf||'-')} ${ageTag14(j.px.asOf,5)} • sumber: ${esc([...new Set(e.map(([,v])=>v.src).filter(Boolean))].join(', '))}. Grafik mini = 30 penutupan harian terakhir.</div></div>`;
+  return `<div class="card"><h3>📈 Harga & teknikal harian</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Pair</th><th align="right">Harga</th><th align="center">30h</th><th align="right">1d</th><th align="right">5d</th><th align="right">20d</th><th align="right">RSI</th><th align="right">ATR%</th><th align="left">&nbsp;Tren</th><th align="right">Range20</th></tr>${e.map(([p,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(p)}</b></td><td align="right">${esc(v.last)}</td><td align="center">${spark16(v.spark)}</td><td align="right">${nfmt(v.chg1d,'%',true)}</td><td align="right">${nfmt(v.chg5d,'%',true)}</td><td align="right">${nfmt(v.chg20d,'%',true)}</td><td align="right">${f(v.rsi)}</td><td align="right">${f(v.atrPct)}</td><td>&nbsp;${esc(v.trend||(v.vsSma20?'harga '+v.vsSma20+' SMA20':'-'))}</td><td align="right">${v.pos20==null?'-':v.pos20+'%'}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Data HARIAN (bukan real-time; bar terakhir bisa belum final) per ${esc(j.px.asOf||'-')} ${ageTag14(j.px.asOf,5)} • sumber: ${esc([...new Set(e.map(([,v])=>v.src).filter(Boolean))].join(', '))}.${e.some(([,v])=>v.live)?' Emas memakai harga spot terbaru (gold-api.com).':''} Grafik mini = 30 penutupan harian terakhir.</div></div>`;
 }
 const HK16=()=>'prohist_'+((user&&user.uid)||'x');
 function histGet16(){try{return JSON.parse(localStorage.getItem(HK16())||'[]')}catch(e){return[]}}
@@ -1470,7 +1470,7 @@ function fundHtml17(j){
   const fv=j.fv;if(!fv||!Object.keys(fv).length)return'';
   const c=(x,u)=>x?`<span title="${esc(x.date)}">${esc(x.v)}${u}</span>`:'<span class="mut">-</span>';
   const t=v=>v==null?'<span class="mut">-</span>':(v>0?'🟢 ':v<0?'🔴 ':'')+(v>0?'+':'')+v;
-  return `<div class="card"><h3>🌍 Fundamental global per mata uang</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Mata uang</th><th align="right">Bunga</th><th align="right">Inflasi YoY</th><th align="right">Penganggur.</th><th align="right">Yield 10Y</th><th align="right">Bunga riil</th><th align="right">Nada CB</th></tr>${Object.entries(fv).map(([k,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(k)}</b></td><td align="right">${c(v.rate,'%')}</td><td align="right">${c(v.cpi,'%')}</td><td align="right">${c(v.ur,'%')}</td><td align="right">${c(v.y10,'%')}</td><td align="right">${v.real==null?'<span class="mut">-</span>':esc(v.real)+'pp'}</td><td align="right">${t(v.tone)}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Sumber: FRED/OECD (bulanan, bisa tertinggal 1-3 bulan), USD memakai EFFR & Treasury terbaru, EUR memakai suku bunga deposit ECB. Arahkan kursor ke angka untuk melihat tanggal data. Data yang usang atau tidak wajar otomatis tidak dipakai. Bunga riil = bunga kebijakan − inflasi YoY.</div></div>`;
+  return `<div class="card"><h3>🌍 Fundamental global per mata uang</h3><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr class="mut"><th align="left">Mata uang</th><th align="right">Bunga</th><th align="right">Inflasi YoY</th><th align="right">Penganggur.</th><th align="right">Yield 10Y</th><th align="right">Bunga riil</th><th align="right">Nada CB</th></tr>${Object.entries(fv).map(([k,v])=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 2px"><b>${esc(k)}</b></td><td align="right">${c(v.rate,'%')}</td><td align="right">${c(v.cpi,'%')}</td><td align="right">${c(v.ur,'%')}</td><td align="right">${c(v.y10,'%')}</td><td align="right">${v.real==null?'<span class="mut">-</span>':esc(v.real)+'pp'}</td><td align="right">${t(v.tone)}</td></tr>`).join('')}</table></div><div class="mut small" style="margin-top:6px">Sumber: FRED/OECD (bulanan, bisa tertinggal 1-3 bulan), USD memakai EFFR & Treasury terbaru, EUR memakai suku bunga deposit ECB. Arahkan kursor ke angka untuk melihat tanggal data. Data yang usang atau tidak wajar otomatis tidak dipakai. Bunga riil = bunga 3M antarbank (proksi kebijakan; USD memakai EFFR, EUR memakai deposit ECB) − inflasi YoY; inflasi USD & EUR dihitung YoY dari indeks harga resmi terbaru, inflasi AUD dari RBA (G1) dan inflasi + pengangguran GBP dari ONS. Inflasi NZD/CHF otomatis terisi bila <code>FUND_JSON_URL</code> diarahkan ke endpoint <code>/api/fund</code> proyek ini; pengangguran NZD/CHF butuh <code>FUND_UPSTREAM_URL</code> dari vendor.</div></div>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 📰 Trading → News — fungsi cbHtml17(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function cbHtml17(j){
