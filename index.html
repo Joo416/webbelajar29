@@ -7,40 +7,40 @@
 <!-- ✏️ [TEKS BISA DIUBAH] Judul tab browser (nama web) — ganti tulisan di antara <title> dan </title> -->
 <title>Ruang Belajar</title>
 <style>
-:root{--bg:#0f1226;--card:#1a1e3a;--line:#2b3160;--tx:#eef0ff;--mut:#9aa3d6;--a:#7c8cff;--b:#3ddbb0;--bad:#ff6b8a}
+:root{--bg:#0a0a0a;--card:#141414;--line:#2b2b2b;--tx:#f2f2f2;--mut:#a0a0a0;--a:#ffffff;--b:#e6e6e6;--bad:#8f8f8f}
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--tx);background:radial-gradient(1000px 500px at 10% -10%,#2a2f6b 0,transparent 60%),radial-gradient(800px 400px at 100% 0,#13524a 0,transparent 55%),var(--bg);min-height:100vh}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--tx);background:var(--bg);min-height:100vh;-webkit-font-smoothing:antialiased}
 .wrap{max-width:780px;margin:0 auto;padding:20px 16px 60px}
 h1{font-size:1.5rem;margin:6px 0 2px}.sub{color:var(--mut);font-size:.9rem;margin-bottom:18px}
 .tabs,.stabs{display:flex;gap:6px;background:var(--card);padding:6px;border-radius:14px;border:1px solid var(--line);margin-bottom:14px}
 .tabs button,.stabs button{flex:1;padding:10px 4px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:600;font-size:.88rem;cursor:pointer}
-.tabs button.on,.stabs button.on{background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 30px #0004}
+.tabs button.on,.stabs button.on{background:var(--tx);color:#0a0a0a}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
 .card h3{margin:0 0 12px;font-size:1rem}
 label{display:block;font-size:.8rem;color:var(--mut);margin:10px 0 5px}
-select,textarea,input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#12152e;color:var(--tx);font:inherit}
+select,textarea,input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#101010;color:var(--tx);font:inherit}
 input[type=checkbox]{width:18px;height:18px;margin-top:3px}
 textarea{min-height:90px;resize:vertical;font-size:.88rem}
 .row{display:flex;gap:10px}.row>*{flex:1}
-.btn{padding:12px 16px;border:0;border-radius:12px;font-weight:700;cursor:pointer;color:#06231c;background:linear-gradient(135deg,var(--b),#7cf0d0);font-size:.95rem}
-.btn.alt{background:#262b55;color:var(--tx)}.btn.red{background:#4a1a2c;color:#ffb3c4}.btn.full{width:100%;margin-top:14px}
-.bar{height:8px;background:#12152e;border-radius:99px;overflow:hidden;margin-bottom:14px}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b));transition:width .3s}
+.btn{padding:12px 16px;border:0;border-radius:12px;font-weight:700;cursor:pointer;color:#0a0a0a;background:var(--tx);font-size:.95rem}
+.btn.alt{background:#242424;color:var(--tx);border:1px solid var(--line)}.btn.red{background:#2a2a2a;color:#e8e8e8}.btn.full{width:100%;margin-top:14px}
+.bar{height:8px;background:#1c1c1c;border-radius:99px;overflow:hidden;margin-bottom:14px}
+.bar i{display:block;height:100%;background:var(--tx);transition:width .3s}
 .q{font-size:1.1rem;line-height:1.5;margin:6px 0 16px}
-.opt{display:block;width:100%;text-align:left;padding:13px 14px;margin-bottom:9px;border-radius:12px;border:1.5px solid var(--line);background:#12152e;color:var(--tx);font:inherit;cursor:pointer}
-.opt:hover:not(:disabled){border-color:var(--a)}.opt.ok{border-color:var(--b);background:#12352f}.opt.no{border-color:var(--bad);background:#3a1626}
-.exp{margin-top:12px;padding:12px;border-radius:12px;background:#12152e;color:var(--mut);font-size:.9rem;line-height:1.5}
-.big{font-size:3rem;font-weight:800;text-align:center;background:linear-gradient(135deg,var(--a),var(--b));-webkit-background-clip:text;color:transparent}
+.opt{display:block;width:100%;text-align:left;padding:13px 14px;margin-bottom:9px;border-radius:12px;border:1.5px solid var(--line);background:#101010;color:var(--tx);font:inherit;cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--tx)}.opt.ok{border-color:var(--tx);background:#232323}.opt.no{border-color:#4d4d4d;background:#141414;color:#b5b5b5}
+.exp{margin-top:12px;padding:12px;border-radius:12px;background:#131313;color:var(--mut);font-size:.9rem;line-height:1.5}
+.big{font-size:3rem;font-weight:800;text-align:center;color:var(--tx)}
 .item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}.item:last-child{border:0}
 .mut{color:var(--mut)}.small{font-size:.85rem}
-.warn{background:#3a2a10;border:1px solid #7a5a1a;color:#ffd48a;padding:12px;border-radius:12px;font-size:.85rem;margin-bottom:14px}
+.warn{background:#191919;border:1px solid #3a3a3a;color:#ededed;padding:12px;border-radius:12px;font-size:.85rem;margin-bottom:14px}
 .note{padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem;white-space:pre-wrap}
 #chat{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px}
 .msg{padding:11px 13px;border-radius:14px;font-size:.92rem;line-height:1.55;max-width:92%}
-.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--a),#a07cff);color:#fff}
-.msg.assistant{align-self:flex-start;background:#12152e;border:1px solid var(--line)}
+.msg.user{align-self:flex-end;background:var(--tx);color:#0a0a0a}
+.msg.assistant{align-self:flex-start;background:#161616;border:1px solid var(--line)}
 .gi{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9rem;line-height:1.5}
-.gi>div{flex:1}.x{border:0;background:#4a1a2c;color:#ffb3c4;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
+.gi>div{flex:1}.x{border:0;background:#242424;color:#e8e8e8;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
@@ -139,7 +139,7 @@ if(auth)auth.onAuthStateChanged(u=>{
 <script>
 /* ===== UPDATE V3 ===== */
 let mo,rt;
-function renderMath(){if(!window.renderMathInElement)return;mo.disconnect();try{renderMathInElement($('app'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})}catch(e){}mo.observe($('app'),{childList:true,subtree:true})}
+function renderMath(){if(!window.renderMathInElement)return;const ap=$('app');if(!ap)return;const tx=ap.textContent||'';if(tx.indexOf('\\(')<0&&tx.indexOf('\\[')<0)return;mo.disconnect();try{renderMathInElement($('app'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})}catch(e){}mo.observe($('app'),{childList:true,subtree:true})}
 mo=new MutationObserver(()=>{clearTimeout(rt);rt=setTimeout(renderMath,60)});mo.observe($('app'),{childList:true,subtree:true});
 const fmtT=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 const nk=q=>String(q).toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -208,7 +208,7 @@ const avg=a=>Math.round(a.reduce((p,c)=>p+c,0)/a.length);
 </script>
 <script>
 /* ===== UPDATE V5 ===== */
-document.head.insertAdjacentHTML('beforeend','<style>.opt.sel{border-color:var(--a);background:#1d2250}.nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.nb{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#12152e;color:var(--tx);cursor:pointer;font-size:.8rem}.nb.done{background:#12352f;border-color:var(--b)}.nb.flag{border-color:#ffd48a;background:#3a2a10}.nb.cur{outline:2px solid var(--a)}a{word-break:break-all}.btn:disabled{opacity:.4}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>.opt.sel{border-color:var(--tx);background:#1c1c1c}.nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.nb{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#101010;color:var(--tx);cursor:pointer;font-size:.8rem}.nb.done{background:#2b2b2b;border-color:var(--tx)}.nb.flag{border-color:#8a8a8a;background:#1b1b1b}.nb.cur{outline:2px solid var(--tx)}a{word-break:break-all}.btn:disabled{opacity:.4}</style>');
 let SRC=[],LT=0,RV={};
 const hostOf=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return u}};
 const optL=(i)=>String.fromCharCode(65+i);
@@ -306,7 +306,7 @@ function show(){
   if(t==='essay')body=`<textarea id="esa" style="min-height:140px" placeholder="${isEng()?'Write your answer here...':'Tulis jawabanmu di sini...'}" ${rev?'disabled':''} oninput="S.sel[S.i]=this.value;saveProg()">${esc(sel||'')}</textarea>${rev||S.exam?'':'<button class="btn full" onclick="submitEssay()">Kirim jawaban</button>'}`;
   else if(t==='multi')body=`<div class="mut small" style="margin-bottom:8px">${isEng()?'Choose ALL correct answers.':'Pilih SEMUA jawaban yang benar.'}</div>`+q.o.map((o,k)=>{const on=(sel||[]).includes(k);return `<button class="opt ${rev?(q.a.includes(k)?'ok':on?'no':''):(on?'sel':'')}" ${rev?'disabled':''} onclick="tog(${k})">${on?'☑':'☐'} ${optL(k)}. ${esc(o)}</button>`}).join('')+(rev||S.exam?'':'<button class="btn full" onclick="lockMulti()">Periksa jawaban</button>');
   else body=q.o.map((o,k)=>`<button class="opt ${rev?(k===q.a?'ok':k===sel?'no':''):(sel===k?'sel':'')}" ${rev?'disabled':''} onclick="pick(${k})">${optL(k)}. ${esc(o)}</button>`).join('');
-  $('app').innerHTML=`<div class="card"><div class="mut small" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>${esc(S.mapel)} • ${i+1}/${S.qs.length}${S.retry?' • ulangi salah':''}</span><span>${S.exam?`<b id="tmr">${fmtT(S.left)}</b> `:''}<button class="x" style="background:#262b55;color:#eef0ff" onclick="quit()">✕ Keluar</button></span></div>
+  $('app').innerHTML=`<div class="card"><div class="mut small" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>${esc(S.mapel)} • ${i+1}/${S.qs.length}${S.retry?' • ulangi salah':''}</span><span>${S.exam?`<b id="tmr">${fmtT(S.left)}</b> `:''}<button class="x" style="background:#242424;color:#f2f2f2" onclick="quit()">✕ Keluar</button></span></div>
     <div class="bar"><i style="width:${S.qs.filter((_,k)=>answered(k)).length/S.qs.length*100}%"></i></div>
     ${q.teks?`<div class="exp" style="margin-bottom:12px;max-height:280px;overflow:auto;color:var(--tx)">📖 ${fmt(q.teks)}</div>`:''}<div class="q">${esc(q.q)}</div>${body}
     <div id="fb">${rev?fbHtml(q):''}</div>
@@ -382,12 +382,12 @@ async function kAI(w){if(!$('kai'))return;($('kai')||{}).innerHTML='<div class="
 async function kAZ(pre,more){
   if(pre!==undefined&&!more){KM.pre=pre;KM.pg=100}if(more)KM.pg+=100;
   const L='abcdefghijklmnopqrstuvwxyz'.split('');
-  $('kbody').innerHTML=`<div class="card"><h3>🔤 Jelajah kata</h3><div class="mut small" style="margin-bottom:8px">Pilih huruf, atau ketik awalan apa saja (misal "inter") untuk menampilkan hingga 1000 kata berawalan itu.</div><div style="display:flex;flex-wrap:wrap;gap:6px">${L.map(c=>`<button class="x" style="background:#262b55;color:#eef0ff" onclick="kAZ('${c}')">${c.toUpperCase()}</button>`).join('')}</div>
+  $('kbody').innerHTML=`<div class="card"><h3>🔤 Jelajah kata</h3><div class="mut small" style="margin-bottom:8px">Pilih huruf, atau ketik awalan apa saja (misal "inter") untuk menampilkan hingga 1000 kata berawalan itu.</div><div style="display:flex;flex-wrap:wrap;gap:6px">${L.map(c=>`<button class="x" style="background:#242424;color:#f2f2f2" onclick="kAZ('${c}')">${c.toUpperCase()}</button>`).join('')}</div>
     <div class="row" style="margin-top:10px"><input id="kp" placeholder="awalan, contoh: inter" value="${esc(KM.pre)}" onkeydown="if(event.key==='Enter')kAZ(this.value.trim().toLowerCase())"><button class="btn" style="flex:0 0 auto" onclick="kAZ($('kp').value.trim().toLowerCase())">Tampilkan</button></div>
-    ${KM.pre&&KM.pre.length===1?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${L.map(c=>`<button class="x" style="background:#1d2250;color:#eef0ff" onclick="kAZ('${KM.pre}${c}')">${KM.pre}${c}</button>`).join('')}</div>`:''}<div id="kaz" class="mut small" style="margin-top:12px"></div></div>`;
+    ${KM.pre&&KM.pre.length===1?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${L.map(c=>`<button class="x" style="background:#1c1c1c;color:#f2f2f2" onclick="kAZ('${KM.pre}${c}')">${KM.pre}${c}</button>`).join('')}</div>`:''}<div id="kaz" class="mut small" style="margin-top:12px"></div></div>`;
   if(!KM.pre)return;($('kaz')||{}).textContent='⏳ Memuat...';
   try{const r=await fetch('https://api.datamuse.com/words?max=1000&sp='+encodeURIComponent(KM.pre)+'*'),j=await r.json(),ws=j.map(x=>x.word).filter(w=>/^[a-z]+$/.test(w)).sort();
-    ($('kaz')||{}).innerHTML=`<div style="margin-bottom:8px">${ws.length} kata berawalan "<b>${esc(KM.pre)}</b>"${ws.length>=1000?' (maks. 1000, persempit awalan untuk melihat lebih banyak)':''}</div><div style="display:flex;flex-wrap:wrap;gap:6px">${ws.slice(0,KM.pg).map(w=>`<button class="x" style="background:#12152e;color:var(--tx);border:1px solid var(--line)" onclick="kPick('${w}')">${w}</button>`).join('')}</div>${ws.length>KM.pg?`<button class="btn alt full" onclick="kAZ(undefined,true)">Muat lebih banyak</button>`:''}`;
+    ($('kaz')||{}).innerHTML=`<div style="margin-bottom:8px">${ws.length} kata berawalan "<b>${esc(KM.pre)}</b>"${ws.length>=1000?' (maks. 1000, persempit awalan untuk melihat lebih banyak)':''}</div><div style="display:flex;flex-wrap:wrap;gap:6px">${ws.slice(0,KM.pg).map(w=>`<button class="x" style="background:#101010;color:var(--tx);border:1px solid var(--line)" onclick="kPick('${w}')">${w}</button>`).join('')}</div>${ws.length>KM.pg?`<button class="btn alt full" onclick="kAZ(undefined,true)">Muat lebih banyak</button>`:''}`;
   }catch(e){($('kaz')||{}).textContent='Gagal memuat daftar kata.'}
 }
 /* ===== END V6 ===== */
@@ -403,7 +403,7 @@ const USE={
 };
 const KH=()=>{try{return JSON.parse(localStorage.getItem('khist')||'[]')}catch(e){return[]}};
 function addHist(w){const h=[w,...KH().filter(x=>x!==w)].slice(0,12);try{localStorage.setItem('khist',JSON.stringify(h))}catch(e){}}
-const chip=w=>`<button class="x" style="background:#262b55;color:#eef0ff;margin:2px" onclick="kPick('${String(w).replace(/[^a-zA-Z' -]/g,'')}')">${esc(w)}</button>`;
+const chip=w=>`<button class="x" style="background:#242424;color:#f2f2f2;margin:2px" onclick="kPick('${String(w).replace(/[^a-zA-Z' -]/g,'')}')">${esc(w)}</button>`;
 // ✏️ [TEKS BISA DIUBAH] 📚 Kamus Inggris — fungsi kamusView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function kamusView(){
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
@@ -457,7 +457,7 @@ function kFlash(){FC={list:shuffle(S.kw||[]),i:0,show:false,ok:0};kFC()}
 function kFC(){
   if(FC.i>=FC.list.length){$('kbody').innerHTML=`<div class="card"><div class="big">${Math.round(FC.ok/Math.max(1,FC.list.length)*100)}</div><div style="text-align:center" class="mut">Hafal ${FC.ok} dari ${FC.list.length}</div><button class="btn full" onclick="kFlash()">🔁 Ulangi</button><button class="btn alt full" onclick="kSaved()">Kembali</button></div>`;return}
   const x=FC.list[FC.i];
-  $('kbody').innerHTML=`<div class="card" style="text-align:center"><div class="mut small">${FC.i+1}/${FC.list.length}</div><h2 style="margin:18px 0">${esc(x.w)}</h2><button class="x" style="background:#262b55;color:#eef0ff" onclick="speak('${esc(x.w).replace(/'/g,'')}')">🔊</button>
+  $('kbody').innerHTML=`<div class="card" style="text-align:center"><div class="mut small">${FC.i+1}/${FC.list.length}</div><h2 style="margin:18px 0">${esc(x.w)}</h2><button class="x" style="background:#242424;color:#f2f2f2" onclick="speak('${esc(x.w).replace(/'/g,'')}')">🔊</button>
     ${FC.show?`<div style="margin:16px 0;font-size:1.2rem"><b>${esc(x.arti||'(arti belum tersimpan)')}</b></div><div class="row"><button class="btn alt" onclick="FC.i++;FC.show=false;kFC()">Belum hafal</button><button class="btn" onclick="FC.ok++;FC.i++;FC.show=false;kFC()">Hafal ✔</button></div>`:`<button class="btn full" onclick="FC.show=true;kFC()">Tampilkan arti</button>`}<button class="btn alt full" onclick="kSaved()">Selesai</button></div>`;
 }
 /* ---- latihan verb V1-V2-V3 ---- */
@@ -497,7 +497,7 @@ function kSug(v){
 }
 function kGo(){const v=($('kq').value||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[^a-z' -]/g,'').trim();if(v){KM.tab='cari';KM.w=v;kamusView()}}
 const spk=el=>speak(el.dataset.t);
-const spBtn=t=>`<button class="x" style="background:#262b55;color:#eef0ff" data-t="${esc(t)}" onclick="spk(this)">🔊</button>`;
+const spBtn=t=>`<button class="x" style="background:#242424;color:#f2f2f2" data-t="${esc(t)}" onclick="spk(this)">🔊</button>`;
 let ITEMS={};
 function fillEnr(j){
   const ar=$('kar');if(ar&&j.arti)ar.textContent=j.arti;
@@ -526,7 +526,7 @@ let ITEMLIST=[];
 async function verbCard(w,d,base){
   const vb=base||w,f=verbForms(vb),forms=[...new Set([f.v1,...f.v2.split('/'),...f.v3.split('/'),f.ing,f.s])],ph={};
   await Promise.all(forms.map(async x=>{ph[x]=phon(x===w?d:await dict(x))}));
-  const cell=x=>x.split('/').map(y=>`<div style="margin-bottom:4px"><b>${esc(y)}</b> <button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(ph[y]&&ph[y].a||'')}','${esc(y)}')">🔊</button> <span class="mut small">${esc(ph[y]&&ph[y].t||'')}</span></div>`).join('');
+  const cell=x=>x.split('/').map(y=>`<div style="margin-bottom:4px"><b>${esc(y)}</b> <button class="x" style="background:#242424;color:#f2f2f2" onclick="playAudio('${esc(ph[y]&&ph[y].a||'')}','${esc(y)}')">🔊</button> <span class="mut small">${esc(ph[y]&&ph[y].t||'')}</span></div>`).join('');
   return `<div class="card"><h3>🔁 Verb "${esc(f.v1)}" ${f.irr?'(irregular)':'(regular — bentuk dibuat dari aturan ejaan, cek ulang bila ragu)'}</h3>${IRRREV[w]?`<div class="mut small" style="margin-bottom:8px">"${esc(w)}" adalah bentuk lampau/participle dari "${esc(base)}".</div>`:''}
   ${['v1','v2','v3','ing','s'].map(k=>`<div class="exp" style="margin-bottom:10px;color:var(--tx)"><div style="color:var(--b);font-weight:700">${USE[k][0]}</div><div style="margin:6px 0">${cell(f[k])}</div><div class="small"><b>Kapan dipakai:</b> ${esc(USE[k][1])}</div><div class="small mut" style="margin-top:4px"><b>Pola:</b> ${esc(USE[k][2])}</div><div id="ex_${k}" class="small" style="margin-top:8px"><span class="mut">⏳ contoh kalimat...</span></div></div>`).join('')}<div id="ex_tip"></div></div>`;
 }
@@ -552,7 +552,7 @@ async function kLookup(w){
   const vb=base||(d&&d.some(e=>(e.meanings||[]).some(m=>m.partOfSpeech==='verb'))?w:null);
   const vf=vb?await verbCard(w,d,base):'';if(!live())return;
   const saved=(S.kw||[]).some(x=>x.w===w);
-  box.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(w)}</h2><span class="mut">${esc(p.t)}</span><button class="x" style="background:#262b55;color:#eef0ff" onclick="playAudio('${esc(p.a)}','${esc(w)}')">🔊 Dengar</button><button id="ksv" class="x" style="background:#262b55;color:#eef0ff" onclick="saveWord('${esc(w)}',${JSON.stringify(tr||'').replace(/"/g,'&quot;')})">${saved?'★ Tersimpan':'☆ Simpan'}</button></div>
+  box.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(w)}</h2><span class="mut">${esc(p.t)}</span><button class="x" style="background:#242424;color:#f2f2f2" onclick="playAudio('${esc(p.a)}','${esc(w)}')">🔊 Dengar</button><button id="ksv" class="x" style="background:#242424;color:#f2f2f2" onclick="saveWord('${esc(w)}',${JSON.stringify(tr||'').replace(/"/g,'&quot;')})">${saved?'★ Tersimpan':'☆ Simpan'}</button></div>
     <div style="margin:10px 0">🇮🇩 <b id="kar">${esc(tr||'…')}</b> <span class="mut small">(arti umum, cek ulang)</span></div>${defs||'<div class="mut small">Definisi tidak tersedia untuk bentuk kata ini.</div>'}<div id="kretry"></div>
     <button class="btn alt full" onclick="kAI('${esc(w).replace(/'/g,'')}')">🤖 Penjelasan tambahan, kolokasi & kesalahan umum</button><div id="kai"></div></div>${vf}`;
   if(items.length)kEnrich(w,items);
@@ -653,7 +653,7 @@ async function savePro(){
 </script>
 <script>
 /* ===== UPDATE V11: kontrol akses (izin / blokir pengguna) ===== */
-document.head.insertAdjacentHTML('beforeend','<style>.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:700}.b-aktif{background:#12352f;color:var(--b)}.b-menunggu{background:#3a2a10;color:#ffd48a}.b-diblokir{background:#3a1626;color:var(--bad)}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:700}.b-aktif{background:#232323;color:var(--tx)}.b-menunggu{background:#1b1b1b;color:#e8e8e8;border:1px solid #3a3a3a}.b-diblokir{background:#141414;color:#b5b5b5;border:1px solid #4d4d4d}</style>');
 const tsNow=()=>firebase.firestore.FieldValue.serverTimestamp();
 const tabsShow=v=>{document.querySelector('.tabs').style.display=v?'':'none'};
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi gate(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -752,7 +752,7 @@ const seenGet=()=>{try{return JSON.parse(localStorage.getItem('seen_'+user.uid)|
 function seenAdd(qs){const m=seenGet();qs.forEach(q=>{const k=seenKey(q);m[k]=(m[k]||0)+1});try{localStorage.setItem('seen_'+user.uid,JSON.stringify(m))}catch(e){}}
 
 /* ---- BUAT SOAL ---- */
-function chipsHtml(){const lv=$('gl')?$('gl').value:S.glv;return topicList(lv).map(t=>`<button class="x" style="background:#262b55;color:#eef0ff;margin:3px" data-t="${esc(t)}" onclick="$('gt').value=this.dataset.t">${esc(t)}</button>`).join('')}
+function chipsHtml(){const lv=$('gl')?$('gl').value:S.glv;return topicList(lv).map(t=>`<button class="x" style="background:#242424;color:#f2f2f2;margin:3px" data-t="${esc(t)}" onclick="$('gt').value=this.dataset.t">${esc(t)}</button>`).join('')}
 function refreshChips(){S.glv=$('gl').value;setTxt('gchips','');const b=$('gchips');if(b)b.innerHTML=chipsHtml()}
 // ✏️ [TEKS BISA DIUBAH] ✨ TKA & Sekolah → Buat soal & kurikulum — fungsi randTopic(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function randTopic(){
@@ -864,7 +864,7 @@ function drawBank(){
   const q=($('bq')?$('bq').value:'').toLowerCase().trim(),bt=$('bt')?$('bt').value:'',bj=$('bj')?$('bj').value:'';
   const rows=S.bank.filter(x=>(!q||String(x.q).toLowerCase().includes(q))&&(!bt||(bt==='__none'?!x.tingkat:x.tingkat===bt))&&(!bj||(x.tipe||'pg')===bj));
   setTxt('bsum',`${rows.length} dari ${S.bank.length} soal`);
-  $('bl').innerHTML=S.bank.length?(rows.length?rows.map(x=>x.id===S.edit?editForm(x):`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(ansTxt(x))}${TL[x.tipe]?' • '+TL[x.tipe]:''}${x.tingkat?' • 🎓 '+esc(x.tingkat):''}${x.teks?' • 📖 bacaan':''}${x.sub?' • 🏷 '+esc(x.sub):''}${x.sumber==='ai'?' • 🤖':''}${x.src&&x.src.length?' • 📚 '+x.src.length+' sumber':''}</div></div><button class="x" style="background:#262b55;color:#eef0ff" onclick="S.edit='${x.id}';drawBank()">✏️</button><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join(''):'<div class="mut small">Tidak ada soal yang cocok dengan filter.</div>')+`<button class="btn alt full" onclick="expBank()">⬇️ Ekspor JSON (cadangan)</button><button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Soal atau tambah manual.';
+  $('bl').innerHTML=S.bank.length?(rows.length?rows.map(x=>x.id===S.edit?editForm(x):`<div class="gi"><div><b>${esc(x.q)}</b><div class="mut small">✅ ${esc(ansTxt(x))}${TL[x.tipe]?' • '+TL[x.tipe]:''}${x.tingkat?' • 🎓 '+esc(x.tingkat):''}${x.teks?' • 📖 bacaan':''}${x.sub?' • 🏷 '+esc(x.sub):''}${x.sumber==='ai'?' • 🤖':''}${x.src&&x.src.length?' • 📚 '+x.src.length+' sumber':''}</div></div><button class="x" style="background:#242424;color:#f2f2f2" onclick="S.edit='${x.id}';drawBank()">✏️</button><button class="x" onclick="del('${x.id}')">🗑</button></div>`).join(''):'<div class="mut small">Tidak ada soal yang cocok dengan filter.</div>')+`<button class="btn alt full" onclick="expBank()">⬇️ Ekspor JSON (cadangan)</button><button class="btn red full" onclick="delAll()">Hapus semua soal ${esc(S.mapel)}</button>`:'Belum ada soal. Buat dengan ✨ Soal atau tambah manual.';
 }
 // ✏️ [TEKS BISA DIUBAH] 🗂 TKA & Sekolah → Bank soal — fungsi delDupes(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function delDupes(){
@@ -924,7 +924,7 @@ function pPro(){
   let c=null;try{c=JSON.parse(localStorage.getItem('pro_last'))}catch(e){}
   $('pane').innerHTML=`<div class="card"><h3>🧠 Analisis Pro — arah bias per pair</h3>
     <div class="mut small" style="margin-bottom:10px">Setiap klik "Analisis mendalam sekarang" mengambil ULANG semua data dari sumbernya tanpa cache (kalender terverifikasi, angka BLS, suku bunga NY Fed, yield Treasury, harga harian Stooq/Yahoo, posisi spekulan CFTC, fundamental FRED/OECD, dan berita tepercaya), lalu menyusun bias dengan kerangka trader profesional. AI tidak "mengingat" situs; hanya data yang tampil di bawah yang dipakai. Edukasi, bukan saran finansial.</div>
-    <label>Pair yang dianalisis</label><div id="ppairs" style="display:flex;flex-wrap:wrap;gap:6px">${ALLP.map(p=>`<button class="x" style="background:${PRP.sel.includes(p)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${p}')">${p}</button>`).join('')}</div>
+    <label>Pair yang dianalisis</label><div id="ppairs" style="display:flex;flex-wrap:wrap;gap:6px">${ALLP.map(p=>`<button class="x" style="background:${PRP.sel.includes(p)?'var(--a)':'#242424'};color:#fff;padding:7px 10px" onclick="ppToggle('${p}')">${p}</button>`).join('')}</div>
     <label>Horizon</label><select onchange="PRP.hz=this.value;prpSave16()">${['hari ini','1-5 hari','1-2 minggu'].map(h=>`<option ${PRP.hz===h?'selected':''}>${h}</option>`).join('')}</select>
     <button class="btn full" id="pbtn" onclick="runPro()">🧠 Analisis mendalam sekarang</button><div id="pmsg" class="mut small" style="margin-top:8px"></div></div><div id="pres"></div>`;
   if(c)renderPro2(c,true);
@@ -1127,7 +1127,7 @@ async function saveGen(){
 // ✏️ [TEKS BISA DIUBAH] ✨ TKA & Sekolah → Buat soal & kurikulum — fungsi drawGen(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function drawGen(){
   if(!$('gres'))return;
-  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div>${x.teks&&(i===0||S.gen[i-1].teks!==x.teks)?`<div class="exp" style="margin-bottom:8px">📖 ${fmt(x.teks)}</div>`:''}<b>${i+1}. ${esc(x.q)}</b> ${TL[x.tipe]?`<span class="mut small">[${TL[x.tipe]}]</span>`:''}${x.uv?' <span class="small" style="color:#ffd48a">⚠️ belum terverifikasi</span>':''}<div class="mut">${x.tipe==='essay'?'✅ '+esc(x.k)+((x.kw||[]).length?'<br>🔑 '+esc(x.kw.join(', ')):''):x.o.map((o,k)=>((x.tipe==='multi'?x.a.includes(k):k===x.a)?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e||'')}</div>${i===0?srcLinks(x):''}</div><button class="x" onclick="dropGen13(${i})">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
+  $('gres').innerHTML=S.gen.length?`<div class="card"><h3>Pratinjau (${S.gen.length})</h3>${S.gen.map((x,i)=>`<div class="gi"><input type="checkbox" id="g${i}" checked><div>${x.teks&&(i===0||S.gen[i-1].teks!==x.teks)?`<div class="exp" style="margin-bottom:8px">📖 ${fmt(x.teks)}</div>`:''}<b>${i+1}. ${esc(x.q)}</b> ${TL[x.tipe]?`<span class="mut small">[${TL[x.tipe]}]</span>`:''}${x.uv?' <span class="small" style="color:#e8e8e8">⚠️ belum terverifikasi</span>':''}<div class="mut">${x.tipe==='essay'?'✅ '+esc(x.k)+((x.kw||[]).length?'<br>🔑 '+esc(x.kw.join(', ')):''):x.o.map((o,k)=>((x.tipe==='multi'?x.a.includes(k):k===x.a)?'✅ ':'• ')+esc(o)).join('<br>')}</div><div class="mut">💡 ${esc(x.e||'')}</div>${i===0?srcLinks(x):''}</div><button class="x" onclick="dropGen13(${i})">✕</button></div>`).join('')}<button class="btn full" onclick="saveGen()">💾 Simpan yang dicentang ke Bank Soal</button></div>`:'';
 }
 function dropGen13(i){const ck=S.gen.map((_,k)=>!$('g'+k)||$('g'+k).checked);S.gen.splice(i,1);ck.splice(i,1);drawGen();ck.forEach((c,k)=>{if($('g'+k))$('g'+k).checked=c})}
 
@@ -1171,7 +1171,7 @@ function calHtml(j){
   const t0=Date.now()-6*3600000;
   const ev=(j.calendar||[]).filter(e=>e.ts>=t0&&(!NF.high||e.impact==='High')&&(NF.cur==='ALL'||e.cur===NF.cur)&&(!NF.key||e.tag));
   const by={};ev.forEach(e=>{const k=ldt(e.ts,{weekday:'long',day:'numeric',month:'long'});(by[k]=by[k]||[]).push(e)});
-  return Object.keys(by).length?Object.entries(by).map(([d,a])=>`<div style="margin-top:12px"><div style="font-weight:700;color:var(--b)">${esc(d)}</div>${a.map(e=>`<div class="item" style="align-items:flex-start"><span><b>${esc(ldt(e.ts,{hour:'2-digit',minute:'2-digit'}))}</b> <span class="x" style="background:#262b55;color:#eef0ff;padding:2px 6px">${esc(e.cur)}</span> ${e.impact==='High'?'🔴':'🟠'} ${e.tag?`<b style="color:var(--b)">${esc(e.title)}</b>`:esc(e.title)}${e.resmi?' <span class="small">📌 dari jadwal resmi (forecast tidak tersedia)</span>':e.verified==='official'?' <span class="small">✅ jadwal dikonfirmasi sumber resmi</span>':e.verified==='conflict'?` <span class="small" style="color:#ffd48a">⚠️ konflik dengan jadwal resmi${e.officialDate?' ('+esc(e.officialDate)+')':''}</span>`:''}</span><span class="small mut" style="text-align:right;white-space:nowrap">${e.actual?'Aktual <b>'+esc(e.actual)+'</b><br>':''}Forecast ${esc(e.forecast||'-')}<br>Prev ${esc(e.previous||'-')}</span></div>`).join('')}</div>`).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada event sesuai filter (atau kalender belum tersedia).</div>';
+  return Object.keys(by).length?Object.entries(by).map(([d,a])=>`<div style="margin-top:12px"><div style="font-weight:700;color:var(--b)">${esc(d)}</div>${a.map(e=>`<div class="item" style="align-items:flex-start"><span><b>${esc(ldt(e.ts,{hour:'2-digit',minute:'2-digit'}))}</b> <span class="x" style="background:#242424;color:#f2f2f2;padding:2px 6px">${esc(e.cur)}</span> ${e.impact==='High'?'🔴':'🟠'} ${e.tag?`<b style="color:var(--b)">${esc(e.title)}</b>`:esc(e.title)}${e.resmi?' <span class="small">📌 dari jadwal resmi (forecast tidak tersedia)</span>':e.verified==='official'?' <span class="small">✅ jadwal dikonfirmasi sumber resmi</span>':e.verified==='conflict'?` <span class="small" style="color:#e8e8e8">⚠️ konflik dengan jadwal resmi${e.officialDate?' ('+esc(e.officialDate)+')':''}</span>`:''}</span><span class="small mut" style="text-align:right;white-space:nowrap">${e.actual?'Aktual <b>'+esc(e.actual)+'</b><br>':''}Forecast ${esc(e.forecast||'-')}<br>Prev ${esc(e.previous||'-')}</span></div>`).join('')}</div>`).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada event sesuai filter (atau kalender belum tersedia).</div>';
 }
 function nfSet(k,v){NF[k]=v;drawCal()} /* hanya kalender yang digambar ulang: hasil/analisis AI yang sedang berjalan tidak hilang */
 /* ===== END V13 ===== */
@@ -1185,7 +1185,7 @@ function ageDays14(d){
   d=String(d||'');const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d),iso=m?`${m[3]}-${m[1]}-${m[2]}`:d.slice(0,10),t=Date.parse(iso+'T00:00:00Z');
   return isFinite(t)?Math.floor((Date.now()-t)/864e5):null;
 }
-function ageTag14(d,max){const a=ageDays14(d);if(a==null)return'';return `<span class="small" style="color:${a>max?'#ffd48a':'var(--mut)'}">${a>max?'⚠️ ':''}${a} hari lalu${a>max?' (usang)':''}</span>`}
+function ageTag14(d,max){const a=ageDays14(d);if(a==null)return'';return `<span class="small" style="color:${a>max?'#e8e8e8':'var(--mut)'}">${a>max?'⚠️ ':''}${a} hari lalu${a>max?' (usang)':''}</span>`}
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi engineHtml14(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function engineHtml14(j){
   const e=j.eng;if(!e||!e.pairs)return'';
@@ -1193,8 +1193,8 @@ function engineHtml14(j){
   const sg=v=>v==null?'n/a':(v>0?'+':'')+v;
   const rows=Object.entries(e.pairs).map(([p,v])=>{
     const a=ai[p];let st='<span class="mut small">menunggu AI</span>';
-    if(a)st=a.conflict?'<span class="small" style="color:#ffb3b3">⚠️ AI bertentangan dengan mesin → keyakinan diturunkan ke RENDAH</span>':a.engineNeutral?'<span class="small" style="color:#ffd48a">➖ mesin netral → keyakinan AI diturunkan</span>':a.bias===v.bias?'<span class="small" style="color:#9be7b0">✅ searah</span>':'<span class="small mut">➖ netral</span>';
-    return `<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:7px 2px"><b>${esc(p)}</b></td><td>${BIASC14[v.bias]||''} ${esc(v.bias)}<div class="small mut">skor ${sg(v.score)} • ${esc(v.conf)} • data ${Math.round((v.cov||0)*100)}%</div></td><td>${a?`${BIASC14[a.bias]||''} ${esc(a.bias)}<div class="small mut">${esc(a.confidence)}</div>`:'-'}</td><td>${st}${v.eventRisk?`<div class="small" style="color:#ffd48a">🗓 risiko: ${esc(v.eventRisk.title)}</div>`:''}</td></tr>`;
+    if(a)st=a.conflict?'<span class="small" style="color:#c3c3c3">⚠️ AI bertentangan dengan mesin → keyakinan diturunkan ke RENDAH</span>':a.engineNeutral?'<span class="small" style="color:#e8e8e8">➖ mesin netral → keyakinan AI diturunkan</span>':a.bias===v.bias?'<span class="small" style="color:#d3d3d3">✅ searah</span>':'<span class="small mut">➖ netral</span>';
+    return `<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:7px 2px"><b>${esc(p)}</b></td><td>${BIASC14[v.bias]||''} ${esc(v.bias)}<div class="small mut">skor ${sg(v.score)} • ${esc(v.conf)} • data ${Math.round((v.cov||0)*100)}%</div></td><td>${a?`${BIASC14[a.bias]||''} ${esc(a.bias)}<div class="small mut">${esc(a.confidence)}</div>`:'-'}</td><td>${st}${v.eventRisk?`<div class="small" style="color:#e8e8e8">🗓 risiko: ${esc(v.eventRisk.title)}</div>`:''}</td></tr>`;
   }).join('');
   const parts=(arr)=>(arr||[]).map(x=>`<div class="small">${x.s>0?'🟢':x.s<0?'🔴':'⚪'} ${esc(x.label)} <span class="mut">→ ${sg(x.s)} (bobot ${x.w})</span></div>`).join('')||'<div class="small mut">tidak ada data</div>';
   return `<div class="card"><h3>⚙️ Mesin skor (tanpa AI) vs analisis AI</h3><div class="mut small" style="margin-bottom:8px">Aturan tetap & transparan sebagai dasar validasi. Bila AI berbeda dari mesin, keyakinannya otomatis diturunkan. Ini bukan prediksi pasti.</div>
@@ -1223,7 +1223,7 @@ function cotHtml14(j){
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi surpriseHtml14(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function surpriseHtml14(j){
   const s=j.sp||[];if(!s.length)return'';
-  const c={'LEBIH KUAT':'#9be7b0','LEBIH LEMAH':'#ffb3b3','SESUAI':'var(--mut)'};
+  const c={'LEBIH KUAT':'#d3d3d3','LEBIH LEMAH':'#c3c3c3','SESUAI':'var(--mut)'};
   return `<div class="card"><h3>⚡ Kejutan rilis (aktual vs forecast, 72 jam)</h3>${s.map(x=>`<div class="item" style="align-items:flex-start"><span><b>${esc(x.cur)}</b> ${esc(x.title)}<div class="small mut">${esc(ldt(x.ts,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></span><span style="text-align:right"><b style="color:${c[x.dir]||'var(--tx)'}">${esc(x.dir)}</b><div class="small mut">aktual ${esc(x.actual)} vs forecast ${esc(x.forecast)}</div></span></div>`).join('')}<div class="mut small" style="margin-top:6px">"Lebih kuat/lemah" dinilai untuk mata uangnya (pengangguran &amp; klaim dibalik). Forecast berasal dari agregator, bukan data resmi.</div></div>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi checkHtml14(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -1262,7 +1262,7 @@ function directionHtml15(j){
   const toneTxt=tone?(tone.score==null?`belum cukup sumber bernada jelas (${esc(tone.n)})`:`${tone.score>=0?'hawkish':'dovish'} ${sg15(tone.score)} dari ${esc(tone.n)} sumber (${esc(tone.hawk)} hawkish • ${esc(tone.dove)} dovish)`):'tidak tersedia';
   const parts=(u.parts||[]).map(x=>`<div class="small">${x.s>0?'🟢':x.s<0?'🔴':'⚪'} ${esc(x.label)} <span class="mut">→ ${sg15(x.s)} (bobot ${esc(x.w)})</span></div>`).join('');
   const toneEv=tone&&tone.top&&tone.top.length?`<details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Berita yang membentuk nada</summary>${tone.top.map(t=>`<div class="small">${t.score>0?'🟢':'🔴'} ${esc(t.title)} <span class="mut">(${esc(t.domain)} • tingkat ${esc(t.tier)} • ${sg15(t.score)})</span></div>`).join('')}<div class="small mut">Heuristik leksikon kata kunci hawkish/dovish, dibobot tingkat sumber dan kesegaran. Bukan pemahaman penuh isi berita.</div></details>`:'';
-  const fdTxt=fd&&fd.latest?`<div class="item" style="align-items:flex-start"><span>Pernyataan FOMC: perubahan teks<div class="small mut">${esc(fd.latest.date)} vs ${esc(fd.prev.date)}</div></span><b>${fd.score>0?'hawkish':fd.score<0?'dovish':'netral'} ${sg15(fd.score)} <span class="small mut">(${esc(fd.n)} kalimat berubah)</span></b></div>${(fd.added.length||fd.removed.length)?`<details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Kalimat yang berubah</summary>${fd.added.map(x=>`<div class="small" style="color:#9be7b0">＋ ${esc(x)}</div>`).join('')}${fd.removed.map(x=>`<div class="small" style="color:#ffb3b3">－ ${esc(x)}</div>`).join('')}<div class="small mut">Sumber: federalreserve.gov (dua pernyataan FOMC terakhir).</div></details>`:''}`:'';
+  const fdTxt=fd&&fd.latest?`<div class="item" style="align-items:flex-start"><span>Pernyataan FOMC: perubahan teks<div class="small mut">${esc(fd.latest.date)} vs ${esc(fd.prev.date)}</div></span><b>${fd.score>0?'hawkish':fd.score<0?'dovish':'netral'} ${sg15(fd.score)} <span class="small mut">(${esc(fd.n)} kalimat berubah)</span></b></div>${(fd.added.length||fd.removed.length)?`<details style="margin:4px 0 8px"><summary class="small" style="cursor:pointer;color:var(--b)">Kalimat yang berubah</summary>${fd.added.map(x=>`<div class="small" style="color:#d3d3d3">＋ ${esc(x)}</div>`).join('')}${fd.removed.map(x=>`<div class="small" style="color:#c3c3c3">－ ${esc(x)}</div>`).join('')}<div class="small mut">Sumber: federalreserve.gov (dua pernyataan FOMC terakhir).</div></details>`:''}`:'';
   const scHtml=sc.length?sc.map(x=>`<div style="margin-top:12px"><div style="font-weight:700;color:var(--b)">${esc(x.event)} <span class="small mut">${esc(ldt(x.ts,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}${x.forecast?' • forecast '+esc(x.forecast):''}</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">${x.scenarios.map(c=>`<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:6px 2px"><b>${esc(c.name)}</b><div class="small mut">${esc(c.desc)}</div></td><td>${B[c.usd.bias]||''} USD ${esc(c.usd.bias)}<div class="small mut">skor ${sg15(c.usd.score)}</div></td><td class="small">${Object.entries(c.pairs).map(([p,v])=>`${B[v.bias]||''} ${esc(p)}`).join('<br>')}</td></tr>`).join('')}</table></div></div>`).join('')+'<div class="mut small" style="margin-top:8px">Skenario = mesin dihitung ulang bila rilis berbeda dari forecast (NFP ±100K, Core CPI ±0.1pp, yield 2Y ±0.15pp setelah FOMC). Ini simulasi aturan, bukan prediksi.</div>':'<div class="mut small" style="margin-top:8px">Tidak ada rilis NFP/CPI/FOMC dalam 14 hari ke depan pada kalender, jadi tidak ada skenario.</div>';
   return `<div class="card"><h3>🧭 Arah berita & data (mesin, tanpa AI)</h3>
   <div class="item"><span><b>Arah USD</b> ${B[u.bias]||''} ${esc(u.bias)}<div class="small mut">cakupan data ${Math.round((u.cov||0)*100)}%</div></span><b>${sg15(u.score)}</b></div>
@@ -1272,7 +1272,7 @@ function directionHtml15(j){
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi validationHtml15(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function validationHtml15(j){
   const rows=[];let pass=0,warn=0;
-  (j.val||[]).forEach(v=>{warn++;rows.push(`<div class="item" style="align-items:flex-start"><span>⚠️ <b>${esc(v.src)}</b><div class="small mut">${esc(v.msg)}</div></span><span class="small" style="text-align:right;color:#ffd48a">${esc(v.act)}</span></div>`)});
+  (j.val||[]).forEach(v=>{warn++;rows.push(`<div class="item" style="align-items:flex-start"><span>⚠️ <b>${esc(v.src)}</b><div class="small mut">${esc(v.msg)}</div></span><span class="small" style="text-align:right;color:#e8e8e8">${esc(v.act)}</span></div>`)});
   (j.rc||[]).forEach(r=>{if(r.status==='COCOK')pass++;else warn++;rows.push(`<div class="item"><span>${r.status==='COCOK'?'✅':'⚠️'} Rilis ${esc(r.label)}<div class="small mut">kalender ${esc(r.calendar)} vs resmi ${esc(r.official)}</div></span><span class="small">${esc(r.status)}${r.status==='BEDA'?'<div class="mut">cek periode/revisi</div>':''}</span></div>`)});
   const y=j.yields&&j.yields.check;if(y){if(y.ok)pass++;else warn++;rows.push(`<div class="item"><span>${y.ok?'✅':'⚠️'} Yield Treasury vs FRED<div class="small mut">${esc(y.date)}: 2Y ${esc(j.yields.y2)} vs ${esc(y.d2)} • 10Y ${esc(j.yields.y10)} vs ${esc(y.d10)}</div></span><span class="small">${y.ok?'cocok':'beda'}</span></div>`)}
   Object.entries((j.px&&j.px.pairs)||{}).forEach(([p,v])=>{if(!v.check)return;if(v.check.ok)pass++;else warn++;rows.push(`<div class="item"><span>${v.check.ok?'✅':'⚠️'} Harga ${esc(p)}: ${esc(v.src)} vs ${esc(v.check.other)}<div class="small mut">penutupan ${esc(v.check.date)} beda ${esc(v.check.diffPct)}%</div></span><span class="small">${v.check.ok?'cocok':'beda → tren pair tidak dipakai mesin'}</span></div>`)});
@@ -1284,13 +1284,13 @@ function validationHtml15(j){
 function corrHtml15(j){
   const s=(j.sources||[]).filter(x=>x&&x.uri&&/^https:\/\//.test(x.uri));if(!s.length)return'';
   const T={1:'🏛 resmi',2:'📰 kantor berita besar',3:'🗞 media lain'},L=[...s].sort((a,b)=>(b.corr||1)-(a.corr||1)||(a.tier||3)-(b.tier||3)).slice(0,10);
-  return `<div class="card"><h3>🔗 Konfirmasi lintas-sumber</h3>${L.map(x=>`<div class="item" style="align-items:flex-start"><span><a href="${esc(x.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(x.title)}</a><div class="small mut">${esc(x.domain)} • ${T[x.tier||3]}${x.ageH!=null?' • '+(x.ageH<48?x.ageH+' jam':Math.round(x.ageH/24)+' hari')+' lalu':''}</div></span><span class="small" style="text-align:right;white-space:nowrap;color:${(x.corr||1)>=2?'#9be7b0':'var(--mut)'}">${(x.corr||1)>=2?'✅ '+x.corr+' sumber':'1 sumber'}</span></div>`).join('')}<div class="mut small" style="margin-top:6px">"N sumber" = jumlah domain berbeda yang memuat judul serupa. Berita 1 sumber (apalagi tingkat 3) diperlakukan sebagai belum terkonfirmasi.</div></div>`;
+  return `<div class="card"><h3>🔗 Konfirmasi lintas-sumber</h3>${L.map(x=>`<div class="item" style="align-items:flex-start"><span><a href="${esc(x.uri)}" target="_blank" rel="noopener noreferrer" style="color:var(--b)">${esc(x.title)}</a><div class="small mut">${esc(x.domain)} • ${T[x.tier||3]}${x.ageH!=null?' • '+(x.ageH<48?x.ageH+' jam':Math.round(x.ageH/24)+' hari')+' lalu':''}</div></span><span class="small" style="text-align:right;white-space:nowrap;color:${(x.corr||1)>=2?'#d3d3d3':'var(--mut)'}">${(x.corr||1)>=2?'✅ '+x.corr+' sumber':'1 sumber'}</span></div>`).join('')}<div class="mut small" style="margin-top:6px">"N sumber" = jumlah domain berbeda yang memuat judul serupa. Berita 1 sumber (apalagi tingkat 3) diperlakukan sebagai belum terkonfirmasi.</div></div>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi ndHtml15(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function ndHtml15(j){
   const nd=j.pro&&j.pro.news_direction,refs=j.refs||[];if(!nd&&!refs.length)return'';
   const B={BULLISH:'🟢',BEARISH:'🔴',NETRAL:'⚪'};
-  return `<div class="card"><h3>🎯 Arah berita menurut AI (divalidasi terhadap mesin)</h3>${nd?`<div class="item"><span><b>Arah USD</b> ${B[nd.usd]||''} ${esc(nd.usd)}</span><span class="small">${nd.engine?'mesin: '+esc(nd.engine.bias)+' ('+sg15(nd.engine.score)+')':''}</span></div>${nd.conflict?'<div class="warn" style="margin:6px 0">⚠️ Bertentangan dengan mesin skor. Utamakan mesin; anggap arah AI tidak terkonfirmasi.</div>':''}<div class="exp" style="color:var(--tx);margin-top:6px">${fmt(nd.summary||'')}</div>${(nd.catalysts||[]).map(c=>`<div style="margin-top:10px"><b>${esc(c.event)}</b><div class="small" style="color:#9be7b0">Bull jika: ${esc(c.bull_if)}</div><div class="small" style="color:#ffb3b3">Bear jika: ${esc(c.bear_if)}</div>${c.pairs_effect?`<div class="small mut">${esc(c.pairs_effect)}</div>`:''}</div>`).join('')}`:''}${refs.length?`<div class="warn" style="margin-top:10px">Pemeriksaan otomatis atas jawaban AI:<br>${refs.map(r=>'• '+esc(r)).join('<br>')}</div>`:''}</div>`;
+  return `<div class="card"><h3>🎯 Arah berita menurut AI (divalidasi terhadap mesin)</h3>${nd?`<div class="item"><span><b>Arah USD</b> ${B[nd.usd]||''} ${esc(nd.usd)}</span><span class="small">${nd.engine?'mesin: '+esc(nd.engine.bias)+' ('+sg15(nd.engine.score)+')':''}</span></div>${nd.conflict?'<div class="warn" style="margin:6px 0">⚠️ Bertentangan dengan mesin skor. Utamakan mesin; anggap arah AI tidak terkonfirmasi.</div>':''}<div class="exp" style="color:var(--tx);margin-top:6px">${fmt(nd.summary||'')}</div>${(nd.catalysts||[]).map(c=>`<div style="margin-top:10px"><b>${esc(c.event)}</b><div class="small" style="color:#d3d3d3">Bull jika: ${esc(c.bull_if)}</div><div class="small" style="color:#c3c3c3">Bear jika: ${esc(c.bear_if)}</div>${c.pairs_effect?`<div class="small mut">${esc(c.pairs_effect)}</div>`:''}</div>`).join('')}`:''}${refs.length?`<div class="warn" style="margin-top:10px">Pemeriksaan otomatis atas jawaban AI:<br>${refs.map(r=>'• '+esc(r)).join('<br>')}</div>`:''}</div>`;
 }
 /* ===== END V15 ===== */
 </script>
@@ -1366,7 +1366,7 @@ function drawAdList(){
   const box=$('adlist');if(!box)return;
   box.innerHTML=rows.length?rows.map(x=>{const self=x.email===me,id=esc(x.id),tr=(AD.tr&&AD.tr[x.id]||{}).status;
     const tb=x.admin?'<span class="badge b-aktif">📈 admin</span>':`<span class="badge ${tr==='disetujui'?'b-aktif':tr==='menunggu'?'b-menunggu':'b-diblokir'}" title="izin Trading">📈 ${tr==='disetujui'?'diizinkan':tr==='menunggu'?'minta izin':'tidak ada'}</span>`;
-    const acts=self?'<span class="mut small">(kamu)</span>':`${x.status!=='aktif'?`<button class="x" style="background:#12352f;color:var(--b)" data-id="${id}" onclick="adSet(this,'aktif')">✅ Izinkan</button>`:''}${x.status!=='diblokir'?`<button class="x" data-id="${id}" onclick="adSet(this,'diblokir')">⛔ Blokir</button>`:''}${x.admin?'':tr==='disetujui'?`<button class="x" style="background:#3a1626;color:var(--bad)" data-id="${id}" onclick="adTrade(this,'dicabut')">🚫 Cabut Trading</button>`:`<button class="x" style="background:#262b55;color:#eef0ff" data-id="${id}" onclick="adTrade(this,'disetujui')">📈 Beri Trading</button>`}<button class="x" style="background:#262b55;color:#eef0ff" data-id="${id}" onclick="adDel(this)">🗑</button>`;
+    const acts=self?'<span class="mut small">(kamu)</span>':`${x.status!=='aktif'?`<button class="x" style="background:#1f1f1f;color:var(--b)" data-id="${id}" onclick="adSet(this,'aktif')">✅ Izinkan</button>`:''}${x.status!=='diblokir'?`<button class="x" data-id="${id}" onclick="adSet(this,'diblokir')">⛔ Blokir</button>`:''}${x.admin?'':tr==='disetujui'?`<button class="x" style="background:#141414;color:var(--bad)" data-id="${id}" onclick="adTrade(this,'dicabut')">🚫 Cabut Trading</button>`:`<button class="x" style="background:#242424;color:#f2f2f2" data-id="${id}" onclick="adTrade(this,'disetujui')">📈 Beri Trading</button>`}<button class="x" style="background:#242424;color:#f2f2f2" data-id="${id}" onclick="adDel(this)">🗑</button>`;
     return `<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span style="display:flex;align-items:center;gap:8px">${x.foto?`<img src="${esc(x.foto)}" referrerpolicy="no-referrer" style="width:30px;height:30px;border-radius:50%">`:'👤'}<span><b>${esc(x.nama||'(belum ada nama)')}</b>${x.admin?' 👑':''}<div class="small mut">${esc(x.email||x.id)}</div></span></span><span class="badge b-${esc(x.status)}">${esc(x.status)}</span>${tb}<span style="display:flex;gap:6px;flex-wrap:wrap">${acts}</span></div>`}).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada pengguna yang cocok.</div>';
 }
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi adTrade(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -1399,11 +1399,11 @@ function startCd16(){tickCd16();if(!CD16&&document.querySelector('[data-cd]'))CD
 // ✏️ [TEKS BISA DIUBAH] 📰 Trading → News — fungsi cdHtml16(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function cdHtml16(j){
   const now=Date.now(),ev=(j.calendar||[]).filter(e=>e.ts>now&&e.impact==='High'&&(e.cur==='USD'||e.tag)).sort((a,b)=>a.ts-b.ts).slice(0,4),s=sess16();
-  return `<div class="card"><h3>⏱ Rilis terdekat & sesi pasar</h3>${s.closed?'<div class="small" style="color:#ffd48a">🌙 Pasar forex tutup (akhir pekan).</div>':`<div class="small">🟢 Sesi aktif: <b>${s.open.length?s.open.map(esc).join(' • '):'jeda antar sesi'}</b></div>`}${ev.length?ev.map(e=>`<div class="item"><span>${esc(e.title)}${e.tag?' 📌':''}<div class="small mut">${esc(ldt(e.ts,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></span><b data-cd="${e.ts}">…</b></div>`).join(''):'<div class="mut small" style="margin-top:6px">Tidak ada rilis High-impact USD terdekat pada kalender.</div>'}</div>`;
+  return `<div class="card"><h3>⏱ Rilis terdekat & sesi pasar</h3>${s.closed?'<div class="small" style="color:#e8e8e8">🌙 Pasar forex tutup (akhir pekan).</div>':`<div class="small">🟢 Sesi aktif: <b>${s.open.length?s.open.map(esc).join(' • '):'jeda antar sesi'}</b></div>`}${ev.length?ev.map(e=>`<div class="item"><span>${esc(e.title)}${e.tag?' 📌':''}<div class="small mut">${esc(ldt(e.ts,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></span><b data-cd="${e.ts}">…</b></div>`).join(''):'<div class="mut small" style="margin-top:6px">Tidak ada rilis High-impact USD terdekat pada kalender.</div>'}</div>`;
 }
 function spark16(a){
   if(!a||a.length<2)return'';const w=64,h=20,mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1,pts=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-2-(v-mn)/r*(h-4)).toFixed(1)}`).join(' ');
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${a[a.length-1]>=a[0]?'#6ee7b7':'#fca5a5'}" stroke-width="1.5"/></svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${a[a.length-1]>=a[0]?'#cacaca':'#b7b7b7'}" stroke-width="1.5"/></svg>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi priceHtml14(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function priceHtml14(j){
@@ -1445,7 +1445,7 @@ function prpSave16(){try{localStorage.setItem('prp16',JSON.stringify({sel:PRP.se
 (function(){try{const s=JSON.parse(localStorage.getItem('prp16')||'null');if(s){const v=(s.sel||[]).filter(p=>ALLP.includes(p));if(v.length)PRP.sel=v;if(['hari ini','1-5 hari','1-2 minggu'].includes(s.hz))PRP.hz=s.hz}}catch(e){}})();
 function ppToggle(p){
   PRP.sel=PRP.sel.includes(p)?PRP.sel.filter(x=>x!==p):[...PRP.sel,p];prpSave16();
-  const b=$('ppairs');if(b)b.innerHTML=ALLP.map(q=>`<button class="x" style="background:${PRP.sel.includes(q)?'var(--a)':'#262b55'};color:#fff;padding:7px 10px" onclick="ppToggle('${q}')">${q}</button>`).join('');
+  const b=$('ppairs');if(b)b.innerHTML=ALLP.map(q=>`<button class="x" style="background:${PRP.sel.includes(q)?'var(--a)':'#242424'};color:#fff;padding:7px 10px" onclick="ppToggle('${q}')">${q}</button>`).join('');
 }
 /* ===== END V16 ===== */
 </script>
@@ -1459,7 +1459,7 @@ function mapHtml17(j){
   const D={BULLISH:'🟢 naik',BEARISH:'🔴 turun',NETRAL:'⚪ range/netral'};
   const rows=Object.entries(E).filter(([,v])=>v.map).map(([p,v])=>{
     const m=v.map,a=ai[p],bt=m.bt&&m.bt.hitNow&&m.bt.hitNow.rate!=null?`${m.bt.hitNow.rate}% searah (n=${m.bt.hitNow.n})`:'-';
-    const aiTxt=a?`<div class="small ${a.conflict?'':'mut'}" style="${a.conflict?'color:#ffb3b3':''}">AI: ${esc(a.bias)} (${esc(a.confidence)})${a.conflict?' ⚠️ beda dari mesin':''}</div>`:'';
+    const aiTxt=a?`<div class="small ${a.conflict?'':'mut'}" style="${a.conflict?'color:#c3c3c3':''}">AI: ${esc(a.bias)} (${esc(a.confidence)})${a.conflict?' ⚠️ beda dari mesin':''}</div>`:'';
     return `<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:7px 2px"><b>${esc(p)}</b><div class="small mut">${esc(m.last)}<br>${esc(m.asOf)}</div></td><td>${D[v.bias]||''}<div class="small mut">${esc(v.conf)} • skor ${v.score==null?'n/a':(v.score>0?'+':'')+v.score}</div>${aiTxt}</td><td><b>${esc(m.zone[0])} – ${esc(m.zone[1])}</b><div class="small mut">gerak wajar ±${esc(m.expMove)} (${esc(m.hzD)} hari)</div></td><td class="small">▲ ${m.keyAbove==null?'-':esc(m.keyAbove)}<br>▼ ${m.keyBelow==null?'-':esc(m.keyBelow)}</td><td class="small">${m.invalidAt==null?'-':(v.bias==='BULLISH'?'tutup harian &lt; ':'tutup harian &gt; ')+esc(m.invalidAt)}</td><td class="small">${bt}</td></tr>`;
   }).join('');
   if(!rows)return'';
@@ -1515,7 +1515,7 @@ const STARTERS18={
 // ✏️ [TEKS BISA DIUBAH] 🤖 Tutor (sekolah & Trading) — fungsi drawChat(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function drawChat(){
   const box=$('chat');if(!box)return;const c=S.chat[S.mapel]||[],st=STARTERS18[S.mapel]||(TOPICS[S.mapel]&&TOPICS[S.mapel].length?TOPICS[S.mapel].slice(0,3).map(t=>'Jelaskan '+t+' dengan contoh praktik'):['Jelaskan konsep dasar materi ini dengan contoh']);
-  box.innerHTML=c.length?c.map(m=>`<div class="msg ${m.role}">${fmt(m.content)}${m.role==='assistant'&&m.meta?metaHtml18(m.meta):''}</div>`).join(''):`<div class="mut small">Tanyakan apa saja tentang <b>${esc(S.mapel)}</b>. Tutor menjawab dengan sumber tepercaya dan memeriksa jawabannya.</div><div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${st.map((t,i)=>`<button class="x" style="background:#262b55;color:#eef0ff;text-align:left" onclick="starter18(${i})">${esc(t)}</button>`).join('')}</div>`;
+  box.innerHTML=c.length?c.map(m=>`<div class="msg ${m.role}">${fmt(m.content)}${m.role==='assistant'&&m.meta?metaHtml18(m.meta):''}</div>`).join(''):`<div class="mut small">Tanyakan apa saja tentang <b>${esc(S.mapel)}</b>. Tutor menjawab dengan sumber tepercaya dan memeriksa jawabannya.</div><div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${st.map((t,i)=>`<button class="x" style="background:#242424;color:#f2f2f2;text-align:left" onclick="starter18(${i})">${esc(t)}</button>`).join('')}</div>`;
   box.scrollTop=1e9;
 }
 function starter18(i){const t=(STARTERS18[S.mapel]||[])[i];if(t&&$('ci')){$('ci').value=t;send2()}}
@@ -1629,7 +1629,7 @@ function trCard16(){
   if(AD.trErr)body=`<div class="card"><h3>📈 Izin Trading</h3><div class="warn">Koleksi "izin_trading" belum bisa dibaca (${esc(AD.trErr)}). Pasang aturan Firestore terbaru agar izin Trading bisa diberikan dan diminta.</div></div>`;
   else{
     const L=Object.values(AD.tr||{}),pend=L.filter(x=>x.status==='menunggu'),okn=L.filter(x=>x.status==='disetujui').length;
-    body=`<div class="card"><h3>📈 Izin Trading (${okn} disetujui${pend.length?' • '+pend.length+' menunggu':''})</h3><div class="mut small">Tab Trading hanya untuk admin. Pengguna lain butuh izin dari sini. Perubahan berlaku maksimal 1 menit.</div>${pend.length?pend.map(x=>`<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span><b>${esc(x.email||x.id)}</b><div class="small mut">${esc(x.pesan||'(tanpa pesan)')}</div></span><span style="display:flex;gap:6px"><button class="x" style="background:#12352f;color:var(--b)" data-id="${esc(x.id)}" onclick="adTrade(this,'disetujui')">✅ Setujui</button><button class="x" data-id="${esc(x.id)}" onclick="adTrade(this,'ditolak')">⛔ Tolak</button></span></div>`).join(''):'<div class="mut small" style="margin-top:8px">Tidak ada permintaan baru.</div>'}</div>`;
+    body=`<div class="card"><h3>📈 Izin Trading (${okn} disetujui${pend.length?' • '+pend.length+' menunggu':''})</h3><div class="mut small">Tab Trading hanya untuk admin. Pengguna lain butuh izin dari sini. Perubahan berlaku maksimal 1 menit.</div>${pend.length?pend.map(x=>`<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span><b>${esc(x.email||x.id)}</b><div class="small mut">${esc(x.pesan||'(tanpa pesan)')}</div></span><span style="display:flex;gap:6px"><button class="x" style="background:#1f1f1f;color:var(--b)" data-id="${esc(x.id)}" onclick="adTrade(this,'disetujui')">✅ Setujui</button><button class="x" data-id="${esc(x.id)}" onclick="adTrade(this,'ditolak')">⛔ Tolak</button></span></div>`).join(''):'<div class="mut small" style="margin-top:8px">Tidak ada permintaan baru.</div>'}</div>`;
   }
   return aiCard19()+body;
 }
@@ -1813,7 +1813,7 @@ function aiCard19(){
 function aiRow19(x,isProv){
   const bad=x.results.filter(r=>!r.ok),errs=[...new Set(bad.map(r=>r.error).filter(Boolean))].slice(0,2),ms=x.results.filter(r=>r.ok).map(r=>r.ms).sort((a,b)=>a-b),med=ms.length?ms[Math.floor(ms.length/2)]+' ms':'';
   const st=!x.keys?'<span class="mut">tidak ada key</span>':x.ok===x.keys?'✅ '+x.ok+'/'+x.keys:x.ok?'🟡 '+x.ok+'/'+x.keys:'❌ 0/'+x.keys,h=hint19(x),used=[...new Set(x.results.filter(r=>r.ok&&r.model).map(r=>r.model))].slice(0,2);
-  return `<div class="item" style="align-items:flex-start"><span><b>${esc(x.id)}</b>${isProv?`<div class="small mut">${used.length?'dipakai: '+esc(used.join(', ')):esc((x.models||[]).join(', '))}</div>`:''}${x.note?`<div class="small" style="color:#ffd48a">${esc(x.note)}</div>`:''}${errs.map(e=>`<div class="small" style="color:#ffb3b3">${esc(e)}</div>`).join('')}${h?`<div class="small" style="color:#ffd48a">💡 ${esc(h)}</div>`:''}</span><span style="text-align:right;white-space:nowrap">${st}<div class="small mut">${med}</div></span></div>`;
+  return `<div class="item" style="align-items:flex-start"><span><b>${esc(x.id)}</b>${isProv?`<div class="small mut">${used.length?'dipakai: '+esc(used.join(', ')):esc((x.models||[]).join(', '))}</div>`:''}${x.note?`<div class="small" style="color:#e8e8e8">${esc(x.note)}</div>`:''}${errs.map(e=>`<div class="small" style="color:#c3c3c3">${esc(e)}</div>`).join('')}${h?`<div class="small" style="color:#e8e8e8">💡 ${esc(h)}</div>`:''}</span><span style="text-align:right;white-space:nowrap">${st}<div class="small mut">${med}</div></span></div>`;
 }
 /* ===== END V20 ===== */
 </script>
@@ -1827,63 +1827,63 @@ function aiRow19(x,isProv){
 
 /* ---------- CSS: lapisan desain baru ---------- */
 document.head.insertAdjacentHTML('beforeend',`<style>
-:root{--card2:#1a2138;--v21sh:0 18px 40px -24px rgba(2,6,24,.95)}
-html[data-theme=light]{--bg:#f5f7fc;--card:#ffffff;--card2:#eef1fa;--line:#e2e7f3;--tx:#151a2c;--mut:#5f6884;--a:#4f5fff;--b:#0fae8a;--bad:#e33a5f;--v21sh:0 12px 30px -18px rgba(20,30,70,.35)}
-body{background:radial-gradient(900px 460px at 6% -10%,#232a63 0,transparent 60%),radial-gradient(720px 400px at 102% 0,#0e4a43 0,transparent 56%),var(--bg);background-attachment:fixed;line-height:1.5}
-html[data-theme=light] body{background:radial-gradient(820px 420px at 6% -12%,#dfe6ff 0,transparent 60%),radial-gradient(700px 380px at 102% 0,#d8f7ee 0,transparent 55%),var(--bg)}
+:root{--card2:#191919}
+html[data-theme=light]{--bg:#ffffff;--card:#fafafa;--card2:#f0f0f0;--line:#e2e2e2;--tx:#111111;--mut:#6b6b6b;--a:#111111;--b:#333333;--bad:#767676}
+body{background:var(--bg);line-height:1.55}
 .wrap{max-width:900px;padding:20px 16px 104px}
 h1{font-size:1.2rem;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
 .sub{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:14px}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008)),var(--card);border-radius:20px;padding:16px;box-shadow:var(--v21sh)}
-html[data-theme=light] .card{background:var(--card)}
+.card{background:var(--card);border-radius:18px;padding:16px}
 .card h3{display:flex;align-items:center;gap:8px;font-size:.98rem;letter-spacing:-.01em;margin:0 0 10px}
 label{font-size:.76rem;letter-spacing:.02em}
-select,textarea,input{padding:12px 13px;border-radius:14px;background:#0f1425;transition:border-color .15s,box-shadow .15s}
-html[data-theme=light] select,html[data-theme=light] textarea,html[data-theme=light] input{background:#f4f6fc}
-select:focus,textarea:focus,input:focus{outline:0;border-color:var(--a);box-shadow:0 0 0 3px rgba(124,140,255,.18)}
-.btn{border-radius:14px;min-height:46px;box-shadow:0 12px 26px -16px rgba(61,219,176,.9);transition:transform .12s,filter .15s}
-.btn:hover{filter:brightness(1.06)}.btn:active{transform:scale(.985)}
-.btn.alt{background:var(--card2);border:1px solid var(--line);color:var(--tx);box-shadow:none}
+select,textarea,input{padding:12px 13px;border-radius:14px;background:#101010;transition:border-color .15s}
+html[data-theme=light] select,html[data-theme=light] textarea,html[data-theme=light] input{background:#ffffff}
+select:focus,textarea:focus,input:focus{outline:0;border-color:var(--tx)}
+.btn{border-radius:14px;min-height:46px;transition:opacity .15s}
+.btn:hover{opacity:.88}.btn:active{opacity:.7}
+.btn.alt{background:var(--card2);border:1px solid var(--line);color:var(--tx)}
 .btn.full{margin-top:12px}
-.opt{border-radius:14px;padding:13px 15px;line-height:1.45;transition:transform .12s,border-color .15s,background .15s}
-.opt:active{transform:scale(.995)}
-.opt.sel{border-color:var(--a);background:rgba(124,140,255,.14)}
-.opt.ok{background:rgba(61,219,176,.13)}
-.opt.no{background:rgba(255,107,138,.13)}
-html[data-theme=light] .opt.ok{background:#e5fbf3}
-html[data-theme=light] .opt.no{background:#ffe9ee}
+html[data-theme=light] .btn{background:#111111;color:#ffffff}
+html[data-theme=light] .tabs button.on,html[data-theme=light] .stabs button.on{background:#111111;color:#ffffff}
+html[data-theme=light] .msg.user{background:#111111;color:#ffffff}
+.opt{border-radius:14px;padding:13px 15px;line-height:1.45;transition:border-color .15s,background .15s}
+.opt.sel{border-color:var(--tx);background:#1c1c1c}
+.opt.ok{background:#232323}
+.opt.no{background:#141414}
+html[data-theme=light] .opt.sel{background:#efefef}
+html[data-theme=light] .opt.ok{background:#ededed}
+html[data-theme=light] .opt.no{background:#f6f6f6}
 .q{font-size:1.08rem;font-weight:600;letter-spacing:-.01em}
-.bar{height:10px;background:rgba(255,255,255,.06)}
-html[data-theme=light] .bar{background:#e8ecf6}
-.exp{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px}
-html[data-theme=light] .exp{background:#f2f5fc}
+.bar{height:10px;background:#1c1c1c}
+html[data-theme=light] .bar{background:#e8e8e8}
+.exp{background:#131313;border:1px solid var(--line);border-radius:14px}
+html[data-theme=light] .exp{background:#f4f4f4}
 .stabs{gap:6px;padding:6px;border-radius:16px;overflow-x:auto;scrollbar-width:none}
 .stabs::-webkit-scrollbar{display:none}
 .stabs button{border-radius:12px;padding:10px 14px;white-space:nowrap;flex:0 0 auto;font-size:.83rem;transition:background .15s,color .15s}
-.stabs button.on{box-shadow:0 8px 18px -12px rgba(124,140,255,.9)}
-.stabs button:not(.on):hover{color:var(--tx);background:rgba(255,255,255,.05)}
+.stabs button:not(.on):hover{color:var(--tx);background:#1c1c1c}
 .item{gap:12px;padding:11px 0;font-size:.88rem}
 #chat{gap:12px;padding-right:2px}
 .msg{border-radius:16px}
-.msg.assistant{background:rgba(255,255,255,.04)}
-html[data-theme=light] .msg.assistant{background:#f4f6fc}
+.msg.assistant{background:#161616}
+html[data-theme=light] .msg.assistant{background:#f4f4f4}
 .nb{width:38px;height:38px;border-radius:11px}
 .x{border-radius:10px;padding:7px 11px}
 .warn{border-radius:14px}
-#userbar .card{padding:8px 10px 8px 12px;border-radius:999px;box-shadow:none;background:rgba(255,255,255,.03)}
-html[data-theme=light] #userbar .card{background:#fff}
-#userbar img{box-shadow:0 0 0 2px rgba(124,140,255,.35)}
+#userbar .card{padding:8px 10px 8px 12px;border-radius:999px;background:#161616}
+html[data-theme=light] #userbar .card{background:#ffffff}
+#userbar img{box-shadow:0 0 0 2px #3a3a3a}
 .v21-pick{padding:12px 14px;border-radius:18px}
 .v21-pick label{margin:0 0 6px}
-.v21-hero{background:linear-gradient(135deg,rgba(124,140,255,.18),rgba(61,219,176,.1)),var(--card);border-color:rgba(124,140,255,.3)}
+.v21-hero{background:var(--card)}
 .v21-hero-top{display:flex;gap:14px;align-items:center}
 .v21-hero-title{font-size:1.16rem;font-weight:800;letter-spacing:-.02em;margin:3px 0 9px;line-height:1.3}
 .v21-chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--line);font-size:.74rem;font-weight:600;color:var(--tx)}
-html[data-theme=light] .chip{background:#eef2fc}
-.ring{--p:0;width:86px;height:86px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--b) calc(var(--p)*1%),rgba(255,255,255,.09) 0);position:relative}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:#1c1c1c;border:1px solid var(--line);font-size:.74rem;font-weight:600;color:var(--tx)}
+html[data-theme=light] .chip{background:#f1f1f1}
+.ring{--p:0;width:86px;height:86px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--tx) calc(var(--p)*1%),#242424 0);position:relative}
 .ring:before{content:'';position:absolute;inset:7px;border-radius:50%;background:var(--card)}
-html[data-theme=light] .ring:before{background:#fff}
+html[data-theme=light] .ring:before{background:#fafafa}
 .ring-in{position:relative;text-align:center;line-height:1.1}
 .ring-in b{font-size:1.15rem}
 .ring-in span{font-size:.7rem;color:var(--mut)}
@@ -1893,36 +1893,36 @@ html[data-theme=light] .ring:before{background:#fff}
 .v21-target select{width:auto;padding:8px 10px;font-size:.8rem;border-radius:11px}
 .v21-bars{display:flex;align-items:flex-end;gap:8px;height:118px;padding-top:6px}
 .v21-bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
-.v21-bar i{display:block;width:100%;max-width:34px;border-radius:8px;background:linear-gradient(180deg,var(--b),var(--a));min-height:6px;transition:height .3s}
+.v21-bar i{display:block;width:100%;max-width:34px;border-radius:8px;background:var(--tx);min-height:6px;transition:height .3s}
 .v21-bar span{font-size:.66rem;color:var(--mut)}
 .v21-board-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
 .v21-board-head h3{margin:0}
 .v21-rank{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.86rem}
 .v21-rank:last-child{border:0}
-.v21-rank.me{color:var(--b)}
+.v21-rank.me{color:var(--tx);font-weight:700}
 .v21-pos{width:28px;text-align:center;font-weight:800;color:var(--mut)}
 .v21-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.v21-nm i{font-style:normal;font-size:.72rem;color:var(--b)}
+.v21-nm i{font-style:normal;font-size:.72rem;color:var(--mut)}
 .v21-xp{text-align:right;font-weight:800;white-space:nowrap}
 .v21-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.v21-toast{position:fixed;left:50%;bottom:98px;transform:translate(-50%,14px);background:#101528;color:#eef1ff;border:1px solid var(--line);padding:10px 16px;border-radius:999px;font-size:.82rem;font-weight:600;box-shadow:0 18px 40px -20px #000;opacity:0;pointer-events:none;transition:.25s;z-index:80;max-width:88vw;text-align:center}
+.v21-toast{position:fixed;left:50%;bottom:98px;transform:translate(-50%,14px);background:#111111;color:#f2f2f2;border:1px solid #3a3a3a;padding:10px 16px;border-radius:999px;font-size:.82rem;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:80;max-width:88vw;text-align:center}
 .v21-toast.on{opacity:1;transform:translate(-50%,0)}
-.v21-fab{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:1.05rem;cursor:pointer;z-index:60;box-shadow:0 12px 30px -16px #000}
-html[data-theme=light] .v21-fab{background:#fff}
-html[data-theme=light] [style*="background:#12152e"]{background:#f1f4fb!important}
-html[data-theme=light] [style*="background:#262b55"]{background:#e6ebf7!important}
-html[data-theme=light] [style*="background:#4a1a2c"]{background:#ffe3ea!important}
-html[data-theme=light] [style*="color:#eef0ff"]{color:#151a2c!important}
-html[data-theme=light] [style*="color:#ffb3c4"]{color:#bf2044!important}
-html[data-theme=light] [style*="background:#12352f"]{background:#d8fbee!important}
-html[data-theme=light] [style*="color:#ffd48a"]{color:#8a5a00!important}
+.v21-fab{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:1.05rem;cursor:pointer;z-index:60}
+html[data-theme=light] .v21-fab{background:#ffffff}
+html[data-theme=light] [style*="background:#101010"]{background:#f1f1f1!important}
+html[data-theme=light] [style*="background:#242424"]{background:#ececec!important}
+html[data-theme=light] [style*="background:#2a2a2a"]{background:#f2f2f2!important}
+html[data-theme=light] [style*="color:#f2f2f2"]{color:#111111!important}
+html[data-theme=light] [style*="color:#dcdcdc"]{color:#444444!important}
+html[data-theme=light] [style*="background:#1f1f1f"]{background:#eeeeee!important}
+html[data-theme=light] [style*="color:#e8e8e8"]{color:#555555!important}
 @media(min-width:641px){.v21-fab{bottom:22px}}
 @media(max-width:640px){
   .wrap{padding:14px 12px 104px}
-  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;background:rgba(12,16,30,.93);backdrop-filter:blur(16px);padding:7px 8px calc(7px + env(safe-area-inset-bottom));z-index:50;gap:4px}
-  html[data-theme=light] .tabs{background:rgba(255,255,255,.95)}
+  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;background:#0b0b0b;padding:7px 8px calc(7px + env(safe-area-inset-bottom));z-index:50;gap:4px}
+  html[data-theme=light] .tabs{background:#ffffff}
   .tabs button{font-size:.68rem;padding:8px 2px;line-height:1.25;border-radius:12px}
-  .card{padding:14px;border-radius:18px}
+  .card{padding:14px;border-radius:16px}
   h1{font-size:1.08rem}
   .row{flex-wrap:wrap}
   .row>*{flex:1 1 130px}
@@ -1930,8 +1930,8 @@ html[data-theme=light] [style*="color:#ffd48a"]{color:#8a5a00!important}
   .ring{width:74px;height:74px}
 }
 @media(min-width:641px){
-  .tabs{position:sticky;top:10px;z-index:30;backdrop-filter:blur(12px);background:rgba(20,26,44,.85);box-shadow:0 12px 30px -24px #000}
-  html[data-theme=light] .tabs{background:rgba(255,255,255,.9)}
+  .tabs{position:sticky;top:10px;z-index:30;background:#0b0b0b}
+  html[data-theme=light] .tabs{background:#ffffff}
   .tabs button{padding:11px 14px;font-size:.86rem}
 }
 </style>`);
