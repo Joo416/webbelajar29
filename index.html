@@ -66,8 +66,15 @@ textarea{min-height:90px;resize:vertical;font-size:.88rem}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
-<script src="firebase-config.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
+  authDomain: "ruangbelajar-8584c.firebaseapp.com",
+  projectId: "ruangbelajar-8584c",
+  storageBucket: "ruangbelajar-8584c.firebasestorage.app",
+  messagingSenderId: "645886662774",
+  appId: "1:645886662774:web:754d8425ed0df42f11a757"
+};
 
 // ✏️ [TEKS BISA DIUBAH] Daftar teks MAPEL: Nama pelajaran di menu. PERHATIAN: nama ini juga tersimpan di database (soal/riwayat lama); mengganti nama membuat data lama tidak terbaca di pelajaran baru.
 const MAPEL={
