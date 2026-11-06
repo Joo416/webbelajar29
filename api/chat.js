@@ -79,14 +79,15 @@ async function doSearch(q, cat, loc) {
   const core = q.includes(': ') ? q.split(': ').slice(1).join(': ') : q;
   const S = (path, qq) => sk.length ? rotate('Serper', sk, k => serper(path, qq, k, loc), errs, dl, path + '|' + ((loc && loc.hl) || 'id') + '|') : Promise.resolve(null);
   const W = async () => { try { if (cat === 'umum') { const [e, i] = await Promise.all([wiki(core, 'en', 6).catch(() => []), wiki(core, 'id', 6).catch(() => [])]); return [...e, ...i]; } let r = cat === 'inggris' ? [] : await wiki(core, 'id'); if (r.length < 2) r = r.concat(await wiki(core, 'en')); return r; } catch (e) { errs.push('Wikipedia: ' + msg(e)); return []; } };
-  const trustedQ = `${core} (${(SITES[cat] || SITES.sekolah).map(d => 'site:' + d).join(' OR ')})`;
+  const trustedQ = `${core} (${(SITES[cat] || SITES.sekolah).slice(0, 8).map(d => 'site:' + d).join(' OR ')})`;
   const [web, news, wk] = await Promise.all([S('search', trustedQ), NEWSQ.test(q) ? S('news', core) : null, W()]);
   let all = [...(web || []), ...(news || []), ...wk];
   if (sk.length && all.filter(r => r.type !== 'wiki' && r.type !== 'news').length < 3) { const g = await S('search', core); if (g) all.push(...g); }
   if (tk.length && (all.filter(r => r.type !== 'wiki').length < 3 || process.env.SEARCH_BOTH === '1')) { const r = await rotate('Tavily', tk, k => tavily(core, k, cat), errs, dl); if (r) all.push(...r); }
   const seen = new Set(), uniq = [];
   all.forEach(r => { const k = r.uri || r.title; if (!seen.has(k)) { seen.add(k); uniq.push(r); } });
-  const rank = r => r.type === 'answer' ? 0 : isAuth(r.uri) ? 1 : r.type === 'wiki' ? 2 : r.type === 'news' ? 4 : 3;
+  const hot = NEWSQ.test(q);
+  const rank = r => r.type === 'answer' ? 0 : isAuth(r.uri) ? 1 : (hot && r.type === 'news') ? 2 : r.type === 'wiki' ? 3 : r.type === 'news' ? 5 : 4;
   uniq.sort((a, b) => rank(a) - rank(b));
   return { results: uniq.slice(0, 9), note: errs.join(' | ') || (sk.length + tk.length ? '' : 'key Serper/Tavily belum diatur') };
 }
@@ -1597,7 +1598,51 @@ const LEVELS = {
   'TKA / UTBK': 'persiapan TKA/UTBK: ringkas, fokus pada strategi, penalaran, dan jebakan soal',
   'Umum': 'pembelajar umum: jelas dan padat, istilah teknis dijelaskan singkat'
 };
-const srcBlock = rs => rs.map((r, i) => `[${i + 1}] (${host(r.uri) || 'data'}${isAuth(r.uri) || r.type === 'data' ? ' ★resmi' : ''}${r.type === 'wiki' ? ' ensiklopedia' : r.type === 'news' ? ' berita' : r.type === 'data' ? ' data' : ''}) ${r.title}: ${String(r.text).slice(0, r.type === 'data' ? 900 : 420)}`).join('\n');
+/* ---------- TRIANGULASI: satukan angka dari semua sumber, hitung dukungan silang ---------- */
+const UNITMAP = { '%': '%', 'persen': '%', 'juta': 'juta', 'miliar': 'miliar', 'triliun': 'triliun', 'ribu': 'ribu', 'million': 'juta', 'billion': 'miliar', 'trillion': 'triliun', 'bn': 'miliar', 'tn': 'triliun' };
+function normNum(s) {
+  let t = String(s).replace(/[\s\u00a0]/g, '');
+  const dot = t.includes('.'), com = t.includes(',');
+  if (dot && com) { const dec = t.lastIndexOf(',') > t.lastIndexOf('.') ? ',' : '.'; t = t.split(dec === ',' ? '.' : ',').join('').replace(dec, '.'); }
+  else if (com) { const p = t.split(','); t = (p.length > 1 && p[p.length - 1].length === 3 && p[0].length <= 3) ? p.join('') : t.replace(',', '.'); }
+  else if (dot) { const p = t.split('.'); if (p.length > 1 && p[p.length - 1].length === 3 && p[0].length <= 3) t = p.join(''); }
+  const n = parseFloat(t); return Number.isFinite(n) ? n : null;
+}
+function fuseEvidence(rs) {
+  const hosts = new Set(), nums = new Map();
+  let chars = 0;
+  (rs || []).forEach(r => {
+    const h = host(r.uri) || (r.type === 'data' ? 'data' : 'web');
+    hosts.add(h);
+    const txt = String(r.text || ''); chars += txt.length;
+    const re = /(\d{1,3}(?:[.\u00a0]\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s*(%|persen|juta|miliar|triliun|ribu|million|billion|trillion|bn|tn)?/g;
+    let m, n = 0;
+    while ((m = re.exec(txt)) && n < 40) {
+      const v = normNum(m[1]); if (v == null) continue;
+      const unit = UNITMAP[(m[2] || '').toLowerCase()] || '';
+      const key = unit + '|' + v;
+      const ctx = txt.slice(Math.max(0, m.index - 50), m.index + 55).replace(/\s+/g, ' ').trim();
+      if (!unit && ((v >= 1900 && v <= 2100) || v < 10)) continue;
+      const e = nums.get(key) || { v, unit, disp: m[1] + (m[2] ? ' ' + m[2] : ''), hits: new Map() };
+      if (!e.hits.has(h)) e.hits.set(h, ctx);
+      nums.set(key, e); n++;
+    }
+  });
+  const multi = [], single = [];
+  nums.forEach(e => {
+    const hs = [...e.hits.keys()];
+    const label = e.disp || (e.v + (e.unit ? ' ' + e.unit : ''));
+    const line = '• ' + label + ' — ' + hs.slice(0, 3).join(', ') + (hs.length > 3 ? ' +' + (hs.length - 3) + ' lain' : '') + ' | ' + String([...e.hits.values()][0]).slice(0, 95);
+    (hs.length >= 2 ? multi : single).push({ n: hs.length, line });
+  });
+  multi.sort((a, b) => b.n - a.n);
+  const out = ['\n\nTRIANGULASI SUMBER (dihitung otomatis; ' + (rs || []).length + ' sumber, ' + hosts.size + ' domain, ' + chars + ' karakter data):'];
+  out.push(multi.length ? 'ANGKA DIDUKUNG ≥2 SUMBER BERBEDA (boleh dinyatakan sebagai fakta):\n' + multi.slice(0, 10).map(x => x.line).join('\n') : 'Belum ada angka yang muncul di ≥2 sumber berbeda: jangan menyatakan angka apa pun sebagai fakta umum.');
+  if (single.length) out.push('ANGKA HANYA DARI 1 SUMBER (sebut sebagai klaim satu sumber, jangan digeneralisasi):\n' + single.slice(0, 8).map(x => x.line).join('\n'));
+  out.push('ATURAN SINTESIS: satukan seluruh SUMBER di atas sebelum menjawab. Fakta yang didukung ≥2 sumber boleh dinyatakan lugas; klaim satu sumber tulis "menurut [n]" dan jangan ditambah angka lain. Bila dua sumber memberi angka/versi berbeda, tampilkan keduanya dengan nomornya dan sebut mana yang lebih baru atau lebih resmi. Utamakan sumber ★resmi dan data dengan tanggal terbaru. Jangan menambah angka, tahun, atau nama yang tidak ada di SUMBER maupun TRIANGULASI. Jika hanya ensiklopedia umum yang tersedia, katakan datanya umum dan sebutkan tahunnya.');
+  return out.join('\n');
+}
+const srcBlock = rs => rs.map((r, i) => `[${i + 1}] (${host(r.uri) || 'data'}${isAuth(r.uri) || r.type === 'data' ? ' ★resmi' : ''}${r.type === 'wiki' ? ' ensiklopedia' : r.type === 'news' ? ' berita' : r.type === 'data' ? ' data' : ''}) ${r.title}: ${String(r.text).slice(0, r.type === 'data' ? 1200 : 620)}`).join('\n');
 // ✏️ [TEKS BISA DIUBAH] [PROMPT AI] tutorSystem: Perintah utama tutor: peran, cara menjawab, aturan akurasi, gaya (termasuk gaya Bahasa Inggris + terjemahan).
 function tutorSystem(mapel, cfg, level, an, today, hasSrc) {
   return `Kamu adalah ${cfg.persona || 'tutor ' + mapel} untuk platform belajar Indonesia. Hari ini: ${today}.
@@ -1617,28 +1662,42 @@ function heurAnalyze(q, cfg) {
 }
 // ✏️ [TEKS BISA DIUBAH] [PROMPT AI] analyzeQ: Perintah AI penyaring pertanyaan (relevan dengan mapel atau tidak, perlu cari sumber atau tidak).
 async function analyzeQ(mapel, cfg, msgs, question, errs, dl) {
-  const sys = `Kamu perutean pertanyaan untuk tutor "${mapel}". Keluarkan HANYA JSON: {"on_topic":true|false,"redirect":"nama mapel lain atau kosong","kind":"math|fact|concept|language|study|chat","needs_search":true|false,"lang":"id|en","standalone":"pertanyaan terakhir ditulis ulang agar berdiri sendiri (selesaikan kata ganti dari riwayat) dalam bahasa yang sama","queries":["kueri pencarian singkat padat kata kunci, maksimal 2; sertakan versi bahasa Inggris untuk topik global atau ilmiah"],"countries":["nama negara dalam bahasa Inggris yang dibahas, jika ada"],"market":true|false}. market=true bila pertanyaan menyangkut kondisi pasar saat ini, rilis atau berita ekonomi yang akan datang, kalender, arah mata uang atau emas, bank sentral, atau data ekonomi terbaru (hanya untuk mapel trading; selain itu false). Aturan: on_topic=false HANYA bila pertanyaan jelas milik mapel lain atau tidak terkait belajar; sapaan, terima kasih, klarifikasi, lanjutan percakapan, dan tips belajar = true. needs_search=true untuk fakta, definisi, tanggal, statistik, aturan kebahasaan, sejarah, dan data dunia; false untuk hitungan atau aljabar murni, sapaan, dan tips belajar. Mapel yang tersedia: ${Object.keys(TUT).filter(k => !TRADING_MAPEL.includes(k)).join(', ')}. Mapel "Umum (Trivia Dunia)" menerima pertanyaan apa pun yang edukatif.`;
+  const sys = `Kamu perutean pertanyaan untuk tutor "${mapel}". Keluarkan HANYA JSON: {"on_topic":true|false,"redirect":"nama mapel lain atau kosong","kind":"math|fact|concept|language|study|chat","needs_search":true|false,"lang":"id|en","standalone":"pertanyaan terakhir ditulis ulang agar berdiri sendiri (selesaikan kata ganti dari riwayat) dalam bahasa yang sama","queries":["kueri pencarian singkat padat kata kunci, maksimal 3; WAJIB sertakan 1 versi bahasa Inggris bila topiknya global, ilmiah, atau berbahasa asing"],"countries":["nama negara dalam bahasa Inggris yang dibahas, jika ada"],"market":true|false}. market=true bila pertanyaan menyangkut kondisi pasar saat ini, rilis atau berita ekonomi yang akan datang, kalender, arah mata uang atau emas, bank sentral, atau data ekonomi terbaru (hanya untuk mapel trading; selain itu false). Aturan: on_topic=false HANYA bila pertanyaan jelas milik mapel lain atau tidak terkait belajar; sapaan, terima kasih, klarifikasi, lanjutan percakapan, dan tips belajar = true. needs_search=true untuk fakta, definisi, tanggal, statistik, aturan kebahasaan, sejarah, dan data dunia; false untuk hitungan atau aljabar murni, sapaan, dan tips belajar. Mapel yang tersedia: ${Object.keys(TUT).filter(k => !TRADING_MAPEL.includes(k)).join(', ')}. Mapel "Umum (Trivia Dunia)" menerima pertanyaan apa pun yang edukatif.`;
   const hist = msgs.slice(-5, -1).map(m => `${m.role === 'user' ? 'Siswa' : 'Tutor'}: ${m.content.slice(0, 300)}`).join('\n');
   const r = await llm(sys, [{ role: 'user', content: `${hist ? 'RIWAYAT:\n' + hist + '\n\n' : ''}PERTANYAAN TERAKHIR: ${question}` }], 500, errs, dl, { temp: 0, json: 'object' });
   if (!r) return null;
   try {
     const o = parseAiJson(r.text), arr = (a, n) => (Array.isArray(a) ? a.map(x => String(x).slice(0, 160)).filter(Boolean).slice(0, n) : []);
     const kind = ['math', 'fact', 'concept', 'language', 'study', 'chat'].includes(o.kind) ? o.kind : 'fact';
-    return { on_topic: o.on_topic !== false, redirect: String(o.redirect || '').slice(0, 40), kind, needs_search: o.needs_search !== false && kind !== 'chat' && kind !== 'study', lang: o.lang === 'en' ? 'en' : 'id', standalone: String(o.standalone || question).slice(0, 500), queries: arr(o.queries, 2), countries: arr(o.countries, 2), market: o.market === true };
+    return { on_topic: o.on_topic !== false, redirect: String(o.redirect || '').slice(0, 40), kind, needs_search: o.needs_search !== false && kind !== 'chat' && kind !== 'study', lang: o.lang === 'en' ? 'en' : 'id', standalone: String(o.standalone || question).slice(0, 500), queries: arr(o.queries, 3), countries: arr(o.countries, 2), market: o.market === true };
   } catch (e) { return null; }
 }
 /* ---------- BUKTI: pencarian situs tepercaya + data negara ---------- */
 async function gatherEvidence(an, cfg, question) {
-  const loc = an.lang === 'en' || cfg.cat === 'umum' ? { gl: 'us', hl: 'en' } : { gl: 'id', hl: 'id' }, qs = (an.queries.length ? an.queries : [an.standalone || question]).slice(0, 2);
-  const jobs = qs.map(q => searchAll(q, cfg.cat, loc).then(r => r.results || []).catch(() => []));
-  if (cfg.countries && an.countries.length) jobs.push(countryEvidence(an.countries).catch(() => []));
-  if (cfg.cat !== 'trading' && cfg.cat !== 'umum' && /kurikulum|capaian pembelajaran|\bfase\b|\bkelas\s*\d|\btka\b|utbk|snbt|kisi-?kisi/i.test(question)) jobs.push(searchAll((an.standalone || question).slice(0, 120) + ' Kurikulum Merdeka terbaru', 'kurikulum', { gl: 'id', hl: 'id' }).then(r => r.results || []).catch(() => []));
-  const all = await Promise.race([Promise.all(jobs), new Promise(r => setTimeout(() => r(null), 17000))]);
-  if (!all) return { results: [], timeout: true };
-  const seen = new Set(), out = [];
-  all.flat().forEach(r => { const k = r.uri || r.title; if (!seen.has(k)) { seen.add(k); out.push(r); } });
+  const loc = an.lang === 'en' || cfg.cat === 'umum' ? { gl: 'us', hl: 'en' } : { gl: 'id', hl: 'id' };
+  const qs = (an.queries.length ? an.queries : [an.standalone || question]).slice(0, 3);
+  const T = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r([]), ms))]);
+  const jobs = qs.map(q => T(searchAll(q, cfg.cat, loc).then(r => r.results || []).catch(() => []), 15000));
+  if (cfg.countries && an.countries.length) jobs.push(T(countryEvidence(an.countries).catch(() => []), 12000));
+  if (cfg.cat !== 'trading' && cfg.cat !== 'umum' && /kurikulum|capaian pembelajaran|\bfase\b|\bkelas\s*\d|\btka\b|utbk|snbt|kisi-?kisi/i.test(question)) jobs.push(T(searchAll((an.standalone || question).slice(0, 120) + ' Kurikulum Merdeka terbaru', 'kurikulum', { gl: 'id', hl: 'id' }).then(r => r.results || []).catch(() => []), 15000));
+  const all = await Promise.all(jobs);
+  const seen = new Set(), fps = new Set(), out = [];
+  const urlKey = r => String(r.uri || r.title || '').toLowerCase().replace(/#.*$/, '').replace(/\/$/, '');
+  const fpOf = r => String(r.text || '').slice(0, 200).toLowerCase().replace(/\W+/g, ' ').trim();
+  all.flat().forEach(r => {
+    const k = urlKey(r); if (!k || seen.has(k)) return;
+    const f = fpOf(r); if (f.length > 60 && fps.has(f)) return;
+    seen.add(k); if (f.length > 60) fps.add(f); out.push(r);
+  });
   const rank = r => (r.type === 'data' ? 0 : r.type === 'answer' ? 1 : isAuth(r.uri) ? 2 : r.type === 'wiki' ? 3 : r.type === 'news' ? 5 : 4);
-  return { results: out.sort((a, b) => rank(a) - rank(b)).slice(0, 8) };
+  const top = out.sort((a, b) => rank(a) - rank(b)).slice(0, 12);
+  await Promise.all(top.filter(r => isAuth(r.uri) && r.type !== 'data' && !/\.pdf(\?|$)/i.test(r.uri)).slice(0, 2).map(async r => {
+    try {
+      const t = await Promise.race([fetchPage(r.uri), new Promise((_, x) => setTimeout(() => x(new Error('timeout')), 7000))]);
+      if (t && t.length > 400) r.text = (String(r.text || '') + ' ' + t).slice(0, 2600);
+    } catch (e) { /* tetap pakai cuplikan pencarian */ }
+  }));
+  return { results: top };
 }
 /* ---------- HITUNGAN: dua solusi independen lalu dibandingkan ---------- */
 const finalOf = t => { const m = /JAWABAN AKHIR:\s*([^\n]+)/i.exec(String(t)); return m ? m[1].trim() : ''; };
@@ -1709,7 +1768,7 @@ async function tutorHandler(req, res) {
     } else searchNote = (searchNote ? searchNote + '; ' : '') + 'data pasar belum bisa dimuat';
   }
   let sys = tutorSystem(mapel, cfg, level, an, today, results.length > 0);
-  if (results.length) sys += '\n\nSUMBER (data hasil pencarian):\n' + srcBlock(results);
+  if (results.length) sys += '\n\nSUMBER (data hasil pencarian):\n' + srcBlock(results) + fuseEvidence(results);
   if (mkt) sys += '\n\nDATA PASAR TERVALIDASI (diambil ' + mkt.fetchedAt + '; kalender rilis, jadwal resmi, data BLS, yield, harga harian, fundamental global, mesin skor). ATURAN: jadikan bagian ini sumber utama untuk kondisi pasar dan berita yang akan datang; kutip penanda seperti [D] [C] [S] [M] [L] [SC]; JANGAN menyebut data atau angka yang tidak ada di sini; bila diminta arah pair, rujuk mesin skor [M] dan skenario [SC] apa adanya dan tegaskan ini edukasi, bukan saran finansial; data berlabel DIBUANG pada [VAL] tidak boleh dipakai.\n' + mktText;
   let ans = null, consensus = null;
   if (an.kind === 'math' && cfg.math) { const m = await mathSolve(sys, msgs, errs, dl); if (m) { ans = m; consensus = m.consensus; } }
@@ -1733,7 +1792,7 @@ async function tutorHandler(req, res) {
   }
   res.status(200).json({ text, intent: an.kind, confidence: conf, provider: ans.provider, model: ans.model, consensus, rewritten: an.standalone, queries: an.queries, searchNote, market: mkt ? { fetchedAt: mkt.fetchedAt, issues: (mkt.val || []).length, usd: mkt.eng && mkt.eng.usd ? mkt.eng.usd.bias : null } : null,
     verified: ver ? { by: ver.provider, verdict: ver.verdict, issues: ver.issues } : null,
-    sources: results.filter(r => r.uri).map((r, i) => ({ n: i + 1, title: String(r.title).slice(0, 140), uri: r.uri, official: isAuth(r.uri) || r.type === 'data', type: r.type })), cited, ms: Date.now() - t0 });
+    sources: results.map((r, i) => ({ n: i + 1, title: String(r.title).slice(0, 140), uri: r.uri, official: isAuth(r.uri) || r.type === 'data', type: r.type })).filter(x => x.uri), cited, triangulasi: results.length ? (fuseEvidence(results).match(/ANGKA DIDUKUNG/g) ? 'silang' : 'tunggal') : null, ms: Date.now() - t0 });
 }
 /* ---------- SOAL DUNIA: data negara (deterministik) + soal AI yang dibuktikan kutipan sumber ---------- */
 // ✏️ [TEKS BISA DIUBAH] [DAFTAR] REG_ID: Nama benua/kawasan dalam Bahasa Indonesia pada soal data negara.
@@ -1959,3 +2018,6 @@ module.exports = async (req, res) => {
     sources: results.filter(r => r.uri).slice(0, 6).map(r => ({ title: r.title, uri: r.uri }))
   });
 };
+
+module.exports.fuseEvidence = fuseEvidence;
+module.exports.normNum = normNum;
