@@ -69,6 +69,20 @@ function lbSay(text, lang) {
   } catch (e) { lbToast('Suara tidak tersedia: ' + e.message); }
 }
 function lbSayEl(el) { lbSay(el.getAttribute('data-w'), el.getAttribute('data-l')); }
+function lbSayAll(i) {
+  const v = LB_VERBS[i]; if (!v) return;
+  try {
+    if (!('speechSynthesis' in window)) { lbToast('Browser ini tidak mendukung suara.'); return; }
+    speechSynthesis.cancel();
+    const vs = speechSynthesis.getVoices() || [];
+    const vv = vs.filter(function (x) { return (x.lang || '').toLowerCase().indexOf('en') === 0; })[0];
+    [v.v1, String(v.v2).split('/')[0], String(v.v3).split('/')[0], v.ing, v.s].forEach(function (w) {
+      const u = new SpeechSynthesisUtterance(String(w));
+      u.lang = 'en-US'; u.rate = 0.9; if (vv) u.voice = vv;
+      speechSynthesis.speak(u);
+    });
+  } catch (e) { lbToast('Suara tidak tersedia: ' + e.message); }
+}
 function lbAudioBtn(w, lang, cls) {
   return '<button type="button" class="lb-audio ' + (cls || '') + '" data-w="' + lbEsc(w) + '" data-l="' + lang + '" onclick="event.stopPropagation();lbSayEl(this)" aria-label="Dengarkan" title="Dengarkan">🔊</button>';
 }
@@ -175,11 +189,11 @@ function lbRender() {
 }
 
 /* ---------- LATIHAN JEPANG ---------- */
-const LB_JP_MODES = [['kana', 'Kana'], ['kanji', 'Kanji'], ['vocab', 'Kosakata'], ['build', 'Susun kalimat']];
+const LB_JP_MODES = [['kana', 'Kana'], ['kanji', 'Kanji'], ['vocab', 'Kosakata'], ['build', 'Susun kalimat'], ['mix', 'Campur']];
 function lbJpQuiz() {
   const q = LB.jq;
   const head = '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Latihan</div><h3>Uji kemampuan Jepangmu</h3></div><span class="lb-count">' + (q ? q.n + ' soal' : 'siap') + '</span></div>' +
-    '<div class="lb-seg lb-seg-wrap">' + LB_JP_MODES.map(function (m) { return '<button type="button" class="' + (q && q.mode === m[0] ? 'on' : '') + '" onclick="lbJpStartQuiz(\'' + m[0] + '\')">' + m[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="lb-seg lb-seg-wrap">' + LB_JP_MODES.map(function (m) { return '<button type="button" class="' + (q && (q.mix ? m[0] === 'mix' : q.mode === m[0]) ? 'on' : '') + '" onclick="lbJpStartQuiz(\'' + m[0] + '\')">' + m[1] + '</button>'; }).join('') + '</div>' +
     (q ? '<div class="lb-quiz-meta"><span>Benar <b>' + q.score + '</b>/' + q.n + '</span><span class="mut">' + lbEsc(q.label) + '</span></div>' : '<div class="mut small" style="margin-top:10px">Pilih jenis latihan. Kana, kanji, dan kosakata memakai pilihan ganda; susun kalimat memakai potongan kata.</div>') +
     '</div>';
   if (!q) return head + '<div class="card lb-empty"><div class="lb-empty-ico">🎯</div><b>Mulai latihan</b><div class="mut small">Ketuk salah satu jenis di atas.</div></div>';
@@ -187,8 +201,10 @@ function lbJpQuiz() {
 }
 function lbJpStartQuiz(mode) {
   if (mode === 'build') { LB.tabJp = 'grammar'; lbBuildStart(); return; }
+  const mix = mode === 'mix';
+  if (mix) mode = ['kana', 'kanji', 'vocab'][Math.floor(Math.random() * 3)];
   const prev = LB.jq || { n: 0, score: 0 };
-  const q = { mode: mode, label: { kana: 'Baca kana', kanji: 'Arti & baca kanji', vocab: 'Arti kosakata' }[mode], n: (prev.n || 0) + 1, score: prev.score || 0, done: false, ok: false };
+  const q = { mode: mode, mix: mix, label: mix ? 'Campur' : { kana: 'Baca kana', kanji: 'Arti & baca kanji', vocab: 'Arti kosakata' }[mode], n: (prev.n || 0) + 1, score: prev.score || 0, done: false, ok: false };
   if (mode === 'kana') {
     const pool = lbKanaFlat(LB.ks === 'kata' ? 'kata' : 'hira');
     const uniq = [], seen = {};
@@ -237,10 +253,10 @@ function lbJqPick(k) {
 function lbJqNext() {
   const q = LB.jq; if (!q) return;
   const st = { n: q.n, score: q.score };
-  const mode = q.mode;
+  const mix = q.mix;
   LB.jq = { n: st.n, score: st.score };
-  lbJpStartQuiz(mode);
-  LB.jq.n = st.n + 1; LB.jq.score = st.score;
+  lbJpStartQuiz(mix ? 'mix' : q.mode);
+  LB.jq.n = st.n + 1; LB.jq.score = st.score; LB.jq.mix = mix;
   lbRender();
 }
 function lbJpAI() { return lbChatView('jp', '🤖 Sakura Sensei', 'AI ini hanya membahas bahasa Jepang: kana, kanji, partikel, dan percakapan.', LB_STARTERS.jp); }
@@ -249,7 +265,7 @@ function lbJpStats() {
   const s = lbStats('jp'), m = lbMastery('jp'), keys = Object.keys(m);
   const mastered = keys.filter(function (k) { return m[k].box >= 4; }).length;
   const learn = keys.filter(function (k) { return m[k].box > 0 && m[k].box < 4; }).length;
-  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Progres</div><h3>Perjalanan bahasa Jepangmu</h3></div><span class="lb-count">' + (s.xp || 0) + ' XP</span></div>' +
+  return lbGoal('jp') + '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Progres</div><h3>Perjalanan bahasa Jepangmu</h3></div><span class="lb-count">' + (s.xp || 0) + ' XP</span></div>' +
     '<div class="lb-statgrid">' +
       '<div class="lb-stat"><b>' + (s.streak || 0) + '</b><span>hari beruntun</span></div>' +
       '<div class="lb-stat"><b>' + (s.tries ? Math.round(s.ok / s.tries * 100) : 0) + '%</b><span>akurasi</span></div>' +
@@ -346,6 +362,11 @@ html[data-theme=light] .lb-switch{background:var(--field)}
 .lb-ex-tag{font-size:.62rem;font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;padding-top:3px;flex:0 0 40px}
 .lb-ex-en{font-size:.88rem;font-weight:600;line-height:1.5}
 .lb-ex-id{font-size:.78rem;color:var(--mut)}
+.lb-ex .lb-audio{display:inline-grid;vertical-align:middle;width:24px;height:24px;font-size:.7rem;margin-left:4px}
+.lb-respell{display:block;font-size:.68rem;color:var(--accent2);min-height:1em;margin-top:1px}
+.lb-note{font-size:.72rem;color:var(--mut);padding:5px 2px}
+.lb-sayall{white-space:nowrap;font-size:.72rem}
+.lb-goal .lb-progress{margin-top:6px}
 .lb-tip{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--warn-soft);border:1px solid var(--warn-line);font-size:.8rem;line-height:1.55}
 .lb-skel{height:14px;border-radius:8px;background:linear-gradient(90deg,var(--card2),var(--field),var(--card2));background-size:200% 100%;animation:lbsh 1.1s infinite;margin:6px 0}
 .lb-skel.sh{width:70%}
@@ -544,18 +565,19 @@ function lbEnDetailHtml(i) {
       '<div><div class="lb-eyebrow">' + (v.irr ? 'Irregular verb' : 'Regular verb') + '</div><h2 class="lb-detail-title">' + lbEsc(v.v1) + '</h2>' +
       '<div class="lb-arti">' + (v.arti ? lbEsc(v.arti) : '<span class="mut">arti belum tersedia</span>') + '</div></div>' +
       '<div class="lb-detail-actions">' + lbAudioBtn(v.v1, 'en', 'lg') +
+      '<button type="button" class="x lb-sayall" onclick="lbSayAll(' + i + ')" title="Dengarkan semua bentuk">🔊 Semua</button>' +
       '<button type="button" class="lb-fav ' + (fav ? 'on' : '') + '" onclick="lbEnFav(' + i + ')" aria-label="Simpan ke favorit" title="Favorit">' + (fav ? '★' : '☆') + '</button>' +
       '<button type="button" class="lb-close" onclick="lbEnClose()" aria-label="Tutup">✕</button></div>' +
     '</div>' +
     '<div class="lb-forms">' + forms.map(function (f, k) {
-      return '<div class="lb-form"><span>' + f.k + '</span><b>' + lbEsc(f.val) + '</b><em id="lbipa' + k + '">…</em>' + lbAudioBtn(String(f.val).split('/')[0], 'en') + '</div>';
+      return '<div class="lb-form"><span>' + f.k + '</span><b>' + lbEsc(f.val) + '</b><em id="lbipa' + k + '">…</em><span class="lb-respell" id="lbresp' + k + '"></span>' + lbAudioBtn(String(f.val).split('/')[0], 'en') + '</div>';
     }).join('') + '</div>' +
     '<div class="lb-use">' + ['v1', 'v2', 'v3', 'ing', 's'].map(function (k) {
       return '<details class="lb-use-item"><summary>' + lbEsc(LB_EN_USE[k][0]) + '</summary><p>' + lbEsc(LB_EN_USE[k][1]) + '</p><code>' + lbEsc(LB_EN_USE[k][2]) + '</code></details>';
     }).join('') + '</div>' +
-    '<div class="lb-ex-head"><div><div class="lb-eyebrow">Contoh</div><b>Kalimat untuk tiap bentuk</b></div><button type="button" class="x" onclick="lbEnEx(' + i + ',true)">✨ Buat ulang</button></div>' +
+    '<div class="lb-ex-head"><div><div class="lb-eyebrow">Contoh</div><b>Kalimat untuk tiap bentuk</b></div><button type="button" class="x" onclick="lbEnEx(' + i + ',true)">✨ Contoh AI</button></div>' +
     '<div id="lben-ex" class="lb-ex-box"><div class="lb-skel"></div></div>' +
-    '<div class="mut small" style="margin-top:8px">Contoh dibuat oleh AI khusus bahasa Inggris dan disimpan di perangkat ini. Pelafalan memakai IPA dari Wiktionary.</div>' +
+    '<div class="mut small" style="margin-top:8px">Contoh pola tersedia luring untuk semua verb. Contoh AI memakai AI khusus bahasa Inggris dan disimpan di perangkat ini.</div>' +
   '</div>';
 }
 function lbEnDetail(i) {
@@ -569,73 +591,146 @@ function lbEnDetail(i) {
 function lbEnClose() { LB.eDetail = -1; const b = $('lben-detail'); if (b) b.innerHTML = ''; }
 function lbEnFav(i) { const v = LB_VERBS[i]; if (!v) return; const on = lbToggleFav('en', v.v1); lbToast(on ? '⭐ Disimpan ke favorit' : 'Dihapus dari favorit'); lbEnDetail(i); }
 
-/* IPA via Wiktionary (dictionaryapi.dev), di-cache */
+/* IPA: Datamuse (CORS-friendly) -> dictionaryapi.dev -> cache */
+const LB_ARP = { AA: 'ɑ', AE: 'æ', AH: 'ʌ', AO: 'ɔ', AW: 'aʊ', AY: 'aɪ', EH: 'e', ER: 'ɜr', EY: 'eɪ', IH: 'ɪ', IY: 'i', OW: 'oʊ', OY: 'ɔɪ', UH: 'ʊ', UW: 'u', B: 'b', CH: 'tʃ', D: 'd', DH: 'ð', F: 'f', G: 'ɡ', HH: 'h', JH: 'dʒ', K: 'k', L: 'l', M: 'm', N: 'n', NG: 'ŋ', P: 'p', R: 'r', S: 's', SH: 'ʃ', T: 't', TH: 'θ', V: 'v', W: 'w', Y: 'j', Z: 'z', ZH: 'ʒ' };
+function lbArpToIpa(s) {
+  const out = String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).map(function (x) {
+    return LB_ARP[x.replace(/[0-9]/g, '').toUpperCase()] || '';
+  }).join('');
+  return out ? '/' + out + '/' : '';
+}
+function lbRespell(ipa) {
+  let s = String(ipa || '').replace(/^\/|\/$/g, '').replace(/[ˈˌ.ːˑ]/g, '');
+  [['tʃ', 'c'], ['dʒ', 'j'], ['ʃ', 'sy'], ['ʒ', 'zh'], ['θ', 'th'], ['ð', 'dh'], ['ŋ', 'ng'],
+    ['aɪ', 'ai'], ['eɪ', 'ei'], ['ɔɪ', 'oi'], ['aʊ', 'au'], ['oʊ', 'ou'], ['əʊ', 'ou'],
+    ['ɪə', 'ir'], ['eə', 'er'], ['ʊə', 'ur'], ['ɜr', 'er'], ['ɜː', 'er']].forEach(function (p) {
+    s = s.split(p[0]).join(p[1]);
+  });
+  const M = { ɑ: 'a', æ: 'e', ʌ: 'a', ɒ: 'o', ɔ: 'o', ə: 'e', ɜ: 'e', ɛ: 'e', ɪ: 'i', i: 'i', ʊ: 'u', u: 'u', e: 'e', o: 'o', a: 'a', ɡ: 'g', j: 'y', w: 'w', r: 'r', l: 'l', m: 'm', n: 'n', b: 'b', p: 'p', t: 't', d: 'd', k: 'k', f: 'f', v: 'v', s: 's', z: 'z', h: 'h', x: 'ks' };
+  let out = '';
+  for (const ch of s) { if (M[ch] !== undefined) out += M[ch]; else if (/[a-z ]/.test(ch)) out += ch; }
+  return out.replace(/\s+/g, ' ').trim();
+}
 function lbIpaLookup(word) {
   const key = 'ipa_' + word;
-  const c = lbLoad(key, null); if (c) return Promise.resolve(c);
-  return fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word))
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) {
-      let t = '', a = '';
-      (Array.isArray(j) ? j : []).forEach(function (e) {
-        (e.phonetics || []).forEach(function (p) { if (!t && p.text) t = p.text; if (!a && p.audio) a = p.audio; });
-        if (!t && e.phonetic) t = e.phonetic;
-      });
-      const out = { t: t, a: a };
-      lbStore(key, out);
-      return out;
-    }).catch(function () { return { t: '', a: '' }; });
+  const c = lbLoad(key, null); if (c && c.t) return Promise.resolve(c);
+  const dm = function () {
+    return fetch('https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=r&max=1')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        const tag = ((Array.isArray(j) && j[0] && j[0].tags) || []).filter(function (x) { return String(x).indexOf('pron:') === 0; })[0];
+        const t = tag ? lbArpToIpa(String(tag).slice(5)) : '';
+        const out = { t: t, a: '' };
+        if (t) lbStore(key, out);
+        return out;
+      }).catch(function () { return { t: '', a: '' }; });
+  };
+  const dict = function () {
+    return fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        let t = '', a = '';
+        (Array.isArray(j) ? j : []).forEach(function (e) {
+          (e.phonetics || []).forEach(function (p) { if (!t && p.text) t = p.text; if (!a && p.audio) a = p.audio; });
+          if (!t && e.phonetic) t = e.phonetic;
+        });
+        const out = { t: t, a: a };
+        if (t) lbStore(key, out);
+        return out;
+      }).catch(function () { return { t: '', a: '' }; });
+  };
+  return dm().then(function (o) { return o.t ? o : dict(); });
 }
 function lbEnIPA(i) {
   const v = LB_VERBS[i]; if (!v) return;
-  const seen = {};
-  let chain = Promise.resolve();
   [v.v1, String(v.v2).split('/')[0], String(v.v3).split('/')[0], v.ing, v.s].forEach(function (w, k) {
-    chain = chain.then(function () { return lbIpaLookup(w); }).then(function (p) {
-      const t = p && p.t ? p.t : '';
-      seen[w] = t;
-      const el = $('lbipa' + k);
-      if (el) el.textContent = t;
+    const timeout = new Promise(function (r) { setTimeout(function () { r({ t: '', a: '' }); }, 4500); });
+    Promise.race([lbIpaLookup(w), timeout]).then(function (p) {
+      const el = $('lbipa' + k), rs = $('lbresp' + k);
+      if (el) el.textContent = p && p.t ? p.t : '—';
+      if (rs) rs.textContent = p && p.t ? 'dibaca: ' + lbRespell(p.t) : 'klik 🔊 untuk dengar';
     });
   });
 }
 
-function lbExHtml(v, d) {
+function lbExHtml(v, d, tip) {
   if (!d) return '';
   const rows = [['v1', 'V1'], ['v2', 'V2'], ['v3', 'V3'], ['ing', 'V-ing'], ['s', 'V-s']].map(function (x) {
-    const e = d[x[0]]; if (!e || !e.en) return '';
+    const e = d[x[0]];
+    if (!e || !e.en) return '<div class="lb-ex"><span class="lb-ex-tag">' + x[1] + '</span><div><div class="lb-ex-en mut">Contoh belum tersedia.</div></div></div>';
     return '<div class="lb-ex"><span class="lb-ex-tag">' + x[1] + '</span><div><div class="lb-ex-en">' + lbEsc(e.en) + ' ' + lbAudioBtn(e.en, 'en') + '</div><div class="lb-ex-id">' + lbEsc(e.id || '') + '</div></div></div>';
   }).join('');
-  return (rows || '<div class="mut small">Contoh belum tersedia.</div>') + (d.tip ? '<div class="lb-tip">💡 ' + lbEsc(d.tip) + '</div>' : '');
+  const t = tip || (d && d.tip);
+  return rows + (t ? '<div class="lb-tip">💡 ' + lbEsc(t) + '</div>' : '');
 }
-function lbBuiltinHtml(arr) {
-  const tags = ['V1', 'V2', 'V3'];
-  return arr.map(function (x, k) {
-    return '<div class="lb-ex"><span class="lb-ex-tag">' + tags[k] + '</span><div><div class="lb-ex-en">' + lbEsc(x[0]) + ' ' + lbAudioBtn(x[0], 'en') + '</div><div class="lb-ex-id">' + lbEsc(x[1]) + '</div></div></div>';
-  }).join('') + '<div class="lb-tip">💡 Contoh bawaan. Ketuk "Buat ulang" untuk meminta contoh AI tambahan untuk verb ini.</div>';
+function lbExValid(d) {
+  if (!d || typeof d !== 'object') return false;
+  return ['v1', 'v2', 'v3', 'ing', 's'].filter(function (k) { return d[k] && d[k].en; }).length >= 5;
+}
+function lbAutoEx(v) {
+  const fix = (typeof LB_EN_ARTIFIX !== 'undefined' && LB_EN_ARTIFIX[v.v1]) || String(v.arti || '').split(/[,;]/)[0].trim() || 'melakukannya';
+  const intr = (typeof LB_EN_INTR !== 'undefined') && LB_EN_INTR[v.v1];
+  const me = /^me/i.test(fix);
+  const obj = intr ? '' : (me ? ' it' : ' something');
+  const idObj = intr ? '' : (me ? 'nya' : ' sesuatu');
+  const v2 = String(v.v2).split('/')[0], v3 = String(v.v3).split('/')[0];
+  return {
+    v1: { en: 'They ' + v.v1 + obj + ' every day.', id: 'Mereka ' + fix + idObj + ' setiap hari.' },
+    v2: { en: 'She ' + v2 + obj + ' yesterday.', id: 'Dia ' + fix + idObj + ' kemarin.' },
+    v3: { en: 'They have ' + v3 + obj + '.', id: 'Mereka sudah ' + fix + idObj + '.' },
+    ing: { en: 'He is ' + v.ing + obj + ' right now.', id: 'Dia sedang ' + fix + idObj + ' sekarang.' },
+    s: { en: 'She ' + v.s + obj + ' every morning.', id: 'Dia ' + fix + idObj + ' setiap pagi.' },
+    tip: 'Contoh pola otomatis untuk memperlihatkan setiap bentuk. Tekan ✨ Contoh AI untuk kalimat yang lebih natural.'
+  };
+}
+function lbLocalEx(v) {
+  if (typeof LB_EN_SPECIAL !== 'undefined' && LB_EN_SPECIAL[v.v1]) return LB_EN_SPECIAL[v.v1];
+  const auto = lbAutoEx(v);
+  const b = (typeof LB_EN_EX !== 'undefined') && LB_EN_EX[v.v1];
+  if (!b) return auto;
+  return {
+    v1: { en: b[0][0], id: b[0][1] }, v2: { en: b[1][0], id: b[1][1] }, v3: { en: b[2][0], id: b[2][1] },
+    ing: auto.ing, s: auto.s,
+    tip: 'Contoh V1–V3 pilihan; V-ing dan V-s memakai pola otomatis. Tekan ✨ Contoh AI untuk kelima bentuk versi AI.'
+  };
 }
 function lbEnEx(i, force) {
   const v = LB_VERBS[i], box = $('lben-ex');
   if (!v || !box) return;
+  const local = lbLocalEx(v);
   const cached = lbLoad('ex_' + v.v1, null);
-  if (cached && !force) { box.innerHTML = lbExHtml(v, cached); return; }
-  if (LB_EN_EX[v.v1] && !force) { box.innerHTML = lbBuiltinHtml(LB_EN_EX[v.v1]); return; }
-  box.innerHTML = '<div class="lb-skel"></div><div class="lb-skel sh"></div>';
+  const show = function (d, tip) { if (LB.eDetail === i && $('lben-ex')) $('lben-ex').innerHTML = lbExHtml(v, d, tip); };
+  if (cached && lbExValid(cached) && !force) { show(cached); return; }
+  show(local);
+  if (typeof ai !== 'function') return;
+  if (typeof user === 'undefined' || !user) { if (force) lbToast('Masuk dulu untuk memakai contoh AI.'); return; }
+  const failKey = 'exfail_' + v.v1, failed = lbLoad(failKey, 0);
+  if (!force && failed && Date.now() - failed < 3600000) return;
+  LB.exBusy = LB.exBusy || {};
+  if (LB.exBusy[v.v1]) return;
+  LB.exBusy[v.v1] = 1;
   const forms = { v1: v.v1, v2: String(v.v2).split('/')[0], v3: String(v.v3).split('/')[0], ing: v.ing, s: v.s };
   const sys = 'You are an accurate English grammar teacher for Indonesian learners. Output ONLY valid JSON, no markdown.';
   const ask = 'Verb: "' + v.v1 + '" (meaning: ' + (v.arti || '-') + '). Forms: V1="' + forms.v1 + '", V2="' + forms.v2 + '", V3="' + forms.v3 + '", V-ing="' + forms.ing + '", V-s="' + forms.s + '". For EACH form write ONE natural example sentence (level A2-B1) that uses that exact form correctly (V1: present simple or after a modal; V2: past simple; V3: present perfect or passive; V-ing: continuous; V-s: he/she/it). Add a natural Indonesian translation. Also add a short "tip" in Indonesian about a common mistake with this verb. JSON: {"v1":{"en":"","id":""},"v2":{"en":"","id":""},"v3":{"en":"","id":""},"ing":{"en":"","id":""},"s":{"en":"","id":""},"tip":""}';
-  if (typeof ai !== 'function') { box.innerHTML = '<div class="lb-error">AI belum siap.</div>'; return; }
+  const note = document.createElement('div');
+  note.className = 'lb-note';
+  note.textContent = '✨ Menyempurnakan contoh dengan AI…';
+  box.appendChild(note);
   ai(sys, [{ role: 'user', content: ask }], false, false, '', 'inggris', { temp: 0.4, json: 'object' })
     .then(function (t) {
       const m = String(t).match(/\{[\s\S]*\}/);
       let d = null;
       if (m) { try { d = JSON.parse(typeof fixJ === 'function' ? fixJ(m[0]) : m[0]); } catch (e) { d = null; } }
-      if (!d) throw new Error('Format contoh tidak terbaca');
+      if (!lbExValid(d)) throw new Error('Format contoh belum lengkap');
       lbStore('ex_' + v.v1, d);
-      if (LB.eDetail === i && $('lben-ex')) $('lben-ex').innerHTML = lbExHtml(v, d);
+      delete LB.exBusy[v.v1];
+      show(d);
     })
     .catch(function (e) {
-      if (LB.eDetail === i && $('lben-ex')) $('lben-ex').innerHTML = '<div class="lb-error">⚠️ ' + lbEsc(e.message) + ' <button type="button" class="x" onclick="lbEnEx(' + i + ',true)">Coba lagi</button></div>';
+      delete LB.exBusy[v.v1];
+      lbStore(failKey, Date.now());
+      show(local, (local.tip || '') + ' (AI belum tersedia: ' + String(e.message || 'gagal').slice(0, 90) + ')');
+      if (force) lbToast('Contoh AI gagal; contoh pola tetap ditampilkan.');
     });
 }
 
@@ -694,12 +789,12 @@ function lbEnRate(ok) {
 }
 
 /* ---------- LATIHAN INGGRIS ---------- */
-const LB_EN_MODES = [['v2', 'Isi V2'], ['v3', 'Isi V3'], ['arti', 'Arti'], ['dengar', 'Listening']];
+const LB_EN_MODES = [['v2', 'Isi V2'], ['v3', 'Isi V3'], ['arti', 'Arti'], ['dengar', 'Listening'], ['mix', 'Campur']];
 function lbEnQuiz() {
   const q = LB.q;
   const head = '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Latihan</div><h3>Uji pemahaman verb</h3></div>' +
     '<span class="lb-count">' + (q ? q.n + ' soal' : 'siap') + '</span></div>' +
-    '<div class="lb-seg">' + LB_EN_MODES.map(function (m) { return '<button type="button" class="' + (q && q.mode === m[0] ? 'on' : '') + '" onclick="lbEnStart(\'' + m[0] + '\')">' + m[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="lb-seg">' + LB_EN_MODES.map(function (m) { return '<button type="button" class="' + (q && (q.mix ? m[0] === 'mix' : q.mode === m[0]) ? 'on' : '') + '" onclick="lbEnStart(\'' + m[0] + '\')">' + m[1] + '</button>'; }).join('') + '</div>' +
     (q ? '<div class="lb-quiz-meta"><span>Benar <b>' + q.score + '</b>/' + q.n + '</span><span class="mut">' + lbEsc(q.modeLabel) + '</span></div>' : '<div class="mut small" style="margin-top:10px">Pilih jenis latihan. Setiap jawaban menambah XP dan memperbarui penguasaan verb.</div>') +
     '</div>';
   if (!q) return head + '<div class="card lb-empty"><div class="lb-empty-ico">🎯</div><b>Mulai latihan</b><div class="mut small">Ketuk salah satu jenis di atas.</div></div>';
@@ -707,8 +802,10 @@ function lbEnQuiz() {
 }
 function lbEnStart(mode) {
   LB.tabEn = 'quiz';
+  const mix = mode === 'mix';
+  if (mix) mode = ['v2', 'v3', 'arti', 'dengar'][Math.floor(Math.random() * 4)];
   const v = LB_VERBS[Math.floor(Math.random() * LB_VERBS.length)];
-  const q = { mode: mode, modeLabel: { v2: 'Isi bentuk V2', v3: 'Isi bentuk V3', arti: 'Pilih arti yang tepat', dengar: 'Dengarkan lalu pilih verb' }[mode], v: v, n: (LB.q && LB.q.n) || 1, score: (LB.q && LB.q.score) || 0, done: false, ok: false, val: '' };
+  const q = { mode: mode, mix: mix, modeLabel: { v2: 'Isi bentuk V2', v3: 'Isi bentuk V3', arti: 'Pilih arti yang tepat', dengar: 'Dengarkan lalu pilih verb' }[mode], v: v, n: (LB.q && LB.q.n) || 1, score: (LB.q && LB.q.score) || 0, done: false, ok: false, val: '' };
   if (mode === 'arti') {
     const pool = lbShuffle(LB_VERBS.filter(function (x) { return x.arti && x.arti !== v.arti; })).slice(0, 3).map(function (x) { return x.arti; });
     q.options = lbShuffle(pool.concat([v.arti]));
@@ -772,10 +869,11 @@ function lbEnFinishQ() {
 function lbEnNext() {
   const q = LB.q; if (!q) return;
   const keep = { n: q.n + 1, score: q.score };
-  const mode = q.mode;
+  const mix = q.mix;
+  const mode = mix ? ['v2', 'v3', 'arti', 'dengar'][Math.floor(Math.random() * 4)] : q.mode;
   LB.q = null;
   const v = LB_VERBS[Math.floor(Math.random() * LB_VERBS.length)];
-  LB.q = { mode: mode, modeLabel: { v2: 'Isi bentuk V2', v3: 'Isi bentuk V3', arti: 'Pilih arti yang tepat', dengar: 'Dengarkan lalu pilih verb' }[mode], v: v, n: keep.n, score: keep.score, done: false, ok: false, val: '' };
+  LB.q = { mode: mode, mix: mix, modeLabel: { v2: 'Isi bentuk V2', v3: 'Isi bentuk V3', arti: 'Pilih arti yang tepat', dengar: 'Dengarkan lalu pilih verb' }[mode], v: v, n: keep.n, score: keep.score, done: false, ok: false, val: '' };
   if (mode === 'arti') {
     const pool = lbShuffle(LB_VERBS.filter(function (x) { return x.arti && x.arti !== v.arti; })).slice(0, 3).map(function (x) { return x.arti; });
     LB.q.options = lbShuffle(pool.concat([v.arti]));
@@ -861,6 +959,10 @@ function lbChatView(lang, title, sub, starters) {
   '</div>';
 }
 function lbEnAI() { return lbChatView('en', '🤖 English Coach', 'AI ini hanya membahas bahasa Inggris: grammar, verb, pelafalan, dan latihan menulis.', LB_STARTERS.en); }
+function lbGoal(lang) {
+  const s = lbStats(lang), x = (s.days || {})[lbToday()] || 0, goal = 30, p = Math.min(100, Math.round(x / goal * 100));
+  return '<div class="card lb-panel lb-goal"><div class="lb-panel-head"><div><div class="lb-eyebrow">Target hari ini</div><h3>' + x + ' / ' + goal + ' XP</h3></div><span class="lb-count">' + p + '%</span></div><div class="lb-progress"><i style="width:' + p + '%"></i></div><div class="mut small" style="margin-top:8px">' + (x >= goal ? '🎉 Target tercapai! Jaga streak dengan satu sesi kecil lagi.' : 'Kurang ' + (goal - x) + ' XP lagi — sekitar ' + Math.ceil((goal - x) / 10) + ' soal atau ' + Math.ceil((goal - x) / 6) + ' kartu.') + '</div></div>';
+}
 
 /* ---------- PROGRES INGGRIS ---------- */
 function lbEnStats() {
@@ -868,7 +970,7 @@ function lbEnStats() {
   const mastered = keys.filter(function (k) { return m[k].box >= 4; }).length;
   const learn = keys.filter(function (k) { return m[k].box > 0 && m[k].box < 4; }).length;
   const weak = keys.filter(function (k) { return m[k].seen >= 2 && m[k].box < 2; }).slice(0, 8).map(function (k) { return k.split(':')[0]; });
-  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Progres</div><h3>Perjalanan bahasa Inggrismu</h3></div><span class="lb-count">' + (s.xp || 0) + ' XP</span></div>' +
+  return lbGoal('en') + '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Progres</div><h3>Perjalanan bahasa Inggrismu</h3></div><span class="lb-count">' + (s.xp || 0) + ' XP</span></div>' +
     '<div class="lb-statgrid">' +
       '<div class="lb-stat"><b>' + (s.streak || 0) + '</b><span>hari beruntun</span></div>' +
       '<div class="lb-stat"><b>' + (s.tries ? Math.round(s.ok / s.tries * 100) : 0) + '%</b><span>akurasi</span></div>' +

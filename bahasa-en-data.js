@@ -29,3 +29,137 @@ const LB_EN_USE = {
   ing: ['V-ing — bentuk berlangsung', 'Continuous tense (be + V-ing: sedang melakukan), gerund (kegiatan sebagai subjek/objek: Swimming is fun), setelah preposisi, dan setelah verba seperti enjoy, finish, avoid.', 'am / is / are / was / were + V-ing'],
   s: ['V-s / V-es — orang ketiga', 'Present simple untuk subjek he/she/it: He goes, she works. Perhatikan penambahan -es dan perubahan -y menjadi -ies.', 'he / she / it + V-s/es']
 };
+
+/* Verb intransitif: contoh pola tidak memakai objek "it". */
+const LB_EN_INTR = {
+  arise: 1, awake: 1, agree: 1, appear: 1, arrive: 1, bleed: 1, breed: 1, burst: 1, cling: 1,
+  creep: 1, cry: 1, dance: 1, dream: 1, fall: 1, flee: 1, fly: 1, grow: 1, hang: 1, jump: 1,
+  kneel: 1, laugh: 1, lean: 1, leap: 1, lie: 1, listen: 1, look: 1, move: 1, quit: 1, rest: 1,
+  return: 1, rise: 1, run: 1, shine: 1, shrink: 1, sink: 1, sit: 1, sleep: 1, slide: 1, smile: 1,
+  speak: 1, spin: 1, stay: 1, stop: 1, talk: 1, travel: 1, wait: 1, walk: 1, work: 1, worry: 1, yell: 1
+};
+
+/* Arti yang dipakai untuk kalimat pola agar bunyinya wajar. */
+const LB_EN_ARTIFIX = {
+  say: 'mengatakan', know: 'mengenal', want: 'menginginkan', hope: 'mengharapkan',
+  speak: 'berbicara', look: 'melihat', wait: 'menunggu', agree: 'setuju', appear: 'muncul',
+  arrive: 'tiba', sleep: 'tidur', dream: 'bermimpi', rain: 'turun hujan', happen: 'terjadi',
+  die: 'meninggal', live: 'tinggal', cost: 'berharga', fit: 'cocok', hurt: 'terasa sakit',
+  belong: 'milik', mean: 'berarti'
+};
+
+/* Contoh lima bentuk untuk verb yang polanya tidak bisa dibuat otomatis. */
+const LB_EN_SPECIAL = {
+  be: {
+    v1: { en: 'They want to be ready.', id: 'Mereka ingin siap.' },
+    v2: { en: 'She was tired yesterday.', id: 'Dia lelah kemarin.' },
+    v3: { en: 'They have been busy.', id: 'Mereka sudah sibuk.' },
+    ing: { en: 'He is being careful.', id: 'Dia sedang berhati-hati.' },
+    s: { en: 'She is ready every morning.', id: 'Dia siap setiap pagi.' },
+    tip: 'V1 be berubah menjadi am/is/are; bentuk lampau was/were; past participle been.'
+  },
+  become: {
+    v1: { en: 'They become tired every day.', id: 'Mereka menjadi lelah setiap hari.' },
+    v2: { en: 'She became a teacher.', id: 'Dia menjadi guru.' },
+    v3: { en: 'They have become friends.', id: 'Mereka sudah menjadi teman.' },
+    ing: { en: 'He is becoming stronger.', id: 'Dia sedang menjadi lebih kuat.' },
+    s: { en: 'She becomes happy every morning.', id: 'Dia menjadi senang setiap pagi.' },
+    tip: 'become diikuti kata sifat atau kata benda.'
+  },
+  cost: {
+    v1: { en: 'It can cost a lot.', id: 'Barang itu bisa sangat mahal.' },
+    v2: { en: 'It cost a lot yesterday.', id: 'Barang itu mahal kemarin.' },
+    v3: { en: 'It has cost a lot.', id: 'Barang itu sudah memakan banyak biaya.' },
+    ing: { en: 'It is costing a lot.', id: 'Biayanya sedang membengkak.' },
+    s: { en: 'It costs a lot.', id: 'Barang itu mahal.' },
+    tip: 'cost tidak berubah pada V2 dan V3.'
+  },
+  fit: {
+    v1: { en: 'It can fit in the bag.', id: 'Itu bisa muat di tas.' },
+    v2: { en: 'It fit well yesterday.', id: 'Itu pas kemarin.' },
+    v3: { en: 'It has fit well.', id: 'Itu sudah pas.' },
+    ing: { en: 'It is fitting well.', id: 'Itu sedang pas.' },
+    s: { en: 'It fits well.', id: 'Itu pas.' },
+    tip: 'fit sering dipakai untuk ukuran atau pakaian.'
+  },
+  hurt: {
+    v1: { en: 'My arm can hurt after exercise.', id: 'Lenganku bisa sakit setelah olahraga.' },
+    v2: { en: 'My arm hurt yesterday.', id: 'Lenganku sakit kemarin.' },
+    v3: { en: 'My arm has hurt all day.', id: 'Lenganku sudah sakit sepanjang hari.' },
+    ing: { en: 'My arm is hurting now.', id: 'Lenganku sedang sakit sekarang.' },
+    s: { en: 'My arm hurts.', id: 'Lenganku sakit.' },
+    tip: 'hurt tidak berubah pada V2 dan V3.'
+  },
+  rain: {
+    v1: { en: 'It can rain today.', id: 'Hari ini bisa hujan.' },
+    v2: { en: 'It rained yesterday.', id: 'Kemarin hujan.' },
+    v3: { en: 'It has rained.', id: 'Sudah hujan.' },
+    ing: { en: 'It is raining now.', id: 'Sekarang sedang hujan.' },
+    s: { en: 'It rains every afternoon.', id: 'Setiap sore hujan.' },
+    tip: 'rain memakai subjek it.'
+  },
+  happen: {
+    v1: { en: 'It can happen to anyone.', id: 'Itu bisa terjadi pada siapa saja.' },
+    v2: { en: 'It happened yesterday.', id: 'Itu terjadi kemarin.' },
+    v3: { en: 'It has happened before.', id: 'Itu sudah terjadi sebelumnya.' },
+    ing: { en: 'It is happening now.', id: 'Itu sedang terjadi sekarang.' },
+    s: { en: 'It happens every day.', id: 'Itu terjadi setiap hari.' },
+    tip: 'happen tidak memakai objek.'
+  },
+  belong: {
+    v1: { en: 'It can belong to you.', id: 'Itu bisa menjadi milikmu.' },
+    v2: { en: 'It belonged to my father.', id: 'Itu milik ayah saya.' },
+    v3: { en: 'It has belonged to us.', id: 'Itu sudah menjadi milik kami.' },
+    ing: { en: 'Belonging to a club is fun.', id: 'Menjadi anggota klub itu menyenangkan.' },
+    s: { en: 'It belongs to me.', id: 'Itu milik saya.' },
+    tip: 'belong to = milik; jarang dipakai dalam bentuk continuous.'
+  },
+  mean: {
+    v1: { en: 'I mean it.', id: 'Saya sungguh-sungguh.' },
+    v2: { en: 'She meant it.', id: 'Dia sungguh-sungguh.' },
+    v3: { en: 'I have meant every word.', id: 'Saya sungguh-sungguh dengan setiap kata.' },
+    ing: { en: 'Meaning matters in language.', id: 'Makna penting dalam bahasa.' },
+    s: { en: 'It means a lot.', id: 'Itu sangat berarti.' },
+    tip: 'mean to = berniat; mean = berarti.'
+  },
+  die: {
+    v1: { en: 'Plants can die without water.', id: 'Tanaman bisa mati tanpa air.' },
+    v2: { en: 'The plant died yesterday.', id: 'Tanaman itu mati kemarin.' },
+    v3: { en: 'The plant has died.', id: 'Tanaman itu sudah mati.' },
+    ing: { en: 'The plant is dying.', id: 'Tanaman itu sedang sekarat.' },
+    s: { en: 'The plant dies without water.', id: 'Tanaman itu mati tanpa air.' },
+    tip: 'die adalah verb intransitif; tidak memakai objek.'
+  },
+  go: {
+    v1: { en: 'They go to school every day.', id: 'Mereka pergi ke sekolah setiap hari.' },
+    v2: { en: 'She went home yesterday.', id: 'Dia pulang kemarin.' },
+    v3: { en: 'They have gone to Bali.', id: 'Mereka sudah pergi ke Bali.' },
+    ing: { en: 'He is going home now.', id: 'Dia sedang pulang sekarang.' },
+    s: { en: 'She goes to work every morning.', id: 'Dia pergi kerja setiap pagi.' },
+    tip: 'go to + tempat; go home tanpa to.'
+  },
+  come: {
+    v1: { en: 'They come here every day.', id: 'Mereka datang ke sini setiap hari.' },
+    v2: { en: 'She came late yesterday.', id: 'Dia datang terlambat kemarin.' },
+    v3: { en: 'They have come back.', id: 'Mereka sudah kembali.' },
+    ing: { en: 'He is coming now.', id: 'Dia sedang datang sekarang.' },
+    s: { en: 'She comes early every morning.', id: 'Dia datang pagi-pagi setiap hari.' },
+    tip: 'come here = datang ke sini; come back = kembali.'
+  },
+  arrive: {
+    v1: { en: 'They arrive at school at seven.', id: 'Mereka tiba di sekolah pukul tujuh.' },
+    v2: { en: 'She arrived late yesterday.', id: 'Dia tiba terlambat kemarin.' },
+    v3: { en: 'They have arrived.', id: 'Mereka sudah tiba.' },
+    ing: { en: 'He is arriving now.', id: 'Dia sedang tiba sekarang.' },
+    s: { en: 'She arrives early every morning.', id: 'Dia tiba pagi-pagi setiap hari.' },
+    tip: 'arrive at + tempat kecil; arrive in + kota atau negara.'
+  },
+  live: {
+    v1: { en: 'They live in Jakarta.', id: 'Mereka tinggal di Jakarta.' },
+    v2: { en: 'She lived there last year.', id: 'Dia tinggal di sana tahun lalu.' },
+    v3: { en: 'They have lived here for years.', id: 'Mereka sudah tinggal di sini bertahun-tahun.' },
+    ing: { en: 'He is living in Bali now.', id: 'Dia sedang tinggal di Bali sekarang.' },
+    s: { en: 'She lives near the school.', id: 'Dia tinggal dekat sekolah.' },
+    tip: 'live in + kota/negara; live at + alamat lengkap.'
+  }
+};
