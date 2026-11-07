@@ -3,7 +3,11 @@
 <head>
 <!-- 📝 PANDUAN: cari tanda ✏️ untuk teks yang boleh diubah. Jangan mengubah isi ${...}, onclick, id, class, dan nama fungsi. Daftar lengkap ada di PANDUAN-EDIT-TEKS.md -->
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" id="v22tc" content="#08090c">
+<script>
+(function(){try{var t=localStorage.getItem('rb21_theme');if(t!=='light'&&t!=='dark')t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t);var m=document.getElementById('v22tc');if(m)m.setAttribute('content',t==='light'?'#f4f6f9':'#08090c')}catch(e){}})();
+</script>
 <!-- ✏️ [TEKS BISA DIUBAH] Judul tab browser (nama web) — ganti tulisan di antara <title> dan </title> -->
 <title>Ruang Belajar</title>
 <style>
@@ -111,6 +115,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
+<a class="v22skip" href="#app">Lewati ke konten</a>
 <div class="wrap">
 <!-- ✏️ [TEKS BISA DIUBAH] Judul besar halaman / nama web (ikon 📖 + nama) -->
   <div class="topbar">
@@ -129,7 +134,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
     <button id="t-sekolah" onclick="setSec('sekolah')">🎓 Belajar</button>
     <button id="t-trading" onclick="setSec('trading')">📈 Trading</button>
   </div>
-  <div id="app"></div>
+  <div id="app" tabindex="-1"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1686,7 +1691,7 @@ function hint19(x){
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi aiStatusHtml19(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function aiStatusHtml19(j){
   const act=(j.order||[]).length?j.order.join(' → '):'(belum ada penyedia aktif)',b=j.bls||{};
-  return `<div class="small" style="margin-bottom:8px">Urutan yang dipakai saat ini: <b>${esc(act)}</b></div>${(j.providers||[]).map(x=>aiRow19(x,true)).join('')}<div style="font-weight:700;margin-top:10px">Pencarian</div>${(j.search||[]).map(x=>aiRow19(x,false)).join('')}<div class="item"><span><b>BLS_API_KEY</b><div class="small mut">${b.keySet?(b.keyRejected?'key ditolak BLS: sistem memakai akses tanpa key (aman)':'terpasang'):'tidak dipasang (memakai akses tanpa key dan FRED)'}</div></span><span>${b.keySet&&!b.keyRejected?'✅':'🟡'}</span></div><div class="mut small" style="margin-top:8px">Penyedia tanpa key otomatis dilewati. Diuji ${esc(new Date(j.checkedAt).toLocaleTimeString('id-ID'))}.</div>`;
+  return `<div class="small" style="margin-bottom:8px">Urutan yang dipakai saat ini: <b>${esc(act)}</b></div>${(j.providers||[]).map(x=>aiRow19(x,true)).join('')}${(j.routing||[]).length?`<div style="font-weight:700;margin-top:10px">Routing per bidang</div><div class="small mut" style="margin-bottom:4px">Tiap bidang memakai urutan penyedia sendiri (hanya yang key-nya ada); provider yang gagal dilewati otomatis.</div>${j.routing.map(r=>`<div class="item"><span><b>${esc(r.label||r.id)}</b><div class="small mut">${esc((r.order||[]).join(' → ')||'belum ada key')}</div></span><span class="small mut">${esc(r.id)}</span></div>`).join('')}`:''}<div style="font-weight:700;margin-top:10px">Pencarian</div>${(j.search||[]).map(x=>aiRow19(x,false)).join('')}<div class="item"><span><b>BLS_API_KEY</b><div class="small mut">${b.keySet?(b.keyRejected?'key ditolak BLS: sistem memakai akses tanpa key (aman)':'terpasang'):'tidak dipasang (memakai akses tanpa key dan FRED)'}</div></span><span>${b.keySet&&!b.keyRejected?'✅':'🟡'}</span></div><div class="mut small" style="margin-top:8px">Penyedia tanpa key otomatis dilewati. Diuji ${esc(new Date(j.checkedAt).toLocaleTimeString('id-ID'))}.</div>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi aiTest19(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function aiTest19(){
@@ -1828,19 +1833,19 @@ function homeBase(){
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
   if(S.sec==='trading'){
-    S.mapel='Trading';if(!['news','pro','tutor','jurnal','catatan'].includes(S.tab))S.tab='news';
-    const T=[['news','📰 News'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
+    S.mapel='Trading';if(!['news','xau','pro','tutor','jurnal','catatan'].includes(S.tab))S.tab='news';
+    const T=[['news','📰 News'],['xau','🎯 News Analisis'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
     $('app').innerHTML=`<div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
     return pane();
   }
-  if(['news','pro','jurnal','catatan'].includes(S.tab))S.tab='latihan';
+  if(['news','xau','pro','jurnal','catatan'].includes(S.tab))S.tab='latihan';
   const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];
   $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
     <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${mapelOptions()}</select></div>
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
   pane();
 }
-function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,pro:pPro,catatan:pCatatan})[S.tab]()}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,xau:pXauNews,pro:pPro,catatan:pCatatan})[S.tab]()}
 // ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi pCatatan(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function pCatatan(){
   $('pane').innerHTML=`<div class="card"><h3>📝 Catatan trading</h3><textarea id="cat" placeholder="Catatan setup, pelajaran, evaluasi..."></textarea><button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes" style="margin-top:10px"></div></div>`;
@@ -1990,7 +1995,8 @@ function v21Theme(){
   const r=document.documentElement,next=r.getAttribute('data-theme')==='light'?'dark':'light';
   r.setAttribute('data-theme',next);
   try{localStorage.setItem('rb21_theme',next)}catch(e){}
-  const b=document.getElementById('v21theme');if(b)b.textContent=next==='light'?'🌙':'☀️';
+  const b=document.getElementById('v21theme');if(b){b.textContent=next==='light'?'🌙':'☀️';b.setAttribute('aria-pressed',next==='light'?'true':'false')}
+  const m=document.getElementById('v22tc');if(m)m.setAttribute('content',next==='light'?'#f4f6f9':'#08090c');
   v21Toast(next==='light'?'Mode terang aktif':'Mode gelap aktif');
 }
 function v21Fab(){
@@ -2097,6 +2103,145 @@ async function pPapan(){
   b.innerHTML=l.map((x,i)=>'<div class="v21-rank '+(x.uid===me?'me':'')+'"><span class="v21-pos">'+(i<3?['🥇','🥈','🥉'][i]:i+1)+'</span><span class="v21-nm">'+esc(x.nama||'Siswa')+(x.uid===me?' <i>(kamu)</i>':'')+'<div class="mut small">🔥 '+(x.streak||0)+' hari • '+(x.minggu||0)+' soal/7 hari</div></span><span class="v21-xp">'+(x.xp||0)+'<div class="mut small">XP</div></span></div>').join('');
 }
 
+</script>
+<script>
+/* ===== UPDATE V22: tab 🎯 News Analisis — NFP · PPI · CPI · FOMC → XAUUSD ===== */
+const XTAGS=['NFP','PPI','CPI','FOMC'];
+const XCOL={BULLISH:'var(--b)',BEARISH:'var(--bad)',NETRAL:'var(--mut)'};
+const XARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
+const XNAME={NFP:'Non-Farm Payrolls',PPI:'Producer Price Index',CPI:'Consumer Price Index',FOMC:'FOMC / suku bunga The Fed'};
+let XR={g:null,cur:null};
+const xauTitle=t=>XNAME[t]||t;
+function xauCountdown(ts){
+  const d=Number(ts)-Date.now();if(!isFinite(d))return'';
+  if(d<0)return'sudah lewat';
+  const h=Math.floor(d/3600000),m=Math.floor(d%3600000/60000),dd=Math.floor(h/24);
+  if(dd>=1)return dd+' hari '+String(h%24).padStart(2,'0')+' jam';
+  return h+' jam '+String(m).padStart(2,'0')+' menit';
+}
+function xauNextHtml(j){
+  const f=j.xau;if(!f)return'';
+  const nx=XTAGS.map(t=>{
+    const e=(f.next||{})[t];
+    if(!e)return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">jadwal belum terbaca</div><div class="small mut">sumber resmi tidak tersedia saat ini</div></div>`;
+    const badge=e.verified==='official'?'✅ dikonfirmasi sumber resmi':e.verified==='conflict'?'⚠️ kalender agregator'+(e.officialDate?' (resmi: '+esc(e.officialDate)+')':''):'• jadwal agregator';
+    return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">${esc(ldt(e.ts,{dateStyle:'medium',timeStyle:'short'}))}</div><div class="small mut">${badge}</div><div class="small" style="color:var(--warn);font-weight:700">⏳ ${esc(xauCountdown(e.ts))}</div></div>`;
+  }).join('');
+  const cl=(f.clusters||[]).length?f.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">⚡ ${esc(c.tags.join(' + '))} · ${esc(c.from)} → ${esc(c.to)}</div><div class="small mut">selisih ${esc(String(c.spanH))} jam · ${c.tags.length} rilis berbeda tag</div>${c.items.map(i=>`<div class="small" style="margin-top:4px">• <b>${esc(i.tag)}</b> ${esc(i.timeUTC)} — ${esc(i.title)}${i.forecast?' · forecast '+esc(i.forecast):''}${i.previous?' · prev '+esc(i.previous):''}</div>`).join('')}</div>`).join(''):'<div class="mut small">Tidak ada dua rilis fokus berbeda yang berjarak ≤48 jam dalam data yang terkumpul saat ini.</div>';
+  return `<div class="card"><h3>🗓 Empat rilis fokus — jadwal berikutnya</h3><div class="mut small" style="margin-bottom:8px">Waktu perangkatmu. ✅ berarti tanggalnya sudah dicocokkan ke jadwal resmi BLS / federalreserve.gov. Cakupan ${esc(String(f.horizonDays||45))} hari${f.nearest?' · terdekat <b>'+esc(f.nearest.tag)+'</b> ('+esc(xauCountdown(f.nearest.ts))+')':''}.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${nx}</div></div><div class="card"><h3>⚡ News yang bertabrakan</h3><div class="mut small" style="margin-bottom:8px">Rilis berbeda tag yang berdekatan digabung (≤48 jam): pasar menilai kombinasi data, bukan satu angka saja.</div>${cl}</div>`;
+}
+function xauDataHtml(j){
+  const g=j.gold&&j.gold.price,y=j.yields,e=j.effr,m=j.mr||{},d=j.data||{},cards=[];
+  if(d.nfp)cards.push(['NFP '+d.nfp.period,nfmt(d.nfp.change,'K',true),'sebelumnya '+nfmt(d.nfp.prevChange,'K',true)]);
+  if(d.ur)cards.push(['Pengangguran '+d.ur.period,d.ur.value+'%','sebelumnya '+d.ur.prev+'%']);
+  if(d.ahe)cards.push(['Upah/jam '+d.ahe.period,nfmt(d.ahe.mom,'%',true)+' MoM','YoY '+nfmt(d.ahe.yoy,'%',true)]);
+  if(d.cpi)cards.push(['CPI '+d.cpi.period,nfmt(d.cpi.yoy,'%')+' YoY','MoM '+nfmt(d.cpi.mom,'%',true)]);
+  if(d.core)cards.push(['Core CPI '+d.core.period,nfmt(d.core.yoy,'%')+' YoY','MoM '+nfmt(d.core.mom,'%',true)]);
+  if(d.ppi)cards.push(['PPI '+d.ppi.period,nfmt(d.ppi.yoy,'%')+' YoY','MoM '+nfmt(d.ppi.mom,'%',true)+' · prev '+nfmt(d.ppi.prevMom,'%',true)]);
+  const gold=g?`<div class="card"><h3>🥇 XAUUSD — harga harian yang terbaca</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px"><div class="exp" style="color:var(--tx)"><div class="small mut">Harga terakhir</div><div style="font-size:1.3rem;font-weight:800">${esc(String(g.last))}</div><div class="small mut">per ${esc(String(g.asOf))} · ${esc(String(g.src||''))}${g.live?' · spot intraday':''}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">1 hari</div><div style="font-weight:800">${nfmt(g.chg1d,'%',true)}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">5 hari</div><div style="font-weight:800">${nfmt(g.chg5d,'%',true)}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">20 hari</div><div style="font-weight:800">${nfmt(g.chg20d,'%',true)}</div></div></div><div class="small mut" style="margin-top:6px">${g.rsi!=null?'RSI14 '+esc(String(g.rsi))+' · ATR14 '+esc(String(g.atrPct))+'% · ':''}${g.hi20!=null&&g.lo20!=null?'range20 '+esc(String(g.lo20))+'–'+esc(String(g.hi20))+' · ':''}${g.check?'verifikasi silang '+(g.check.ok?'cocok':'BEDA')+' · ':''}${g.partial?'Hanya spot terakhir; OHLC harian tidak tersedia saat ini.':'Data harian, bukan real-time.'}</div></div>`:`<div class="card"><h3>🥇 XAUUSD</h3><div class="warn">Harga emas tidak terbaca dari sumber harga saat ini. Analisis arah tetap disusun dari data makro, tetapi keyakinan dibatasi SEDANG dan level harga tidak ditampilkan.</div></div>`;
+  const kd=[];
+  if(y)kd.push(`<div class="item"><span>Yield Treasury 2Y / 10Y (${esc(String(y.date))})</span><b>${esc(String(y.y2))}% / ${esc(String(y.y10))}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(String(y.spread))}</b></div>`);
+  if(e)kd.push(`<div class="item"><span>EFFR (NY Fed, ${esc(String(e.date))})</span><b>${esc(String(e.rate))}%</b></div>`);
+  if(m.ry)kd.push(`<div class="item"><span>Yield riil 10Y / TIPS (${esc(String(m.ry.date))})</span><b>${esc(String(m.ry.v))}%</b></div>`);
+  if(m.dxy)kd.push(`<div class="item"><span>Indeks dolar luas / Fed (${esc(String(m.dxy.date))})</span><b>${esc(String(m.dxy.v))}</b></div>`);
+  const key=kd.length?`<div class="card"><h3>🏦 Data makro kunci untuk emas</h3>${kd.join('')}<div class="small mut" style="margin-top:6px">XAUUSD umumnya berlawanan dengan yield riil dan USD; ini konteks data, bukan sinyal entry.</div></div>`:'';
+  const official=cards.length?`<div class="card"><h3>📊 Angka resmi terbaru (NFP · PPI · CPI)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.18rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="small mut" style="margin-top:6px">Sumber: ${esc((d.meta&&d.meta.src)||'BLS')}. Angka bisa direvisi.</div></div>`:'<div class="card"><div class="warn">Angka resmi BLS tidak tersedia saat ini.</div></div>';
+  return gold+official+key;
+}
+function renderXau(j,stale){
+  const box=$('xres');if(!box)return;
+  const x=j.xai,t=new Date(j.fetchedAt||Date.now());
+  const head=`<div class="mut small" style="margin:0 0 8px">${stale?'🗂 TERSIMPAN (bukan data baru) · ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} · AI: ${esc(j.provider||'-')} ${esc(j.model||'')}${j.cached?' · cache':''}</div>`;
+  if(!x){
+    box.innerHTML=`<div class="card">${head}${j.pending?'<div class="exp">⏳ AI sedang menganalisis paket data di atas. Data mentah sudah tampil dan tidak perlu menunggu.</div>':`<div class="warn">AI belum menghasilkan analisis XAUUSD yang valid${j.aiError?': '+esc(j.aiError):''}.</div>${j.raw?`<div class="exp" style="color:var(--tx);margin-top:8px">${fmtMd(j.raw)}</div>`:''}<button class="btn full" style="margin-top:8px" onclick="retryXauAI()">🔄 Ulangi analisis AI saja</button>`}</div>${xauNextHtml(j)}${xauDataHtml(j)}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}`;
+    return;
+  }
+  const b=x.bias||{},sched=(j.xau&&j.xau.next)||{};
+  const eng=j.eng?' · mesin skor XAUUSD: '+esc(j.eng.bias)+' (skor '+esc(String(j.eng.score))+')':'';
+  const lv=(b.key_levels||[]).length?`<div style="margin-top:10px"><b>Level referensi (dari data harga)</b>${b.key_levels.map(l=>`<div class="item"><span>${esc(l.label)} <span class="small mut">${esc(l.source||'')}</span></span><b>${esc(l.value)}</b></div>`).join('')}<div class="small mut" style="margin-top:4px">Area referensi berbasis data harian, bukan entry/SL/TP.</div></div>`:'';
+  const drivers=(b.drivers||[]).length?`<div style="margin-top:10px"><b>Pendorong utama</b>${b.drivers.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:'';
+  const evs=(x.events||[]).map(e=>{
+    const s=sched[e.tag];
+    const when=s?`📅 <b>${esc(ldt(s.ts,{dateStyle:'full',timeStyle:'short'}))}</b> · ${s.verified==='official'?'✅ jadwal resmi':'⚠️ jadwal agregator'} · ⏳ ${esc(xauCountdown(s.ts))}`:`📅 ${esc(e.date||'-')} ${esc(e.time_utc||'')}`;
+    return `<div class="card" style="border-left:4px solid ${XCOL[e.gold_bias]||'var(--line2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${esc(e.tag)} — ${esc(xauTitle(e.tag))}</h3><span style="color:${XCOL[e.gold_bias]||'var(--mut)'};font-weight:800">${XARR[e.gold_bias]||'▶'} XAU ${esc(e.gold_bias)}</span></div><div class="mut small" style="margin:4px 0 8px">${when} · keyakinan analisis <b>${esc(e.confidence)}</b></div><div class="small">Forecast: <b>${esc(e.forecast||'konsensus tidak ditemukan')}</b>${e.previous?' · Previous: '+esc(e.previous):''}${(!e.forecast&&s&&s.forecast)?' · kalender: '+esc(s.forecast):''}</div>${e.consensus_note?`<div class="small mut">${esc(e.consensus_note)}</div>`:''}<div style="line-height:1.55;margin-top:8px">${fmtMd(e.why)}</div><div class="exp" style="margin-top:8px;color:var(--tx)"><b>🟢 Skenario XAUUSD naik:</b> ${esc(e.gold_bull_if)}</div><div class="exp" style="margin-top:6px;color:var(--tx)"><b>🔴 Skenario XAUUSD turun:</b> ${esc(e.gold_bear_if)}</div></div>`;
+  }).join('');
+  const clus=(x.clusters||[]).length?`<div class="card"><h3>⚡ News bertabrakan — efek gabungan</h3>${x.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">${esc((c.tags||[]).join(' + ')||'beberapa rilis')} · ${esc(c.when)}</div><div class="small">${esc(c.why)}</div><div class="small" style="margin-top:4px"><b>Untuk XAUUSD:</b> ${esc(c.gold_note)}</div></div>`).join('')}</div>`:'';
+  const scen=(x.scenarios||[]).length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${x.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:'';
+  const flags=(j.flags||[]).length?`<div class="warn" style="margin-bottom:10px">⚠️ Angka yang TIDAK ditemukan di data terkumpul: <b>${esc(j.flags.join(', '))}</b>. Anggap belum valid.</div>`:'<div class="mut small" style="margin-bottom:10px">✅ Tidak ada angka harga/level dalam jawaban AI di luar data terkumpul.</div>';
+  box.innerHTML=`<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🎯 XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">📝 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Edukasi berbasis data publik, bukan saran finansial dan bukan sinyal entry/SL/TP. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
+}
+/* ---------- riwayat analisis XAUUSD (maks 5, bisa dibuka & dihapus) ---------- */
+const XHKEY='xau_hist_v1',XHMAX=5;
+function xauHist(){
+  try{const a=JSON.parse(localStorage.getItem(XHKEY)||'[]');return Array.isArray(a)?a.filter(x=>x&&x.j&&x.j.xai):[]}catch(e){return[]}
+}
+function xauHistSave(j){
+  if(!j||!j.xai)return;
+  const id=String(j.fetchedAt||'');
+  let h=xauHist().filter(x=>String((x.j&&x.j.fetchedAt)||'')!==id);
+  h.unshift({ts:Date.now(),j});
+  for(const n of [XHMAX,3,1]){
+    try{localStorage.setItem(XHKEY,JSON.stringify(h.slice(0,n)));return}catch(e){}
+  }
+}
+function xauHistPaint(){
+  const el=$('xhist');if(!el)return;
+  const h=xauHist();
+  if(!h.length){el.innerHTML='';return}
+  el.innerHTML=`<div class="card"><div class="v21-board-head"><h3>🗂 Riwayat analisis</h3><button class="x" onclick="xauHistClear()">Hapus semua</button></div><div class="mut small" style="margin-bottom:6px">Tersimpan di perangkat ini (maks ${XHMAX}). Buka kembali tanpa mengambil data baru.</div>${h.map((it,i)=>{
+    const j=it.j,x=j.xai||{},b=x.bias||{},t=new Date(j.fetchedAt||it.ts),bi=b.bias||'NETRAL';
+    const ic=bi==='BULLISH'?'🟢':bi==='BEARISH'?'🔴':'⚪';
+    return `<div class="item" style="align-items:center;gap:8px"><div style="min-width:0"><div><b>${ic} ${esc(bi)}</b> <span class="small mut">${esc(b.confidence||'RENDAH')}</span></div><div class="small mut">${esc(t.toLocaleString('id-ID'))} · ${esc(j.provider||'-')}${j.model?' · '+esc(String(j.model).slice(0,28)):''}</div></div><div style="display:flex;gap:6px;flex:none"><button class="x" onclick="xauHistOpen(${i})">Buka</button><button class="x" onclick="xauHistDel(${i})" aria-label="Hapus riwayat ini" title="Hapus">🗑</button></div></div>`;
+  }).join('')}</div>`;
+}
+function xauHistOpen(i){
+  const it=xauHist()[i];if(!it)return;
+  XR.cur=it.j;renderXau(it.j,true);
+  const r=$('xres');if(r&&r.scrollIntoView)r.scrollIntoView({behavior:'smooth',block:'start'});
+  v21Toast('Riwayat dibuka — data lama, bukan data baru');
+}
+function xauHistDel(i){
+  const h=xauHist();if(!h[i])return;
+  h.splice(i,1);
+  try{localStorage.setItem(XHKEY,JSON.stringify(h))}catch(e){}
+  xauHistPaint();v21Toast('Riwayat dihapus');
+}
+function xauHistClear(){
+  if(!xauHist().length)return;
+  if(!confirm('Hapus semua riwayat analisis XAUUSD di perangkat ini?'))return;
+  try{localStorage.removeItem(XHKEY)}catch(e){}
+  xauHistPaint();v21Toast('Semua riwayat dihapus');
+}
+function pXauNews(){
+  let c=null;try{c=JSON.parse(localStorage.getItem('xau_last')||'null')}catch(e){}
+  $('pane').innerHTML=`<div class="card"><h3>🎯 News Analisis — NFP · PPI · CPI · FOMC → XAUUSD</h3><div class="mut small" style="margin-bottom:10px">Fokus tunggal XAUUSD. Setiap klik mengambil ULANG data tanpa cache: jadwal resmi BLS (NFP, PPI, CPI) dan The Fed (FOMC), angka resmi BLS/FRED, EFFR NY Fed, yield Treasury, yield riil, indeks dolar, posisi spekulan CFTC, serta berita Reuters/Bloomberg/CNBC dkk. Server mengelompokkan keempat rilis dan mendeteksi rilis berbeda yang bertabrakan (≤48 jam), lalu AI menyusun skenario ke mana emas bergerak menjelang dan saat rilis. Edukasi, bukan saran finansial.</div><button class="btn full" id="xbtn" onclick="runXau()">⚡ Ambil data global & analisis XAUUSD</button><div id="xmsg" class="mut small" style="margin-top:8px"></div></div><div id="xhist"></div><div id="xres"></div>`;
+  xauHistPaint();if(c)renderXau(c,true);
+}
+async function runXau(){
+  busy('xbtn',true);setTxt('xmsg','⏳ Tahap 1/2: mengumpulkan jadwal resmi, angka BLS/FRED, yield, dolar, CFTC & berita global...');
+  let d;try{d=await tcall({action:'xau',phase:'data',fresh:true})}catch(e){setTxt('xmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('xbtn',false);return}
+  XR.g=d.g;const base={...d};delete base.g;delete base.phase;base.pending=true;XR.cur=base;
+  if(S.tab==='xau'&&$('xres'))renderXau(base,false);
+  setTxt('xmsg','⏳ Tahap 2/2: AI menganalisis paket data (data sudah tampil di bawah)...');await xauAI(base);
+}
+async function xauAI(base){
+  try{const a=await tcall({action:'xau',phase:'ai',g:XR.g,fresh:true});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;XR.cur=j;
+    if(j.xai){try{localStorage.setItem('xau_last',JSON.stringify(j))}catch(e){}xauHistSave(j)}
+    if(S.tab==='xau'&&$('xres'))renderXau(j,false);
+    setTxt('xmsg',j.xai?'✅ Selesai — analisis XAUUSD siap':'⚠️ AI belum memberi format valid (lihat catatan)');
+  }catch(e){const j={...base,pending:false,aiError:e.message};XR.cur=j;if(S.tab==='xau'&&$('xres'))renderXau(j,false);setTxt('xmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
+  busy('xbtn',false);
+}
+function retryXauAI(){if(!XR.g||!XR.cur)return;const base={...XR.cur};delete base.xai;delete base.raw;delete base.aiError;base.pending=true;XR.cur=base;renderXau(base,false);setTxt('xmsg','⏳ Mengulang analisis AI...');busy('xbtn',true);xauAI(base)}
+async function saveXauNews(){
+  const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disimpan.');
+  const x=c.xai,b=x.bias||{};
+  const txt=`[News Analisis XAUUSD · ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}]\nBias XAUUSD: ${b.bias} (keyakinan ${b.confidence})\n${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'))+((x.clusters||[]).length?'\nGabungan: '+x.clusters.map(k=>(k.tags||[]).join('+')+' → '+k.gold_note).join(' | '):'');
+  await db.collection('catatan').add({uid:user.uid,teks:txt,waktu:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('Ringkasan disimpan ke Catatan (tab Jurnal).');
+}
+</script>
+<script>
 /* ---------- lapisan navigasi: seksi, tab, pane ---------- */
 function v21MarkTabs(){['beranda','sekolah','trading','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)})}
 function home(){
@@ -2111,8 +2256,8 @@ function homeBase(){
   if(S.sec==='beranda'){S.tab='beranda';$('app').innerHTML='<div id="pane"></div>';return pane()}
   if(S.sec==='trading'){
     S.mapel='Trading';
-    if(['news','pro','tutor','jurnal','catatan'].indexOf(S.tab)<0)S.tab='news';
-    const T=[['news','📰 News'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
+    if(['news','xau','pro','tutor','jurnal','catatan'].indexOf(S.tab)<0)S.tab='news';
+    const T=[['news','📰 News'],['xau','🎯 News Analisis'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
     $('app').innerHTML='<div class="stabs">'+T.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" onclick="S.tab=\''+k+'\';home()">'+l+'</button>').join('')+'</div><div id="pane"></div>';
     return pane();
   }
@@ -2123,7 +2268,7 @@ function homeBase(){
   pane();
 }
 function pane(){
-  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,pro:pPro,catatan:pCatatan,papan:pPapan}[S.tab];
+  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,xau:pXauNews,pro:pPro,catatan:pCatatan,papan:pPapan}[S.tab];
   if(f)return f();
   S.tab='latihan';return pLatihan();
 }
@@ -2148,6 +2293,96 @@ async function enter(){
 /* ---------- mulai di Beranda ---------- */
 S.sec='beranda';
 v21Fab();
+</script>
+<script>
+/* ===== UPDATE V23: tampilan modern ringan + fitur HP ===== */
+document.head.insertAdjacentHTML('beforeend',`<style>
+:root{--shadow:0 1px 2px rgba(0,0,0,.35),0 16px 36px -28px rgba(0,0,0,.9)}
+html[data-theme=light]{--shadow:0 1px 2px rgba(16,24,40,.05),0 16px 34px -28px rgba(16,24,40,.45)}
+html{scroll-behavior:smooth}
+body{background-image:radial-gradient(780px 360px at 50% -150px,rgba(111,141,255,.16),transparent 72%),linear-gradient(180deg,var(--bg2),var(--bg) 440px)}
+html[data-theme=light] body{background-image:radial-gradient(780px 360px at 50% -150px,rgba(52,87,224,.10),transparent 72%),linear-gradient(180deg,#fff,var(--bg) 440px)}
+.wrap{max-width:1000px;padding:20px 18px 112px}
+.topbar{align-items:center;margin-bottom:14px}
+h1{font-size:1.42rem;letter-spacing:-.03em}
+.logo{width:40px;height:40px;border-radius:14px;background:linear-gradient(150deg,var(--accent-soft),transparent 75%);box-shadow:inset 0 0 0 1px var(--line2);font-size:1.1rem}
+.sub{letter-spacing:.14em}
+.tabs,.stabs{gap:6px;padding:6px;border-radius:18px;box-shadow:none}
+.tabs button,.stabs button{border-radius:14px;min-height:42px;font-size:.84rem}
+.tabs button.on,.stabs button.on{background:linear-gradient(160deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 20px -14px rgba(111,141,255,.85)}
+html[data-theme=light] .tabs button.on,html[data-theme=light] .stabs button.on{color:#fff;box-shadow:0 8px 18px -14px rgba(52,87,224,.7)}
+.stabs{position:sticky;top:8px;z-index:45;background:var(--card);margin-bottom:12px}
+.stabs button{min-height:40px;font-size:.78rem;padding:9px 12px}
+.card{border-radius:20px;padding:18px;box-shadow:var(--shadow)}
+.card h3{font-size:1.02rem;letter-spacing:-.015em;margin-bottom:10px}
+.btn{border-radius:14px;min-height:46px;padding:12px 18px;color:#fff;background:linear-gradient(155deg,var(--accent),var(--accent2));box-shadow:0 12px 26px -18px rgba(111,141,255,.9);letter-spacing:-.01em}
+.btn:hover{opacity:.96}
+.btn.alt,.btn.red{background:var(--card2);color:var(--tx);border:1px solid var(--line);box-shadow:none}
+.btn.alt:hover{background:var(--field);border-color:var(--line2)}
+select,textarea,input{border-radius:13px}
+select,input{min-height:46px}
+textarea{min-height:104px}
+.opt{border-radius:14px;padding:13px 15px;background:var(--field)}
+.opt:hover:not(:disabled){background:var(--card2);border-color:var(--line2)}
+.exp{border-radius:14px;background:var(--field)}
+.warn{border-radius:14px;padding:12px 14px}
+.item{padding:12px 0}
+.hint{border-radius:14px}
+#chat{max-height:min(56vh,480px);gap:10px;padding-right:0}
+.msg{border-radius:16px;padding:12px 14px;max-width:100%}
+.msg.user{background:linear-gradient(155deg,var(--accent),var(--accent2));color:#fff}
+.msg.assistant{background:var(--card2)}
+.v21-hero{background:linear-gradient(160deg,var(--card2),var(--card) 65%);border-color:var(--line2)}
+.v21-hero-title{letter-spacing:-.03em}
+.chip{background:var(--field);border-color:var(--line);font-size:.72rem;padding:5px 10px}
+.ring{width:84px;height:84px}.ring:before{inset:8px}
+.v21-fab{border-radius:13px}
+.v21-toast{border-radius:14px;bottom:calc(96px + env(safe-area-inset-bottom))}
+.card table{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{scroll-margin-top:14px}
+#app>#pane,#app>.stabs{animation:v23in .2s ease-out both}
+@keyframes v23in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.v22skip{position:fixed;left:12px;top:-64px;z-index:120;background:var(--card);color:var(--tx);border:1px solid var(--line2);padding:10px 14px;border-radius:12px;font-weight:700;font-size:.85rem;transition:top .15s}
+.v22skip:focus{top:10px}
+.v22-top{position:fixed;left:16px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:55;width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:var(--card);color:var(--tx);display:grid;place-items:center;font-size:1.05rem;cursor:pointer;opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .18s,transform .18s;box-shadow:var(--shadow)}
+.v22-top.on{opacity:1;pointer-events:auto;transform:none}
+@media(min-width:641px){.v22-top{left:24px;bottom:24px}}
+@media(max-width:640px){
+.wrap{padding:14px 13px calc(106px + env(safe-area-inset-bottom))}
+h1{font-size:1.2rem}
+.sub{font-size:.65rem;margin-bottom:12px}
+.card{padding:15px;border-radius:18px}
+.tabs{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));border:1px solid var(--line);border-radius:20px;padding:6px;box-shadow:0 16px 40px -20px rgba(0,0,0,.8)}
+.tabs button{font-size:.72rem;min-height:50px;padding:7px 2px;border-radius:15px;line-height:1.25}
+.stabs{top:calc(6px + env(safe-area-inset-top));margin-bottom:10px;padding:5px}
+.stabs button{font-size:.75rem;padding:8px 11px;min-height:38px}
+select,input,textarea{font-size:16px}
+.btn{min-height:48px}
+.v21-fab{right:12px;bottom:calc(96px + env(safe-area-inset-bottom));width:42px;height:42px}
+.v21-toast{bottom:calc(96px + env(safe-area-inset-bottom));font-size:.8rem}
+.v22-top{bottom:calc(148px + env(safe-area-inset-bottom));left:12px;width:40px;height:40px}
+#chat{max-height:52vh}
+.msg{font-size:.9rem}
+.v21-actions .btn{flex:1 1 100px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>`);
+async function copyXauNews(btn){
+  const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disalin.');
+  const x=c.xai,b=x.bias||{};
+  const txt=`News Analisis XAUUSD — ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}\nBias: ${b.bias} (${b.confidence})\n${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'));
+  try{await navigator.clipboard.writeText(txt);if(btn){btn.textContent='✅ Tersalin';setTimeout(()=>{btn.textContent='📋 Salin ringkasan'},1600)}}
+  catch(e){alert('Gagal menyalin: '+e.message)}
+}
+(function(){
+  const b=document.createElement('button');b.className='v22-top';b.type='button';b.setAttribute('aria-label','Kembali ke atas');b.textContent='↑';document.body.appendChild(b);
+  let raf=0;
+  const upd=()=>{raf=0;b.classList.toggle('on',window.scrollY>520)};
+  window.addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(upd)},{passive:true});
+  b.addEventListener('click',()=>window.scrollTo({top:0,behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
+  upd();
+})();
 </script>
 </body>
 </html>
