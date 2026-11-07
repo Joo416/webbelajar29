@@ -7,7 +7,7 @@
 <meta name="theme-color" id="v22tc" content="#090b10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Sora:wght@500..800&display=swap" rel="stylesheet">
 <script>
 (function(){try{var t=localStorage.getItem('rb21_theme');if(t!=='light'&&t!=='dark')t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t);var m=document.getElementById('v22tc');if(m)m.setAttribute('content',t==='light'?'#f6f7fb':'#090b10')}catch(e){}})();
 </script>
@@ -125,7 +125,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
     <div>
       <h1><span class="logo">📖</span>Ruang Belajar</h1>
 <!-- ✏️ [TEKS BISA DIUBAH] Kalimat kecil di bawah judul -->
-      <div class="sub">Pelajaran umum · sekolah · TKA · trading</div>
+      <div class="sub">Pelajaran · bahasa · trading</div>
     </div>
     <button id="v21theme" class="theme-btn" onclick="v21Theme()" aria-label="Ganti tema gelap atau terang" title="Ganti tema">☀️</button>
   </div>
@@ -135,6 +135,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
 <!-- ✏️ [TEKS BISA DIUBAH] Tulisan tiga tombol tab utama: Beranda, Belajar, Trading (jangan ubah onclick/id) -->
     <button id="t-beranda" onclick="v21Home()">🏠 Beranda</button>
     <button id="t-sekolah" onclick="setSec('sekolah')">🎓 Belajar</button>
+    <button id="t-bahasa" onclick="setSec('bahasa')">🌐 Bahasa</button>
     <button id="t-trading" onclick="setSec('trading')">📈 Trading</button>
   </div>
   <div id="app" tabindex="-1"></div>
@@ -292,12 +293,6 @@ function pJurnal(){
   <div class="card"><h3>📝 Catatan trade</h3><div class="mut small">Setup, evaluasi, dan pelajaran dari trade.</div><textarea id="catt" style="margin-top:10px" placeholder="Contoh: entry EURUSD buy karena OB H1, risiko 1%, evaluasi eksekusi..."></textarea><button class="btn alt full" onclick="saveNote('trade')">Simpan catatan trade</button><div id="notesTrade" class="mut small" style="margin-top:10px"></div></div>
   <div class="card"><h3>📰 Catatan news</h3><div class="mut small">Ringkasan NFP/CPI/PPI/FOMC, berita pasar, dan analisis XAUUSD.</div><textarea id="catn" style="margin-top:10px" placeholder="Contoh: NFP lebih kuat, yield naik, XAUUSD SELL..."></textarea><button class="btn alt full" onclick="saveNote('news')">Simpan catatan news</button><div id="notesNews" class="mut small" style="margin-top:10px"></div></div>`;
   calcLot();loadJ();loadNotes();
-}
-// ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi calc(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function calc(){
-  const b=+$('kb').value,r=+$('kr').value,s=+$('ks').value,p=+$('kp').value;
-  if(!(b>0&&r>0&&s>0&&p>0)){$('kout').textContent='Isi semua angka dengan benar.';return}
-  const risk=b*r/100;$('kout').innerHTML=`Risiko: <b>$${risk.toFixed(2)}</b><br>Ukuran lot: <b>${(risk/(s*p)).toFixed(2)}</b> lot<br><span class="small">Nilai pip $10/lot berlaku untuk pair berakhiran USD. Pair lain berbeda, cek broker-mu.</span>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi saveJ(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function saveJ(){
@@ -1879,7 +1874,10 @@ function topicList(lv){
   const t=TOPICS[S.mapel];return Array.isArray(t)?t:(t&&t[tierOf(lv)])||[];
 }
 /* ---------- tab Trading: hanya News, Analisis, Tutor, Jurnal, Catatan ---------- */
-function setSec(s){S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':'latihan';home()}
+function setSec(s){
+  if(s==='bahasa'){S.sec='bahasa';S.mapel='Bahasa Inggris';S.tab='bahasa';return home()}
+  S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':'latihan';home()
+}
 // ✏️ [TEKS BISA DIUBAH] 🎯 TKA & Sekolah → Latihan & riwayat — fungsi homeBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function homeBase(){
   if(S.sec==='admin')return adminView();
@@ -2381,9 +2379,10 @@ async function saveXauNews(){
 </script>
 <script>
 /* ---------- lapisan navigasi: seksi, tab, pane ---------- */
-function v21MarkTabs(){['beranda','sekolah','trading','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)})}
+function v21MarkTabs(){['beranda','sekolah','bahasa','trading','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)})}
 function home(){
   v21MarkTabs();
+  if(S.sec==='bahasa'){S.tab='bahasa';return langHome();}
   if(S.sec==='trading'&&!S.admin&&!S.trading)return tradingLockView();
   return homeBase();
 }
@@ -2700,5 +2699,61 @@ select,input,textarea{font-size:16px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 </style>`);
 </script>
+<style>
+/* ===== V25: penyegaran visual (tipografi Manrope/Sora, permukaan modern) ===== */
+:root{
+--font-ui:'Manrope',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+--font-display:'Sora','Manrope',ui-sans-serif,system-ui,sans-serif;
+--bg:#070910;--bg2:#0b0f18;--card:#0e131c;--card2:#151b26;--field:#0a0f17;
+--line:#1d2634;--line2:#2b3849;--tx:#eef2f8;--mut:#95a3b7;
+--accent:#93a4ff;--accent2:#5eead4;--accent-soft:rgba(147,164,255,.13);
+--action:#5563e8;--action2:#8b5cf6;
+--shadow:0 1px 1px rgba(255,255,255,.03),0 22px 54px -38px rgba(0,0,0,.95)
+}
+html[data-theme=light]{
+--bg:#f5f7fb;--bg2:#ffffff;--card:#ffffff;--card2:#f3f6fb;--field:#f8fafc;
+--line:#e3e9f2;--line2:#cfd8e6;--tx:#0f172a;--mut:#5f6b7d;
+--accent:#4f5fe8;--accent2:#0ea5a4;--accent-soft:rgba(79,95,232,.1);
+--action:#4655e0;--action2:#7c3aed;
+--shadow:0 1px 2px rgba(15,23,42,.04),0 20px 44px -36px rgba(15,23,42,.3)
+}
+body{font-family:var(--font-ui);font-size:15.5px;line-height:1.66;letter-spacing:0;background-image:radial-gradient(820px 420px at 88% -12%,rgba(147,164,255,.14),transparent 64%),radial-gradient(620px 380px at -8% 4%,rgba(94,234,212,.07),transparent 62%)}
+html[data-theme=light] body{background-image:radial-gradient(820px 420px at 88% -12%,rgba(79,95,232,.09),transparent 64%),radial-gradient(620px 380px at -8% 4%,rgba(14,165,164,.07),transparent 62%)}
+h1,h2,h3,h4,.big,.v21-hero-title{font-family:var(--font-display);letter-spacing:-.035em}
+h1{font-weight:700}
+h3{font-weight:600}
+.wrap{max-width:1060px;padding:24px 20px 120px}
+.topbar{margin-bottom:18px}
+.logo{background:linear-gradient(145deg,var(--accent),var(--accent2));color:#07111a}
+.sub{color:var(--mut)}
+.card{border-radius:22px;border-color:var(--line);background:linear-gradient(165deg,var(--card),var(--card) 60%,var(--bg2))}
+.card h3{letter-spacing:-.025em;font-weight:650}
+.tabs,.stabs{border-radius:18px}
+.tabs button,.stabs button{font-weight:650;letter-spacing:-.005em}
+.tabs button.on,.stabs button.on{background:linear-gradient(145deg,var(--action),var(--action2))}
+.btn{background:linear-gradient(145deg,var(--action),var(--action2));letter-spacing:-.01em}
+.btn.alt{background:var(--card2)}
+.x{border-radius:999px;font-weight:650}
+.chip{font-weight:650}
+.exp,.msg,.note,.q,.opt{line-height:1.68}
+input,select,textarea{background:var(--field)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(min-width:900px){
+.topbar{position:sticky;top:10px;z-index:71;background:var(--nav);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:20px;padding:12px 16px;box-shadow:var(--shadow)}
+}
+@media(max-width:640px){
+.wrap{padding:16px 14px calc(112px + env(safe-area-inset-bottom))}
+.tabs button{font-size:.66rem;min-height:50px}
+.tabs button:nth-child(3){font-size:.64rem}
+.card{padding:16px;border-radius:19px}
+.stabs{top:6px}
+}
+@media(prefers-reduced-motion:reduce){.card,.btn{transition:none}}
+</style>
+<script src="bahasa-en-data.js"></script>
+<script src="bahasa-jp-data.js"></script>
+<script src="bahasa-jp-data2.js"></script>
+<script src="bahasa-jp-grammar.js"></script>
+<script src="bahasa.js"></script>
 </body>
 </html>
