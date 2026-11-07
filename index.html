@@ -1982,7 +1982,7 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .v21-rank:last-child{border:0}
 .v21-rank.me{font-weight:700}
 .v21-pos{width:26px;text-align:center;font-weight:800;color:var(--mut);font-variant-numeric:tabular-nums}
-.v21-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v21-nm{flex:1;min-width:0;line-height:1.25}
 .v21-nm i{font-style:normal;font-size:.72rem;color:var(--mut)}
 .v21-xp{text-align:right;font-weight:750;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--accent)}
 .v21-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -2058,36 +2058,106 @@ function v21Fab(){
 }
 
 /* ---------- aktivitas, XP & papan peringkat ---------- */
-function v21Record(ok,total){
+const V21_CATS=[['s','🎓 Sekolah'],['t','📝 TKA'],['u','🌍 Umum']];
+let v21BoardCat='s',v21MiniReq=0,v21PapanReq=0;
+function v21CatLabel(c){const x=V21_CATS.find(v=>v[0]===c);return x?x[1]:'Sekolah'}
+function v21CatButtons(){return '<div class="v21-cats">'+V21_CATS.map(([k,l])=>'<button class="'+(v21BoardCat===k?'on':'')+'" onclick="v21Cat(\''+k+'\')">'+l+'</button>').join('')+'</div>'}
+function v21Cat(c){if(!V21_CATS.some(x=>x[0]===c))return;v21BoardCat=c;if($('v21mini'))v21MiniBoard();if($('v21board'))pPapan()}
+function v21Kind(x){
+  if(!x)return'';
+  const sec=String(x.kategori||x.sec||''),mapel=String(x.mapel||'');
+  if(sec==='trading')return'';
+  if(x.exam||x.mode==='ujian')return't';
+  if(sec==='tka')return't';
+  if(sec==='umum')return'u';
+  if(sec==='sekolah')return /^umum/i.test(mapel)?'u':'s';
+  return'';
+}
+function v21Stat(x,c){x=x||{};return{b:Math.max(0,+x[c+'Benar']||0),s:Math.max(0,+x[c+'Salah']||0),t:Math.max(0,+x[c+'Total']||0)}}
+function v21Acc(st){const t=(st.b||0)+(st.s||0);return t?Math.round((st.b||0)/t*100):0}
+function v21Cmp(a,b,c){const A=v21Stat(a,c),B=v21Stat(b,c);return B.b-A.b||v21Acc(B)-v21Acc(A)||(+b.xp||0)-(+a.xp||0)||String(a.nama||'').localeCompare(String(b.nama||''))}
+function v21Record(ok,total,meta){
   const a=v21Act(),k=v21Day(new Date()),d=a.days[k]||{n:0,ok:0};
   d.n+=(+total||0);d.ok+=(+ok||0);a.days[k]=d;
   a.xp=(a.xp||0)+(+ok||0)*10+5;
-  v21Streak(a);v21SaveAct(a);v21WriteBoard(a);
+  v21Streak(a);v21SaveAct(a);
+  const cat=v21Kind(meta||{});
+  if(cat&&!(meta&&meta.retry))v21WriteBoard(a,{prefix:cat,ok:ok,total:total});
+  else v21WriteBoard(a);
 }
-async function v21WriteBoard(a){
+async function v21WriteBoard(a,delta){
   if(!db||!user)return false;
   a=a||v21Act();
   try{
-    await db.collection('papan').doc(user.uid).set({
-      uid:user.uid,nama:user.displayName||user.email||'Siswa',foto:user.photoURL||'',
-      xp:+(a.xp||0),streak:v21Streak(a),today:v21Today(a).n,target:v21Target(),
-      minggu:v21WeekSum(a),updated:firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true});
+    const ref=db.collection('papan').doc(user.uid);
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref),cur=snap.exists?(snap.data()||{}):{};
+      const data={
+        uid:user.uid,nama:user.displayName||user.email||'Siswa',foto:user.photoURL||'',
+        xp:+(a.xp||0),streak:v21Streak(a),today:v21Today(a).n,target:v21Target(),
+        minggu:v21WeekSum(a),updated:firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if(delta&&['s','t','u'].includes(delta.prefix)){
+        const p=delta.prefix,ok=Math.max(0,Math.round(+delta.ok||0)),total=Math.max(0,Math.round(+delta.total||0)),salah=Math.max(0,total-ok);
+        data[p+'Benar']=Math.max(0,Math.round(+cur[p+'Benar']||0))+ok;
+        data[p+'Salah']=Math.max(0,Math.round(+cur[p+'Salah']||0))+salah;
+        data[p+'Total']=Math.max(0,Math.round(+cur[p+'Total']||0))+total;
+      }
+      tx.set(ref,data,{merge:true});
+    });
     return true;
   }catch(e){console.warn('V21 papan:',e.message);return false}
 }
-async function v21BoardList(n){
+async function v21BackfillStats(){
+  if(!db||!user)return false;
+  const syncKey='rb21_stats_'+user.uid;
+  try{if(localStorage.getItem(syncKey)==='1')return true}catch(e){}
+  try{
+    const agg={s:{b:0,s:0,t:0},t:{b:0,s:0,t:0},u:{b:0,s:0,t:0}};
+    const hs=await db.collection('hasil').where('uid','==',user.uid).limit(1000).get();
+    hs.docs.forEach(doc=>{
+      const x=doc.data()||{},k=v21Kind(x);if(!agg[k])return;
+      const ok=Math.max(0,Math.round(+x.skor||0)),total=Math.max(0,Math.round(+x.total||0));
+      agg[k].b+=ok;agg[k].s+=Math.max(0,total-ok);agg[k].t+=total;
+    });
+    const ref=db.collection('papan').doc(user.uid);
+    const done=await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);if(!snap.exists)return false;
+      const cur=snap.data()||{},patch={};
+      ['s','t','u'].forEach(k=>{
+        const b=Math.max(0,+cur[k+'Benar']||0,agg[k].b),s=Math.max(0,+cur[k+'Salah']||0,agg[k].s),t=Math.max(0,+cur[k+'Total']||0,agg[k].t);
+        if(b!==(+cur[k+'Benar']||0))patch[k+'Benar']=b;
+        if(s!==(+cur[k+'Salah']||0))patch[k+'Salah']=s;
+        if(t!==(+cur[k+'Total']||0))patch[k+'Total']=t;
+      });
+      if(Object.keys(patch).length){patch.uid=user.uid;tx.set(ref,patch,{merge:true})}
+      return true;
+    });
+    if(!done)return false;
+    try{localStorage.setItem(syncKey,'1')}catch(e){}
+    return true;
+  }catch(e){console.warn('V21 rekap hasil:',e.message);return false}
+}
+async function v21BoardList(n,cat){
   if(!db)return null;
-  try{const s=await db.collection('papan').orderBy('xp','desc').limit(n||20).get();return s.docs.map(d=>d.data())}
-  catch(e){console.warn('V21 papan:',e.message);return null}
+  try{
+    const s=await db.collection('papan').limit(250).get();
+    const l=s.docs.map(d=>d.data()).filter(x=>x&&x.uid);
+    l.sort((a,b)=>v21Cmp(a,b,cat||v21BoardCat));
+    return l.slice(0,n||20);
+  }catch(e){console.warn('V21 papan:',e.message);return null}
 }
 async function v21MiniBoard(){
   const el=$('v21mini');if(!el)return;
-  const l=await v21BoardList(5);if(!el.isConnected)return;
-  if(!l){el.innerHTML='<div class="warn small">Papan peringkat belum aktif. Izinkan koleksi <b>papan</b> (baca &amp; tulis) di Firestore — lihat PANDUAN-V21.md.</div>';return}
+  const req=++v21MiniReq;
+  const l=await v21BoardList(5,v21BoardCat);if(req!==v21MiniReq||!el.isConnected)return;
+  if(!l){el.innerHTML='<div class="warn small">Papan peringkat belum aktif. Pastikan aturan Firestore terbaru sudah dipasang.</div>';return}
   if(!l.length){el.innerHTML='<div class="mut small">Belum ada peserta. Selesaikan latihan pertamamu!</div>';return}
   const me=user&&user.uid;
-  el.innerHTML=l.map((x,i)=>'<div class="v21-rank '+(x.uid===me?'me':'')+'"><span class="v21-pos">'+(i<3?['🥇','🥈','🥉'][i]:i+1)+'</span><span class="v21-nm">'+esc(x.nama||'Siswa')+(x.uid===me?' <i>(kamu)</i>':'')+'</span><span class="v21-xp">'+(x.xp||0)+' XP</span></div>').join('');
+  el.innerHTML=l.map((x,i)=>{
+    const st=v21Stat(x,v21BoardCat);
+    return '<div class="v21-rank '+(x.uid===me?'me':'')+'"><span class="v21-pos">'+(i<3?['🥇','🥈','🥉'][i]:i+1)+'</span><div class="v21-nm">'+esc(x.nama||'Siswa')+(x.uid===me?' <i>(kamu)</i>':'')+'<div class="v21-stat">✅ <b>'+st.b+'</b> benar • ❌ <b>'+st.s+'</b> salah • '+v21Acc(st)+'%</div></div><span class="v21-xp">'+(x.xp||0)+'<div class="mut small">XP</div></span></div>';
+  }).join('');
 }
 
 /* ---------- Beranda ---------- */
@@ -2106,7 +2176,8 @@ function pBeranda(){
     +'<div class="card"><h3>📈 7 hari terakhir</h3><div class="v21-bars">'
     +w.map(x=>'<div class="v21-bar" title="'+x.n+' soal"><i style="height:'+Math.max(6,Math.round(x.n/maxN*100))+'%"></i><span>'+x.lbl+'</span></div>').join('')
     +'</div><div class="mut small" style="margin-top:10px">'+sum+' soal total • '+ok+' benar • streak terbaik '+(a.best||st)+' hari</div></div>'
-    +'<div class="card"><div class="v21-board-head"><h3>🏆 Peringkat</h3><button class="x" onclick="v21Go(\'papan\')">Semua ›</button></div><div id="v21mini" class="mut small">Memuat...</div></div>';
+    +'<div class="card"><div class="v21-board-head"><h3>🏆 Peringkat</h3><button class="x" onclick="v21Go(\'papan\')">Semua ›</button></div>'
+    +v21CatButtons()+'<div class="mut small" style="margin:2px 0 8px">Pilih kategori. Semua akun Google yang aktif ikut peringkat.</div><div id="v21mini" class="mut small">Memuat...</div></div>';
   v21MiniBoard();
 }
 function v21Go(tab){S.sec='sekolah';S.tab=tab;home()}
@@ -2139,19 +2210,25 @@ async function startTryout(){
 
 /* ---------- Papan peringkat ---------- */
 async function pPapan(){
-  $('pane').innerHTML='<div class="card"><div class="v21-board-head"><h3>🏆 Papan peringkat</h3><button class="x" onclick="pPapan()">🔄</button></div>'
-    +'<div class="mut small">XP: 10 per jawaban benar + 5 per sesi latihan. Diperbarui otomatis setiap latihan selesai.</div>'
+  const req=++v21PapanReq,label=v21CatLabel(v21BoardCat);
+  $('pane').innerHTML='<div class="card"><div class="v21-board-head"><h3>🏆 Peringkat '+label+'</h3><button class="x" onclick="pPapan()">🔄</button></div>'
+    +'<div class="mut small">Diurutkan dari jumlah jawaban benar. Akun Google yang sudah aktif otomatis masuk peringkat.</div>'
+    +v21CatButtons()
     +'<div id="v21board" class="mut small" style="margin-top:12px">Memuat...</div></div>'
     +'<div class="card"><h3>📊 Statistikku</h3><div id="v21mine" class="mut small">Memuat...</div></div>';
   const a=v21Act(),st=v21Streak(a),t=v21Today(a),days=Object.values(a.days);
   const sum=days.reduce((s,x)=>s+(x.n||0),0),ok=days.reduce((s,x)=>s+(x.ok||0),0);
   const mine=$('v21mine');
   if(mine)mine.innerHTML='<div class="item"><span>🔥 Streak</span><b>'+st+' hari</b></div><div class="item"><span>⚡ XP</span><b>'+a.xp+'</b></div><div class="item"><span>🎯 Hari ini</span><b>'+t.n+' / '+v21Target()+' soal</b></div><div class="item"><span>📈 7 hari</span><b>'+v21WeekSum(a)+' soal</b></div><div class="item"><span>✅ Akurasi total</span><b>'+(sum?Math.round(ok/sum*100):0)+'%</b></div>';
-  const l=await v21BoardList(25),b=$('v21board');if(!b)return;
-  if(!l){b.innerHTML='<div class="warn">Belum bisa memuat papan peringkat. Izinkan koleksi <b>papan</b> (baca &amp; tulis) di Firestore — lihat PANDUAN-V21.md.</div>';return}
+  const all=await v21BoardList(250,v21BoardCat),b=$('v21board');if(req!==v21PapanReq||!b||!b.isConnected)return;
+  if(!all){b.innerHTML='<div class="warn">Belum bisa memuat papan peringkat. Pastikan aturan Firestore terbaru sudah dipasang.</div>';return}
+  const l=all.slice(0,50),me=user&&user.uid,mineRow=all.find(x=>x.uid===me);
+  if(mine&&mineRow){const ms=v21Stat(mineRow,v21BoardCat);mine.insertAdjacentHTML('afterbegin','<div class="item"><span>'+label+'</span><b>✅ '+ms.b+' benar • ❌ '+ms.s+' salah</b></div>')}
   if(!l.length){b.innerHTML='<div class="mut small">Belum ada peserta.</div>';return}
-  const me=user&&user.uid;
-  b.innerHTML=l.map((x,i)=>'<div class="v21-rank '+(x.uid===me?'me':'')+'"><span class="v21-pos">'+(i<3?['🥇','🥈','🥉'][i]:i+1)+'</span><span class="v21-nm">'+esc(x.nama||'Siswa')+(x.uid===me?' <i>(kamu)</i>':'')+'<div class="mut small">🔥 '+(x.streak||0)+' hari • '+(x.minggu||0)+' soal/7 hari</div></span><span class="v21-xp">'+(x.xp||0)+'<div class="mut small">XP</div></span></div>').join('');
+  b.innerHTML=l.map((x,i)=>{
+    const s=v21Stat(x,v21BoardCat);
+    return '<div class="v21-rank '+(x.uid===me?'me':'')+'"><span class="v21-pos">'+(i<3?['🥇','🥈','🥉'][i]:i+1)+'</span><div class="v21-nm">'+esc(x.nama||'Siswa')+(x.uid===me?' <i>(kamu)</i>':'')+'<div class="v21-stat">✅ <b>'+s.b+'</b> benar • ❌ <b>'+s.s+'</b> salah • '+v21Acc(s)+'%</div><div class="mut small">🔥 '+(x.streak||0)+' hari • '+(x.minggu||0)+' soal/7 hari</div></div><span class="v21-xp">'+(x.xp||0)+'<div class="mut small">XP</div></span></div>';
+  }).join('');
 }
 
 </script>
@@ -2336,7 +2413,7 @@ async function finish(){
   const r=await window.__v20.finish.apply(this,arguments);
   try{
     const ok=+(S.score||0),tot=(S.qs||[]).length||0;
-    v21Record(ok,tot);
+    v21Record(ok,tot,{kategori:S.sec,mapel:S.mapel,exam:S.exam,retry:S.retry});
     if(S.tryout21){S.tryout21=false;setTimeout(()=>v21Toast('Tryout selesai — skor tersimpan'),700)}
     else v21Toast('Latihan tersimpan · 🔥 '+v21Streak()+' hari');
   }catch(e){console.warn('V21 record:',e)}
@@ -2344,7 +2421,13 @@ async function finish(){
 }
 async function enter(){
   const r=await window.__v20.enter.apply(this,arguments);
-  try{v21Fab();v21WriteBoard()}catch(e){}
+  try{
+    v21Fab();
+    await v21WriteBoard();
+    await v21BackfillStats();
+    if($('v21mini'))v21MiniBoard();
+    if($('v21board'))pPapan();
+  }catch(e){}
   return r;
 }
 
