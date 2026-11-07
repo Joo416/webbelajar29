@@ -174,8 +174,10 @@ const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math
 const isUmum=()=>S.mapel.startsWith('Umum');
 
 /* ---------- LATIHAN ---------- */
-async function saveNote(){const v=$('cat').value.trim();if(!v)return;await db.collection('catatan').add({uid:user.uid,teks:v,waktu:firebase.firestore.FieldValue.serverTimestamp()});$('cat').value='';loadNotes()}
-async function loadNotes(){const s=await db.collection('catatan').where('uid','==',user.uid).limit(50).get();const r=s.docs.map(d=>d.data()).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0)).slice(0,8);($('notes')||{}).innerHTML=r.map(x=>`<div class="note">${esc(x.teks)}</div>`).join('')}
+async function saveNote(jenis){const news=jenis==='news',el=$(news?'catn':'catt');if(!el)return;const v=el.value.trim();if(!v)return;try{await db.collection('catatan').add({uid:user.uid,teks:v,jenis:news?'news':'trade',waktu:firebase.firestore.FieldValue.serverTimestamp()});el.value='';loadNotes()}catch(e){alert('Gagal menyimpan catatan: '+e.message)}}
+async function loadNotes(){try{const s=await db.collection('catatan').where('uid','==',user.uid).limit(60).get();const r=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0));const isNews=x=>x.jenis==='news'||/^\[(news|analisis pro|news analisis)/i.test(String(x.teks||'').trim());const tr=r.filter(x=>!isNews(x)).slice(0,12),nw=r.filter(isNews).slice(0,12);if($('notesTrade'))$('notesTrade').innerHTML=tr.length?tr.map(noteHtml).join(''):'<div class="mut small">Belum ada catatan trade.</div>';if($('notesNews'))$('notesNews').innerHTML=nw.length?nw.map(noteHtml).join(''):'<div class="mut small">Belum ada catatan news.</div>'}catch(e){if($('notesTrade'))$('notesTrade').textContent='Gagal memuat catatan.';if($('notesNews'))$('notesNews').textContent='Gagal memuat catatan.'}}
+function noteHtml(x){const id=String(x.id||'').replace(/[^A-Za-z0-9_-]/g,'');return `<div class="note" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;white-space:pre-wrap">${esc(x.teks)}</div><button class="x" onclick="delNote('${id}')" aria-label="Hapus catatan" title="Hapus">🗑</button></div>`}
+async function delNote(id){if(!confirm('Hapus catatan ini?'))return;try{await db.collection('catatan').doc(id).delete();loadNotes()}catch(e){alert('Gagal menghapus: '+e.message)}}
 
 /* ---------- TUTOR AI ---------- */
 /* ---------- BUAT SOAL (AI) ---------- */
@@ -228,17 +230,65 @@ async function send2(){await send();saveChat()}
 /* ---- Bank soal: edit, subtopik, anti-duplikat ---- */
 /* ---- Jurnal trading + kalkulator lot ---- */
 // ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi pJurnal(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
+const BROKERS={
+  exness:{n:'Exness',min:0.01,max:200,step:0.01,note:'Standard / Standard Cent'},
+  hfm:{n:'HFM (HotForex)',min:0.01,max:100,step:0.01,note:'Premium / Micro / Cent'},
+  icmarkets:{n:'IC Markets',min:0.01,max:200,step:0.01,note:'Standard / Raw Spread'},
+  pepperstone:{n:'Pepperstone',min:0.01,max:200,step:0.01,note:'Standard / Razor'},
+  xm:{n:'XM',min:0.01,max:50,step:0.01,note:'Standard / Micro'},
+  fbs:{n:'FBS',min:0.01,max:100,step:0.01,note:'Standard / Cent'},
+  roboforex:{n:'RoboForex',min:0.01,max:100,step:0.01,note:'Pro / Cent'},
+  octafx:{n:'OctaFX',min:0.01,max:100,step:0.01,note:'Standard / Pro'},
+  fxtm:{n:'FXTM',min:0.01,max:100,step:0.01,note:'Standard / Cent'},
+  tickmill:{n:'Tickmill',min:0.01,max:100,step:0.01,note:'Classic / Raw'},
+  fpmarkets:{n:'FP Markets',min:0.01,max:100,step:0.01,note:'Standard / Raw'},
+  vantage:{n:'Vantage',min:0.01,max:100,step:0.01,note:'Standard / RAW ECN'},
+  deriv:{n:'Deriv',min:0.01,max:50,step:0.01,note:'Standard / Financial'},
+  admiral:{n:'Admiral Markets',min:0.01,max:100,step:0.01,note:'Trade / Zero'},
+  swissquote:{n:'Swissquote',min:0.01,max:100,step:0.01,note:'Standard / Premium'},
+  saxo:{n:'Saxo',min:0.01,max:100,step:0.01,note:'Classic / Platinum'},
+  ig:{n:'IG',min:0.01,max:100,step:0.01,note:'Standard / DMA'},
+  other:{n:'Lainnya / manual',min:0.01,max:100,step:0.01,note:'spesifikasi umum'}
+};
+const KPAIRS={XAUUSD:{pip:0.01,usd:1},EURUSD:{pip:0.0001,usd:10},GBPUSD:{pip:0.0001,usd:10},AUDUSD:{pip:0.0001,usd:10},NZDUSD:{pip:0.0001,usd:10}};
+let IDRX={v:null,src:'',t:0};
+async function usdIdr(){
+  if(IDRX.v&&Date.now()-IDRX.t<6*3600000)return IDRX;
+  try{const c=JSON.parse(localStorage.getItem('idr_rate')||'null');if(c&&c.v>1000&&Date.now()-(c.t||0)<6*3600000){IDRX=c;return c}}catch(e){}
+  for(const u of ['https://api.frankfurter.dev/v1/latest?base=USD&symbols=IDR','https://open.er-api.com/v6/latest/USD']){
+    try{const r=await fetch(u,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const j=await r.json(),v=+(j.rates&&j.rates.IDR);if(v>1000&&v<100000){IDRX={v,src:new URL(u).hostname,t:Date.now()};try{localStorage.setItem('idr_rate',JSON.stringify(IDRX))}catch(e){};return IDRX}}catch(e){}
+  }
+  IDRX={v:16500,src:'perkiraan, cek kurs',t:Date.now()};return IDRX;
+}
+function kcurSet(){const c=($('kcur')||{}).value;$('kb').value=c==='usd'?1000:c==='cent'?100000:15000000;calcLot()}
+async function calcLot(){
+  const out=$('kout');if(!out)return;
+  const br=BROKERS[($('kbr')||{}).value]||BROKERS.exness,cur=($('kcur')||{}).value||'usd',pair=($('kpair')||{}).value||'XAUUSD';
+  const b=+($('kb')||{}).value,r=+($('kr')||{}).value,sl=+($('ks')||{}).value;
+  if(!(b>0&&r>0&&sl>0)){out.textContent='Isi saldo, risiko, dan stop loss dengan angka lebih dari 0.';return}
+  const K=KPAIRS[pair]||KPAIRS.XAUUSD,cent=cur==='cent',pipUsd=K.usd*(cent?0.01:1);
+  let rate=1,src='';
+  if(cur==='idr'){const x=await usdIdr();rate=x.v;src=x.src}
+  const pipAcct=cur==='idr'?pipUsd*rate:(cent?pipUsd*100:pipUsd),risk=b*r/100,min=br.min||0.01,step=br.step||0.01;
+  let lots=risk/(sl*pipAcct),note='';
+  if(!isFinite(lots)||lots<=0){out.textContent='Perhitungan tidak valid. Cek angka.';return}
+  if(lots>br.max){lots=br.max;note='Dibatasi maksimum '+br.max+' lot milik broker.'}
+  else if(lots<min){lots=min;note='Target risiko di bawah lot minimum; lot minimum dipakai sehingga risiko aktual bisa lebih besar dari target.'}
+  else lots=Math.floor(lots/step+1e-9)*step;
+  const actual=lots*sl*pipAcct,cs=cur==='usd'?'$':cur==='cent'?'¢':'Rp',fmt=v=>new Intl.NumberFormat('id-ID',{maximumFractionDigits:2}).format(v);
+  out.innerHTML=`Risiko target: <b>${cs}${fmt(risk)}</b><br>Nilai pip per 1 lot: <b>${cs}${fmt(pipAcct)}</b><br>Ukuran lot: <b>${lots.toFixed(2)} lot</b><br>Risiko aktual: <b>${cs}${fmt(actual)}</b>${note?`<div class="warn" style="margin-top:8px">${note}</div>`:''}<div class="small mut" style="margin-top:8px">${esc(br.n)} • ${pair} • akun ${cur.toUpperCase()}${cur==='idr'?` • kurs USD/IDR ${fmt(rate)} (${esc(src)})`:''} • kontrak ${cent?'cent (1/100 standar)':'standar'} • min ${min} / langkah ${step} / maks ${br.max} lot. ${esc(br.note||'')}</div>`;
+}
 function pJurnal(){
-  $('pane').innerHTML=`<div class="card"><h3>🧮 Kalkulator lot</h3><div class="row"><div><label>Saldo ($)</label><input id="kb" type="number" value="1000"></div><div><label>Risiko (%)</label><input id="kr" type="number" value="1" step="0.1"></div></div>
-    <div class="row"><div><label>Stop loss (pips)</label><input id="ks" type="number" value="20"></div><div><label>Nilai pip per 1 lot ($)</label><input id="kp" type="number" value="10"></div></div>
-    <button class="btn full" onclick="calc()">Hitung</button><div id="kout" class="exp"></div></div>
+  $('pane').innerHTML=`<div class="card"><h3>🧮 Kalkulator lot</h3><div class="row"><div><label>Broker</label><select id="kbr" onchange="calcLot()">${Object.entries(BROKERS).map(([k,b])=>`<option value="${k}"${k==='exness'?' selected':''}>${esc(b.n)}</option>`).join('')}</select></div><div><label>Jenis akun</label><select id="kcur" onchange="kcurSet()"><option value="usd">USD ($)</option><option value="cent">Cent (¢)</option><option value="idr">IDR (Rp)</option></select></div></div><div class="row"><div><label>Pair</label><select id="kpair" onchange="calcLot()">${Object.keys(KPAIRS).map(p=>`<option${p==='XAUUSD'?' selected':''}>${p}</option>`).join('')}</select></div><div><label>Saldo akun</label><input id="kb" type="number" step="any" value="1000"></div></div><div class="row"><div><label>Risiko (%)</label><input id="kr" type="number" value="1" step="0.1"></div><div><label>Stop loss (pips)</label><input id="ks" type="number" value="20"></div></div><button class="btn full" onclick="calcLot()">Hitung lot</button><div id="kout" class="exp"></div><div class="mut small" style="margin-top:8px">Min/max lot dan dukungan akun Cent/IDR berbeda per broker, negara, dan jenis akun. Angka ini spesifikasi umum; cek kontrak dan leverage di broker sebelum order.</div></div>
+
   <div class="card"><h3>📒 Catat trade</h3><div class="row"><input id="jp" placeholder="Pair (EURUSD)"><select id="jd"><option>Buy</option><option>Sell</option></select></div>
     <div class="row" style="margin-top:10px"><input id="je" type="number" step="any" placeholder="Entry"><input id="jl" type="number" step="any" placeholder="SL"><input id="jt" type="number" step="any" placeholder="TP"></div>
     <div class="row" style="margin-top:10px"><input id="jr" type="number" step="any" placeholder="Hasil (R, contoh 2 / -1)"><input id="js" placeholder="Setup (OB, FVG...)"></div>
     <textarea id="jn" style="margin-top:10px;min-height:70px" placeholder="Catatan / evaluasi"></textarea><button class="btn full" onclick="saveJ()">Simpan trade</button></div>
   <div class="card"><h3>📈 Jurnal</h3><div id="jlist" class="mut">Memuat...</div></div>
-  <div class="card"><h3>📝 Catatan</h3><textarea id="cat" placeholder="Catatan bebas..."></textarea><button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes"></div></div>`;
-  calc();loadJ();loadNotes();
+  <div class="card"><h3>📝 Catatan trade</h3><div class="mut small">Setup, evaluasi, dan pelajaran dari trade.</div><textarea id="catt" style="margin-top:10px" placeholder="Contoh: entry EURUSD buy karena OB H1, risiko 1%, evaluasi eksekusi..."></textarea><button class="btn alt full" onclick="saveNote('trade')">Simpan catatan trade</button><div id="notesTrade" class="mut small" style="margin-top:10px"></div></div>
+  <div class="card"><h3>📰 Catatan news</h3><div class="mut small">Ringkasan NFP/CPI/PPI/FOMC, berita pasar, dan analisis XAUUSD.</div><textarea id="catn" style="margin-top:10px" placeholder="Contoh: NFP lebih kuat, yield naik, XAUUSD SELL..."></textarea><button class="btn alt full" onclick="saveNote('news')">Simpan catatan news</button><div id="notesNews" class="mut small" style="margin-top:10px"></div></div>`;
+  calcLot();loadJ();loadNotes();
 }
 // ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi calc(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function calc(){
@@ -645,8 +695,8 @@ const fmtMd=t=>esc(t).replace(/^#{1,3}\s*(.+)$/gm,'<div style="font-weight:800;c
 // ✏️ [TEKS BISA DIUBAH] 📰 Trading → News — fungsi saveNews(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function saveNews(){
   const c=JSON.parse(localStorage.getItem('news_'+NEWSF)||'null');if(!c||!c.analysis)return;
-  await db.collection('catatan').add({uid:user.uid,teks:`[News ${NEWSF.toUpperCase()} • ${new Date(c.fetchedAt).toLocaleString('id-ID')}]\n${c.analysis}`,waktu:firebase.firestore.FieldValue.serverTimestamp()});
-  alert('Analisis disimpan ke Catatan (tab Jurnal).');
+  await db.collection('catatan').add({uid:user.uid,teks:`[News ${NEWSF.toUpperCase()} • ${new Date(c.fetchedAt).toLocaleString('id-ID')}]\n${c.analysis}`,jenis:'news',waktu:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('Analisis disimpan ke Catatan news (tab Jurnal).');
 }
 /* ===== END V9 ===== */
 </script>
@@ -723,7 +773,7 @@ function renderProBase(j,stale){
 async function savePro(){
   const c=JSON.parse(localStorage.getItem('pro_last')||'null');if(!c||!c.pro)return;const p=c.pro;
   const txt=`[Analisis Pro • ${new Date(c.fetchedAt).toLocaleString('id-ID')} • ${c.horizon}]\nUSD: ${p.usd_bias} — ${p.usd_reason}\n${p.summary}\n`+p.pairs.map(x=>`• ${x.pair}: ${x.bias} (${x.confidence}) — ${x.thesis}`).join('\n');
-  await db.collection('catatan').add({uid:user.uid,teks:txt,waktu:firebase.firestore.FieldValue.serverTimestamp()});alert('Ringkasan disimpan ke Catatan (tab Jurnal).');
+  await db.collection('catatan').add({uid:user.uid,teks:txt,jenis:'news',waktu:firebase.firestore.FieldValue.serverTimestamp()});alert('Ringkasan disimpan ke Catatan news (tab Jurnal).');
 }
 /* ===== END V10 ===== */
 </script>
@@ -1826,31 +1876,27 @@ function topicList(lv){
   const t=TOPICS[S.mapel];return Array.isArray(t)?t:(t&&t[tierOf(lv)])||[];
 }
 /* ---------- tab Trading: hanya News, Analisis, Tutor, Jurnal, Catatan ---------- */
-function setSec(s){S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'news':'latihan';home()}
+function setSec(s){S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':'latihan';home()}
 // ✏️ [TEKS BISA DIUBAH] 🎯 TKA & Sekolah → Latihan & riwayat — fungsi homeBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function homeBase(){
   if(S.sec==='admin')return adminView();
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
   if(S.sec==='trading'){
-    S.mapel='Trading';if(!['news','xau','pro','tutor','jurnal','catatan'].includes(S.tab))S.tab='news';
-    const T=[['news','📰 News'],['xau','🎯 News Analisis'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
+    S.mapel='Trading';if(!['xau','tutor','jurnal'].includes(S.tab))S.tab='xau';
+    const T=[['xau','🎯 News Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal']];
     $('app').innerHTML=`<div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
     return pane();
   }
-  if(['news','xau','pro','jurnal','catatan'].includes(S.tab))S.tab='latihan';
+  if(['xau','jurnal'].includes(S.tab))S.tab='latihan';
   const T=[['latihan','🎯 Latihan'],['tutor','🤖 Tutor'],['buat','✨ Soal'],['bank','🗂 Bank']];
   $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
     <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${mapelOptions()}</select></div>
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
   pane();
 }
-function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,xau:pXauNews,pro:pPro,catatan:pCatatan})[S.tab]()}
-// ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi pCatatan(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function pCatatan(){
-  $('pane').innerHTML=`<div class="card"><h3>📝 Catatan trading</h3><textarea id="cat" placeholder="Catatan setup, pelajaran, evaluasi..."></textarea><button class="btn alt full" onclick="saveNote()">Simpan catatan</button><div id="notes" style="margin-top:10px"></div></div>`;
-  loadNotes();
-}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews})[S.tab]()}
+// Tab Catatan lama sudah dihapus; catatan trade & news kini berada di tab Jurnal.
 Object.assign(STARTERS18,{'Trading':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Bagaimana arah USD dan pair utama berdasarkan data terbaru?','Jelaskan order block dan fair value gap dengan contoh','Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip']});
 /* ---------- kamus: definisi dibantu sumber kamus global ---------- */
 // ✏️ [TEKS BISA DIUBAH] 🤖 Tutor (sekolah & Trading) — fungsi ai(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -1927,6 +1973,11 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .v21-bar span{font-size:.66rem;color:var(--mut);font-weight:600}
 .v21-board-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
 .v21-board-head h3{margin:0}
+.v21-cats{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.v21-cats button{border:1px solid var(--line);background:var(--field);color:var(--tx);padding:6px 10px;border-radius:999px;font-size:.74rem;font-weight:700;cursor:pointer}
+.v21-cats button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.v21-stat{display:flex;flex-wrap:wrap;gap:4px 9px;font-size:.72rem;color:var(--mut);margin-top:2px}
+.v21-stat b{color:var(--tx);font-weight:750}
 .v21-rank{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.86rem}
 .v21-rank:last-child{border:0}
 .v21-rank.me{font-weight:700}
@@ -2128,7 +2179,8 @@ function xauNextHtml(j){
     return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">${esc(ldt(e.ts,{dateStyle:'medium',timeStyle:'short'}))}</div><div class="small mut">${badge}</div><div class="small" style="color:var(--warn);font-weight:700">⏳ ${esc(xauCountdown(e.ts))}</div></div>`;
   }).join('');
   const cl=(f.clusters||[]).length?f.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">⚡ ${esc(c.tags.join(' + '))} · ${esc(c.from)} → ${esc(c.to)}</div><div class="small mut">selisih ${esc(String(c.spanH))} jam · ${c.tags.length} rilis berbeda tag</div>${c.items.map(i=>`<div class="small" style="margin-top:4px">• <b>${esc(i.tag)}</b> ${esc(i.timeUTC)} — ${esc(i.title)}${i.forecast?' · forecast '+esc(i.forecast):''}${i.previous?' · prev '+esc(i.previous):''}</div>`).join('')}</div>`).join(''):'<div class="mut small">Tidak ada dua rilis fokus berbeda yang berjarak ≤48 jam dalam data yang terkumpul saat ini.</div>';
-  return `<div class="card"><h3>🗓 Empat rilis fokus — jadwal berikutnya</h3><div class="mut small" style="margin-bottom:8px">Waktu perangkatmu. ✅ berarti tanggalnya sudah dicocokkan ke jadwal resmi BLS / federalreserve.gov. Cakupan ${esc(String(f.horizonDays||45))} hari${f.nearest?' · terdekat <b>'+esc(f.nearest.tag)+'</b> ('+esc(xauCountdown(f.nearest.ts))+')':''}.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${nx}</div></div><div class="card"><h3>⚡ News yang bertabrakan</h3><div class="mut small" style="margin-bottom:8px">Rilis berbeda tag yang berdekatan digabung (≤48 jam): pasar menilai kombinasi data, bukan satu angka saja.</div>${cl}</div>`;
+  const rel=(f.related||[]).length?`<div class="card"><h3>📰 Berita lain di waktu yang sama</h3><div class="mut small" style="margin-bottom:8px">Rilis USD lain dalam ±48 jam dari NFP/CPI/PPI/FOMC; AI menggabungkan efeknya dengan rilis fokus.</div>${f.related.map(r=>`<div class="item"><span><b>${esc(r.title)}</b><div class="small mut">${esc(r.timeUTC)}${r.forecast?' · forecast '+esc(r.forecast):''}${r.previous?' · prev '+esc(r.previous):''}${r.actual?' · aktual '+esc(r.actual):''}</div></span><span class="small mut">${esc(r.impact||'')}</span></div>`).join('')}</div>`:'';
+  return `<div class="card"><h3>🗓 Empat rilis fokus — jadwal berikutnya</h3><div class="mut small" style="margin-bottom:8px">Waktu perangkatmu. ✅ berarti tanggalnya sudah dicocokkan ke jadwal resmi BLS / federalreserve.gov. Cakupan ${esc(String(f.horizonDays||60))} hari${f.nearest?' · terdekat <b>'+esc(f.nearest.tag)+'</b> ('+esc(xauCountdown(f.nearest.ts))+')':''}.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${nx}</div></div><div class="card"><h3>⚡ News yang bertabrakan</h3><div class="mut small" style="margin-bottom:8px">Rilis berbeda tag yang berdekatan digabung (≤48 jam): pasar menilai kombinasi data, bukan satu angka saja.</div>${cl}</div>${rel}`;
 }
 function xauDataHtml(j){
   const g=j.gold&&j.gold.price,y=j.yields,e=j.effr,m=j.mr||{},d=j.data||{},cards=[];
@@ -2144,6 +2196,9 @@ function xauDataHtml(j){
   if(e)kd.push(`<div class="item"><span>EFFR (NY Fed, ${esc(String(e.date))})</span><b>${esc(String(e.rate))}%</b></div>`);
   if(m.ry)kd.push(`<div class="item"><span>Yield riil 10Y / TIPS (${esc(String(m.ry.date))})</span><b>${esc(String(m.ry.v))}%</b></div>`);
   if(m.dxy)kd.push(`<div class="item"><span>Indeks dolar luas / Fed (${esc(String(m.dxy.date))})</span><b>${esc(String(m.dxy.v))}</b></div>`);
+  if(m.us&&m.us.pce)kd.push(`<div class="item"><span>PCE YoY (${esc(String(m.us.pce.date))})</span><b>${nfmt(m.us.pce.yoy,'%')}</b></div>`);
+  if(m.us&&m.us.corePce)kd.push(`<div class="item"><span>Core PCE YoY (${esc(String(m.us.corePce.date))})</span><b>${nfmt(m.us.corePce.yoy,'%')}</b></div>`);
+  if(m.us&&m.us.claims)kd.push(`<div class="item"><span>Klaim pengangguran mingguan (${esc(String(m.us.claims.date))})</span><b>${esc(String(m.us.claims.v))}</b></div>`);
   const key=kd.length?`<div class="card"><h3>🏦 Data makro kunci untuk emas</h3>${kd.join('')}<div class="small mut" style="margin-top:6px">XAUUSD umumnya berlawanan dengan yield riil dan USD; ini konteks data, bukan sinyal entry.</div></div>`:'';
   const official=cards.length?`<div class="card"><h3>📊 Angka resmi terbaru (NFP · PPI · CPI)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.18rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="small mut" style="margin-top:6px">Sumber: ${esc((d.meta&&d.meta.src)||'BLS')}. Angka bisa direvisi.</div></div>`:'<div class="card"><div class="warn">Angka resmi BLS tidak tersedia saat ini.</div></div>';
   return gold+official+key;
@@ -2157,6 +2212,9 @@ function renderXau(j,stale){
     return;
   }
   const b=x.bias||{},sched=(j.xau&&j.xau.next)||{};
+  const act=['BUY','SELL','WAIT'].includes(x.action)?x.action:(b.bias==='BULLISH'?'BUY':b.bias==='BEARISH'?'SELL':'WAIT');
+  const AC={BUY:'var(--ok)',SELL:'var(--no)',WAIT:'var(--warn)'},AL={BUY:'🟢 BUY XAUUSD',SELL:'🔴 SELL XAUUSD',WAIT:'🟡 TUNGGU — data belum konklusif'};
+  const actCard=`<div class="card" style="border-left:5px solid ${AC[act]}"><div class="mut small">Keputusan arah XAUUSD dari gabungan data global</div><div style="font-size:1.55rem;font-weight:900;color:${AC[act]};letter-spacing:-.02em;margin:4px 0">${AL[act]}</div>${x.action_reason?`<div class="exp" style="color:var(--tx);line-height:1.55">${fmtMd(x.action_reason)}</div>`:'<div class="mut small">Alasan aksi tidak diberikan AI; baca ringkasan dan skenario di bawah.</div>'}${x.action_conflict?'<div class="warn" style="margin-top:8px">⚠️ Aksi dan bias AI bertentangan. Baca skenario sebelum dipakai.</div>':''}<div class="mut small" style="margin-top:8px">Edukasi berbasis data publik, bukan sinyal entry/SL/TP.</div></div>`;
   const eng=j.eng?' · mesin skor XAUUSD: '+esc(j.eng.bias)+' (skor '+esc(String(j.eng.score))+')':'';
   const lv=(b.key_levels||[]).length?`<div style="margin-top:10px"><b>Level referensi (dari data harga)</b>${b.key_levels.map(l=>`<div class="item"><span>${esc(l.label)} <span class="small mut">${esc(l.source||'')}</span></span><b>${esc(l.value)}</b></div>`).join('')}<div class="small mut" style="margin-top:4px">Area referensi berbasis data harian, bukan entry/SL/TP.</div></div>`:'';
   const drivers=(b.drivers||[]).length?`<div style="margin-top:10px"><b>Pendorong utama</b>${b.drivers.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:'';
@@ -2168,7 +2226,7 @@ function renderXau(j,stale){
   const clus=(x.clusters||[]).length?`<div class="card"><h3>⚡ News bertabrakan — efek gabungan</h3>${x.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">${esc((c.tags||[]).join(' + ')||'beberapa rilis')} · ${esc(c.when)}</div><div class="small">${esc(c.why)}</div><div class="small" style="margin-top:4px"><b>Untuk XAUUSD:</b> ${esc(c.gold_note)}</div></div>`).join('')}</div>`:'';
   const scen=(x.scenarios||[]).length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${x.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:'';
   const flags=(j.flags||[]).length?`<div class="warn" style="margin-bottom:10px">⚠️ Angka yang TIDAK ditemukan di data terkumpul: <b>${esc(j.flags.join(', '))}</b>. Anggap belum valid.</div>`:'<div class="mut small" style="margin-bottom:10px">✅ Tidak ada angka harga/level dalam jawaban AI di luar data terkumpul.</div>';
-  box.innerHTML=`<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🎯 XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">📝 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Edukasi berbasis data publik, bukan saran finansial dan bukan sinyal entry/SL/TP. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
+  box.innerHTML=`${actCard}<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🎯 XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>📝 Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">📝 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Edukasi berbasis data publik, bukan saran finansial dan bukan sinyal entry/SL/TP. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
 }
 /* ---------- riwayat analisis XAUUSD (maks 5, bisa dibuka & dihapus) ---------- */
 const XHKEY='xau_hist_v1',XHMAX=5;
@@ -2189,9 +2247,9 @@ function xauHistPaint(){
   const h=xauHist();
   if(!h.length){el.innerHTML='';return}
   el.innerHTML=`<div class="card"><div class="v21-board-head"><h3>🗂 Riwayat analisis</h3><button class="x" onclick="xauHistClear()">Hapus semua</button></div><div class="mut small" style="margin-bottom:6px">Tersimpan di perangkat ini (maks ${XHMAX}). Buka kembali tanpa mengambil data baru.</div>${h.map((it,i)=>{
-    const j=it.j,x=j.xai||{},b=x.bias||{},t=new Date(j.fetchedAt||it.ts),bi=b.bias||'NETRAL';
-    const ic=bi==='BULLISH'?'🟢':bi==='BEARISH'?'🔴':'⚪';
-    return `<div class="item" style="align-items:center;gap:8px"><div style="min-width:0"><div><b>${ic} ${esc(bi)}</b> <span class="small mut">${esc(b.confidence||'RENDAH')}</span></div><div class="small mut">${esc(t.toLocaleString('id-ID'))} · ${esc(j.provider||'-')}${j.model?' · '+esc(String(j.model).slice(0,28)):''}</div></div><div style="display:flex;gap:6px;flex:none"><button class="x" onclick="xauHistOpen(${i})">Buka</button><button class="x" onclick="xauHistDel(${i})" aria-label="Hapus riwayat ini" title="Hapus">🗑</button></div></div>`;
+    const j=it.j,x=j.xai||{},b=x.bias||{},t=new Date(j.fetchedAt||it.ts),bi=b.bias||'NETRAL',act=x.action||(bi==='BULLISH'?'BUY':bi==='BEARISH'?'SELL':'WAIT');
+    const ic=act==='BUY'?'🟢':act==='SELL'?'🔴':'🟡';
+    return `<div class="item" style="align-items:center;gap:8px"><div style="min-width:0"><div><b>${ic} ${esc(act)} XAU</b> <span class="small mut">${esc(bi)} · ${esc(b.confidence||'RENDAH')}</span></div><div class="small mut">${esc(t.toLocaleString('id-ID'))} · ${esc(j.provider||'-')}${j.model?' · '+esc(String(j.model).slice(0,28)):''}</div></div><div style="display:flex;gap:6px;flex:none"><button class="x" onclick="xauHistOpen(${i})">Buka</button><button class="x" onclick="xauHistDel(${i})" aria-label="Hapus riwayat ini" title="Hapus">🗑</button></div></div>`;
   }).join('')}</div>`;
 }
 function xauHistOpen(i){
@@ -2236,9 +2294,9 @@ function retryXauAI(){if(!XR.g||!XR.cur)return;const base={...XR.cur};delete bas
 async function saveXauNews(){
   const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disimpan.');
   const x=c.xai,b=x.bias||{};
-  const txt=`[News Analisis XAUUSD · ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}]\nBias XAUUSD: ${b.bias} (keyakinan ${b.confidence})\n${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'))+((x.clusters||[]).length?'\nGabungan: '+x.clusters.map(k=>(k.tags||[]).join('+')+' → '+k.gold_note).join(' | '):'');
-  await db.collection('catatan').add({uid:user.uid,teks:txt,waktu:firebase.firestore.FieldValue.serverTimestamp()});
-  alert('Ringkasan disimpan ke Catatan (tab Jurnal).');
+  const txt=`[News Analisis XAUUSD · ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}]\nBias: ${b.bias} (keyakinan ${b.confidence}) · Aksi: ${x.action||'WAIT'}\n${x.action_reason?x.action_reason+'\n':''}${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'))+((x.clusters||[]).length?'\nGabungan: '+x.clusters.map(k=>(k.tags||[]).join('+')+' → '+k.gold_note).join(' | '):'');
+  await db.collection('catatan').add({uid:user.uid,teks:txt,jenis:'news',waktu:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('Ringkasan disimpan ke Catatan news (tab Jurnal).');
 }
 </script>
 <script>
@@ -2256,8 +2314,8 @@ function homeBase(){
   if(S.sec==='beranda'){S.tab='beranda';$('app').innerHTML='<div id="pane"></div>';return pane()}
   if(S.sec==='trading'){
     S.mapel='Trading';
-    if(['news','xau','pro','tutor','jurnal','catatan'].indexOf(S.tab)<0)S.tab='news';
-    const T=[['news','📰 News'],['xau','🎯 News Analisis'],['pro','🧠 Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal'],['catatan','📝 Catatan']];
+    if(['xau','tutor','jurnal'].indexOf(S.tab)<0)S.tab='xau';
+    const T=[['xau','🎯 News Analisis'],['tutor','🤖 Tutor'],['jurnal','📒 Jurnal']];
     $('app').innerHTML='<div class="stabs">'+T.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" onclick="S.tab=\''+k+'\';home()">'+l+'</button>').join('')+'</div><div id="pane"></div>';
     return pane();
   }
@@ -2268,7 +2326,7 @@ function homeBase(){
   pane();
 }
 function pane(){
-  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,news:pNews,xau:pXauNews,pro:pPro,catatan:pCatatan,papan:pPapan}[S.tab];
+  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,papan:pPapan}[S.tab];
   if(f)return f();
   S.tab='latihan';return pLatihan();
 }
@@ -2371,7 +2429,7 @@ select,input,textarea{font-size:16px}
 async function copyXauNews(btn){
   const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disalin.');
   const x=c.xai,b=x.bias||{};
-  const txt=`News Analisis XAUUSD — ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}\nBias: ${b.bias} (${b.confidence})\n${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'));
+  const txt=`News Analisis XAUUSD — ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}\nBias: ${b.bias} (${b.confidence}) · Aksi: ${x.action||'WAIT'}\n${x.action_reason?x.action_reason+'\n':''}${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_bias} — ${e.why}`).join('\n'));
   try{await navigator.clipboard.writeText(txt);if(btn){btn.textContent='✅ Tersalin';setTimeout(()=>{btn.textContent='📋 Salin ringkasan'},1600)}}
   catch(e){alert('Gagal menyalin: '+e.message)}
 }
