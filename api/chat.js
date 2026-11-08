@@ -128,16 +128,19 @@ async function gemini(system, messages, max, errs, dl, tmo, opt) {
   const keys = keysOf('GEMINI');
   if (!keys.length) return null;
   const fenv = opt && opt.field ? 'GEMINI_MODELS_' + String(opt.field).toUpperCase().replace(/[^A-Z0-9]/g, '_') : '';
-  const models = ((fenv && process.env[fenv]) || (opt && opt.smart && process.env.GEMINI_MODELS_SMART) || process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite,gemini-3.8-flash').split(/[\s,]+/).filter(Boolean);
+  const base = ((opt && opt.smart && process.env.GEMINI_MODELS_SMART) || process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite,gemini-3.8-flash').split(/[\s,]+/).filter(Boolean);
+  const fieldModels = fenv && process.env[fenv] ? process.env[fenv].split(/[\s,]+/).filter(Boolean) : [];
+  const models = [...new Set([...fieldModels, ...base])];
   for (const m of models) {
     const r = await rotate('Gemini/' + m, keys, k => callGemini(k, m, system, messages, max, dl, tmo, opt), errs, dl, m + '|');
     if (r) return r;
   }
   return null;
 }
-async function callGroq(key, system, messages, max, dl, opt) {
+async function callGroq(key, system, messages, max, dl, opt, model) {
+  const pick = model || (opt && opt.field && process.env['GROQ_MODEL_' + String(opt.field).toUpperCase().replace(/[^A-Z0-9]/g, '_')]) || process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   const body = {
-    model: (opt && opt.field && process.env['GROQ_MODEL_' + String(opt.field).toUpperCase().replace(/[^A-Z0-9]/g, '_')]) || process.env.GROQ_MODEL || 'openai/gpt-oss-120b', max_tokens: max, reasoning_effort: (opt && opt.smart && (process.env.GROQ_REASONING_SMART || 'medium')) || process.env.GROQ_REASONING || 'low',
+    model: pick, max_tokens: max, reasoning_effort: (opt && opt.smart && (process.env.GROQ_REASONING_SMART || 'medium')) || process.env.GROQ_REASONING || 'low',
     messages: [{ role: 'system', content: system }, ...messages.map(m => ({ role: m.role, content: String(m.content) }))]
   };
   if (opt && opt.temp != null) body.temperature = opt.temp;
@@ -165,7 +168,13 @@ async function callGroq(key, system, messages, max, dl, opt) {
 }
 async function groq(system, messages, max, errs, dl, opt) {
   const keys = keysOf('GROQ');
-  return keys.length ? rotate('Groq', keys, k => callGroq(k, system, messages, max, dl, opt), errs, dl) : null;
+  if (!keys.length) return null;
+  const fk = opt && opt.field ? 'GROQ_MODEL_' + String(opt.field).toUpperCase().replace(/[^A-Z0-9]/g, '_') : '';
+  const fm = fk && process.env[fk] ? process.env[fk] : '';
+  const def = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+  let r = await rotate('Groq', keys, k => callGroq(k, system, messages, max, dl, opt, fm || def), errs, dl);
+  if (!r && fm && fm !== def) r = await rotate('Groq default', keys, k => callGroq(k, system, messages, max, dl, opt, def), errs, dl);
+  return r;
 }
 
 async function verify(req) {
@@ -1726,7 +1735,7 @@ const AI_FIELDS = {
   math: { label: 'Matematika & hitungan', smart: true, temp: 0.1, order: ['gemini', 'groq', 'nvidia', 'sambanova', 'zai', 'openrouter', 'mistral', 'cloudflare'] },
   science: { label: 'IPA & sains', smart: true, temp: 0.25, order: ['gemini', 'groq', 'nvidia', 'sambanova', 'mistral', 'zai', 'openrouter', 'cloudflare'] },
   indonesian: { label: 'Bahasa Indonesia & sastra', smart: false, temp: 0.35, order: ['gemini', 'groq', 'mistral', 'openrouter', 'nvidia', 'zai', 'sambanova', 'cloudflare'] },
-  english: { label: 'Bahasa Inggris & terjemahan', smart: false, temp: 0.35, order: ['mistral', 'gemini', 'groq', 'openrouter', 'nvidia', 'zai', 'sambanova', 'cloudflare'] },
+  english: { label: 'Bahasa Inggris & terjemahan', smart: false, temp: 0.35, order: ['gemini', 'groq', 'mistral', 'openrouter', 'nvidia', 'zai', 'sambanova', 'cloudflare'] },
   social: { label: 'IPS, sejarah, ekonomi', smart: true, temp: 0.3, order: ['gemini', 'groq', 'zai', 'nvidia', 'openrouter', 'mistral', 'sambanova', 'cloudflare'] },
   world: { label: 'Pengetahuan umum dunia', smart: true, temp: 0.35, order: ['gemini', 'groq', 'nvidia', 'zai', 'openrouter', 'mistral', 'sambanova', 'cloudflare'] },
   trading: { label: 'Tutor trading & pasar', smart: true, temp: 0.3, order: ['gemini', 'zai', 'groq', 'nvidia', 'mistral', 'openrouter', 'sambanova', 'cloudflare'] },
@@ -1735,7 +1744,7 @@ const AI_FIELDS = {
   xau: { label: 'News analisis XAUUSD', smart: true, temp: 0.3, order: ['gemini', 'zai', 'groq', 'nvidia', 'mistral', 'openrouter', 'sambanova', 'cloudflare'] },
   curriculum: { label: 'Kurikulum Indonesia', smart: true, temp: 0.2, order: ['gemini', 'groq', 'mistral', 'openrouter', 'zai', 'nvidia', 'sambanova', 'cloudflare'] },
   quiz: { label: 'Pembuat soal & kuis', smart: true, temp: 0.6, order: ['groq', 'gemini', 'zai', 'mistral', 'nvidia', 'openrouter', 'sambanova', 'cloudflare'] },
-  dictionary: { label: 'Kamus & istilah bahasa', smart: false, temp: 0.2, order: ['mistral', 'gemini', 'groq', 'openrouter', 'nvidia', 'zai', 'sambanova', 'cloudflare'] },
+  dictionary: { label: 'Kamus & istilah bahasa', smart: false, temp: 0.2, order: ['gemini', 'groq', 'mistral', 'openrouter', 'nvidia', 'zai', 'sambanova', 'cloudflare'] },
   router: { label: 'Perutean pertanyaan (cepat)', smart: false, temp: 0, order: ['groq', 'gemini', 'zai', 'nvidia', 'mistral', 'openrouter', 'sambanova', 'cloudflare'] },
   verify: { label: 'Pemeriksa fakta & hitungan', smart: true, temp: 0, order: ['gemini', 'groq', 'nvidia', 'sambanova', 'zai', 'mistral', 'openrouter', 'cloudflare'] },
   general: { label: 'Umum', smart: false, temp: 0.3, order: ['gemini', 'groq', 'nvidia', 'mistral', 'zai', 'openrouter', 'sambanova', 'cloudflare'] }
