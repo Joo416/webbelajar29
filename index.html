@@ -228,8 +228,8 @@ const nk=q=>String(q).toLowerCase().replace(/[^a-z0-9]/g,'');
 /* ---- Latihan, ujian, review, statistik ---- */
 /* ---- Tutor: riwayat chat tersimpan ---- */
 const chatId=()=>user.uid+'__'+S.sec+'__'+S.mapel.replace(/\W/g,'');
-async function saveChat(){const c=(S.chat[S.mapel]||[]).filter(m=>!/^(⚠️|⏳)/.test(m.content)).slice(-30);try{await db.collection('chat').doc(chatId()).set({uid:user.uid,mapel:S.mapel,msgs:c})}catch(e){console.error(e)}}
-async function send2(){await send();saveChat()}
+async function saveChat(){if(!user)return;const c=(S.chat[S.mapel]||[]).filter(m=>!/^(⚠️|⏳)/.test(m.content)).slice(-30);try{await db.collection('chat').doc(chatId()).set({uid:user.uid,mapel:S.mapel,msgs:c})}catch(e){console.error(e)}}
+async function send2(){await send();if(user)saveChat()}
 
 /* ---- Bank soal: edit, subtopik, anti-duplikat ---- */
 /* ---- Jurnal trading + kalkulator lot ---- */
@@ -2755,5 +2755,7 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa-jp-data2.js"></script>
 <script src="bahasa-jp-grammar.js"></script>
 <script src="bahasa.js"></script>
+<script src="rb-core.js"></script>
+<script src="rb-content.js"></script>
 </body>
 </html>
