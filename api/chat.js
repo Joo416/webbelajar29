@@ -2346,8 +2346,13 @@ module.exports = async (req, res) => {
   const field = /dictionary|kamus|english dictionary/i.test(system) ? 'dictionary' : catField(cat);
   const out = await llm(sys, messages, big ? 8000 : 2500, errs, dl, { ...opt, field });
   if (!out) return res.status(500).json({ error: errs.length ? 'Semua AI gagal: ' + errs.join(' | ').slice(0, 450) : 'Belum ada key AI di Vercel (GEMINI_API_KEY_1, GROQ_API_KEY_1, atau penyedia lain seperti CEREBRAS/OPENROUTER/MISTRAL)' });
+  let ans = out.text;
+  if (Array.isArray(ans)) ans = ans.map(x => typeof x === 'string' ? x : String((x && (x.text || x.content || x.answer)) || '')).join('\n');
+  else if (ans && typeof ans === 'object') ans = String(ans.text || ans.content || ans.answer || '');
+  ans = ans == null ? '' : String(ans);
+  if (!ans.trim()) return res.status(502).json({ error: 'AI mengembalikan jawaban kosong. Coba lagi.' });
   res.status(200).json({
-    ...out, grounded: !want || results.length > 0, trusted: results.filter(r => isAuth(r.uri)).length, searchNote: want && !results.length ? note : '',
+    ...out, text: ans, grounded: !want || results.length > 0, trusted: results.filter(r => isAuth(r.uri)).length, searchNote: want && !results.length ? note : '',
     sources: results.filter(r => r.uri).slice(0, 6).map(r => ({ title: r.title, uri: r.uri }))
   });
 };
