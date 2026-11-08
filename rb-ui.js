@@ -10,7 +10,12 @@ document.head.insertAdjacentHTML('beforeend', '<style id="rb27css">'
   + '.topbar{align-items:center;margin-bottom:16px;gap:12px}'
   + '.topbar h1{display:flex;align-items:center;gap:11px;font-size:clamp(1.16rem,4.2vw,1.52rem);letter-spacing:-.035em;margin:0}'
   + '.logo{width:42px;height:42px;border-radius:14px;margin:0;font-size:1.08rem;background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:0 14px 26px -18px rgba(125,150,255,.95);display:inline-grid;place-items:center}'
-  + '.sub{font-size:.66rem;letter-spacing:.16em;margin:3px 0 0;color:var(--mut)}'
+  + '.sub{font-size:.7rem;letter-spacing:.05em;margin:4px 0 0;color:var(--mut);font-weight:600}'
+  + 'h1,h2,h3{text-wrap:balance}'
+  + 'p,.mut,.small,.sub{text-wrap:pretty}'
+  + '.card,.rb-gbody section{overflow-wrap:anywhere}'
+  + '.card p,.card li,.msg,.hint,.exp{line-height:1.65}'
+  + '.tabs button{white-space:nowrap}'
   + '.theme-btn{flex:0 0 auto;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:1.12rem;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);color:var(--tx);transition:transform .15s,background .15s,border-color .15s}'
   + '.theme-btn:hover{background:var(--card2);border-color:var(--line2)}'
   + '.theme-btn:active{transform:scale(.95)}'
@@ -138,7 +143,7 @@ var RB_GUIDE = [
     + '<li>Pilih seksi di tab bawah: <b>Beranda</b>, <b>Belajar</b>, <b>Bahasa</b>, atau <b>Trading</b>.</li>'
     + '<li>Di Belajar, pilih pelajaran lewat dropdown, lalu mulai dari <b>Latihan</b>.</li>'
     + '<li>Semua hasil, soal, catatan, dan riwayat tersimpan di akunmu.</li></ol>'
-    + '<div class="rb-gtip">💡 Buka menu <b>☰</b> di kanan atas untuk mengganti tema, membuka panduan ini, atau keluar dari akun.</div>'],
+    + '<div class="rb-gtip">💡 Buka tombol <b>Menu</b> di bar akun untuk mengganti tema, membuka panduan ini, atau keluar dari akun. Saat belum masuk, gunakan tautan <b>Panduan &amp; tema</b> di halaman masuk.</div>'],
   ['beranda', '🏠 Beranda & konsistensi',
     '<h3>Angka di atas</h3><ul>'
     + '<li><b>Menit belajar</b>, <b>soal dikerjakan</b>, <b>akurasi</b>, dan <b>streak</b> dihitung dari aktivitasmu.</li>'
@@ -204,9 +209,9 @@ var RB_GUIDE = [
     + '<li><b>Mahir</b>: Psikologi → Backtest → Rencana trading.</li>'
     + '<li><b>Uji</b>: kuis untuk memastikan pemahaman.</li></ol>'
     + '<div class="rb-gwarn">⚠️ Semua materi trading adalah edukasi, bukan sinyal atau saran finansial. Uji di akun demo dan batasi risiko.</div>'],
-  ['menu', '☰ Menu, tema, dan akun',
+  ['menu', '⚙️ Menu, tema, dan akun',
     '<ul>'
-    + '<li>Tombol <b>☰</b> di kanan atas membuka menu: akun, tema, navigasi cepat, panduan, dan keluar.</li>'
+    + '<li>Tombol <b>Menu</b> di bar akun membuka menu: akun, tema, navigasi cepat, panduan, dan keluar.</li>'
     + '<li><b>Terang/Gelap</b> langsung berubah dan diingat di perangkat ini.</li>'
     + '<li><b>Keluar dari akun</b> hanya mengakhiri sesi. Soal, riwayat, dan catatan tetap tersimpan di akun.</li>'
     + '<li>Tekan <b>Esc</b> atau area gelap untuk menutup menu/panduan.</li></ul>'],
@@ -222,7 +227,7 @@ var RB_GUIDE = [
     + '<h3>Soal tidak muncul</h3><ul><li>Periksa pelajaran, kategori, dan filter tingkat/jenis. Soal lama dengan nama pelajaran berbeda tidak terbaca.</li></ul>'
     + '<h3>Peringkat kosong atau salah kategori</h3><ul><li>Jawab minimal satu latihan. Data lama akan dirapikan otomatis saat peringkat dibuka.</li></ul>'
     + '<h3>Login gagal</h3><ul><li>Izinkan popup Google, lalu ulangi. Bila akun belum disetujui, hubungi admin.</li></ul>'
-    + '<h3>Tampilan sempit</h3><ul><li>Pastikan zoom browser 100%. Menu ☰ tetap tersedia di semua ukuran layar.</li></ul>']
+    + '<h3>Tampilan sempit</h3><ul><li>Pastikan zoom browser 100%. Tombol Menu tetap tersedia di semua ukuran layar.</li></ul>']
 ];
 
 document.body.insertAdjacentHTML('beforeend',

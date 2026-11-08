@@ -942,7 +942,9 @@ async function lbSend(lang) {
   const hist = c.slice(0, -1).filter(function (m) { return !/^⏳/.test(lbText(m.content)); }).slice(-8).map(function (m) { return { role: m.role, content: lbText(m.content) }; });
   try {
     if (typeof ai !== 'function') throw new Error('AI belum siap');
-    const t = await ai(LB_SYS[lang], hist, false, false, '', lang === 'en' ? 'inggris' : 'sekolah', { temp: 0.5 });
+    // Kedua tutor memakai jalur umum yang sama; batasan materi sudah dijaga oleh LB_SYS.
+    // Sebelumnya 'inggris' memakai routing penyedia berbeda yang bisa gagal total.
+    const t = await ai(LB_SYS[lang], hist, false, false, '', 'sekolah', { temp: 0.5 });
     const out = lbText(t).trim();
     if (!out) throw new Error('Jawaban kosong dari server AI');
     c[c.length - 1].content = out;
