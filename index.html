@@ -127,7 +127,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
 <!-- ✏️ [TEKS BISA DIUBAH] Kalimat kecil di bawah judul -->
       <div class="sub">Pelajaran · bahasa · trading</div>
     </div>
-    <button id="v21theme" class="theme-btn" onclick="v21Theme()" aria-label="Ganti tema gelap atau terang" title="Ganti tema">☀️</button>
+    <button id="rbMenuBtn" class="theme-btn" onclick="rbDrawer(true)" aria-label="Buka menu akun, tema, dan panduan" title="Menu" aria-expanded="false">☰</button>
   </div>
   <div id="warn"></div>
   <div id="userbar"></div>
@@ -1913,6 +1913,11 @@ async function ai(system,messages,big,search,q,cat,opt){
   let j;try{j=await r.json()}catch(e){throw new Error('Server error '+r.status+'. Cek Logs di Vercel.')}
   if(!r.ok)throw new Error(j.error||'AI gagal');
   let t=j.text;
+  if(Array.isArray(t))t=t.map(x=>typeof x==='string'?x:String((x&&(x.text||x.content||x.answer))||'')).join('\n');
+  else if(t&&typeof t==='object')t=String(t.text||t.content||t.answer||JSON.stringify(t));
+  else if(t==null)t='';
+  else t=String(t);
+  if(!t.trim())throw new Error('AI mengembalikan jawaban kosong. Coba lagi.');
   if(search){(j.sources||[]).forEach(s=>{if(!SRC.some(x=>x.uri===s.uri))SRC.push(s)});LT=Math.max(LT,j.trusted||0)}
         if(search&&!big){
     if(j.sources&&j.sources.length)t+='\n\n🔎 Sumber:\n'+j.sources.slice(0,5).map(s=>`[[${String(s.title).split('|').join(' ').split(']').join(' ')}|${s.uri}]]`).join('\n');
@@ -2757,5 +2762,7 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa.js"></script>
 <script src="rb-core.js"></script>
 <script src="rb-content.js"></script>
+<script src="rb-ui.js"></script>
+<script src="rb-alch.js"></script>
 </body>
 </html>

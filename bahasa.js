@@ -6,7 +6,14 @@ const LB = { lang: 'en', tabEn: 'verbs', tabJp: 'kana', eq: '', eFilter: 'all', 
 function lbStore(k, v) { try { if (v === undefined) return localStorage.getItem('lb_' + k); localStorage.setItem('lb_' + k, typeof v === 'string' ? v : JSON.stringify(v)); } catch (e) { return null; } }
 function lbLoad(k, d) { try { const v = localStorage.getItem('lb_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function lbEsc(s) { return typeof esc === 'function' ? esc(s) : String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-function lbFmt(s) { return typeof fmt === 'function' ? fmt(s) : lbEsc(s); }
+function lbText(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.map(lbText).filter(function (x) { return String(x).trim() !== ''; }).join('\n');
+  if (typeof v === 'object') return lbText(v.text || v.content || v.answer || v.message || v.reply || '');
+  return String(v);
+}
+function lbFmt(s) { const t = lbText(s); return typeof fmt === 'function' ? fmt(t) : lbEsc(t); }
 function lbShuffle(a) { return typeof shuffle === 'function' ? shuffle(a) : a.slice(); }
 function lbToast(t) { if (typeof v21Toast === 'function') v21Toast(t); }
 
@@ -910,9 +917,10 @@ function lbChatHtml(lang) {
   const c = lbChat(lang);
   if (!c.length) return '<div class="lb-chat-empty"><div class="lb-empty-ico">' + (lang === 'jp' ? '🌸' : '🎓') + '</div><b>' + (lang === 'jp' ? 'Sakura Sensei' : 'English Coach') + ' siap membantu</b><div class="mut small">Tanyakan kosakata, tata bahasa, pelafalan, atau minta latihan.</div></div>';
   return c.map(function (m) {
-    if (m.role === 'user') return '<div class="msg user">' + lbEsc(m.content) + '</div>';
-    const pending = /^⏳/.test(m.content);
-    return '<div class="msg assistant ' + (pending ? 'pending' : '') + '">' + (pending ? lbEsc(m.content) : lbFmt(m.content)) + '</div>';
+    const txt = lbText(m.content);
+    if (m.role === 'user') return '<div class="msg user">' + lbEsc(txt) + '</div>';
+    const pending = /^⏳/.test(txt);
+    return '<div class="msg assistant ' + (pending ? 'pending' : '') + '">' + (pending ? lbEsc(txt) : lbFmt(txt)) + '</div>';
   }).join('');
 }
 function lbChatDraw(lang) {
@@ -931,11 +939,13 @@ async function lbSend(lang) {
   const c = lbChat(lang);
   c.push({ role: 'user', content: v }, { role: 'assistant', content: '⏳ Menyusun jawaban...' });
   lbChatSave(lang); lbChatDraw(lang);
-  const hist = c.slice(0, -1).filter(function (m) { return !/^⏳/.test(m.content); }).slice(-8).map(function (m) { return { role: m.role, content: m.content }; });
+  const hist = c.slice(0, -1).filter(function (m) { return !/^⏳/.test(lbText(m.content)); }).slice(-8).map(function (m) { return { role: m.role, content: lbText(m.content) }; });
   try {
     if (typeof ai !== 'function') throw new Error('AI belum siap');
     const t = await ai(LB_SYS[lang], hist, false, false, '', lang === 'en' ? 'inggris' : 'sekolah', { temp: 0.5 });
-    c[c.length - 1].content = t;
+    const out = lbText(t).trim();
+    if (!out) throw new Error('Jawaban kosong dari server AI');
+    c[c.length - 1].content = out;
     lbAward(lang, 2, null);
   } catch (e) {
     c[c.length - 1].content = '⚠️ ' + (e.message || 'AI gagal menjawab');
