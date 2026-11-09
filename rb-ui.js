@@ -11,6 +11,9 @@ document.head.insertAdjacentHTML('beforeend', '<style id="rb27css">'
   + '.topbar h1{display:flex;align-items:center;gap:11px;font-size:clamp(1.16rem,4.2vw,1.52rem);letter-spacing:-.035em;margin:0}'
   + '.logo{width:42px;height:42px;border-radius:14px;margin:0;font-size:1.08rem;background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:0 14px 26px -18px rgba(125,150,255,.95);display:inline-grid;place-items:center}'
   + '.sub{font-size:.7rem;letter-spacing:.05em;margin:4px 0 0;color:var(--mut);font-weight:600}'
+  + '.rb-topmenu{flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:13px;border:1px solid var(--line);background:var(--card);color:var(--tx);font:inherit;font-weight:800;font-size:.85rem;cursor:pointer;box-shadow:var(--shadow);transition:background .15s}'
+  + '.rb-topmenu:hover{background:var(--card2)}'
+  + '.rb-topmenu[hidden]{display:none}'
   + 'h1,h2,h3{text-wrap:balance}'
   + 'p,.mut,.small,.sub{text-wrap:pretty}'
   + '.card,.rb-gbody section{overflow-wrap:anywhere}'
@@ -115,23 +118,14 @@ document.body.insertAdjacentHTML('beforeend',
   '<div id="rbScrim" class="rb-scrim" onclick="rbDrawer(false)"></div>'
   + '<aside id="rbDrawer" class="rb-drawer" aria-hidden="true" aria-label="Menu akun dan tampilan">'
   + '<div class="rb-dhead"><b>Menu</b><button type="button" class="x" onclick="rbDrawer(false)" aria-label="Tutup menu">✕</button></div>'
-  + '<div id="rbAcct"></div>'
   + '<div class="rb-sec"><div class="rb-lab">Tampilan</div><div class="rb-theme">'
   + '<button type="button" data-rbtheme="light" onclick="rbThemeSet(\'light\')">☀️ Terang</button>'
   + '<button type="button" data-rbtheme="dark" onclick="rbThemeSet(\'dark\')">🌙 Gelap</button>'
   + '</div></div>'
-  + '<div class="rb-sec"><div class="rb-lab">Navigasi</div>'
-  + '<button type="button" class="rb-mi" onclick="rbGo(\'beranda\')"><span>🏠</span>Beranda</button>'
-  + '<button type="button" class="rb-mi" onclick="rbGo(\'sekolah\')"><span>🎓</span>Belajar</button>'
-  + '<button type="button" class="rb-mi" onclick="rbGo(\'bahasa\')"><span>🌐</span>Bahasa</button>'
-  + '<button type="button" class="rb-mi" onclick="rbGo(\'trading\')"><span>📈</span>Trading</button>'
-  + '<button type="button" class="rb-mi" onclick="rbGo(\'alchemist\')"><span>⚗️</span>Strategi Alchemist</button>'
-  + '</div>'
   + '<div class="rb-sec"><div class="rb-lab">Bantuan</div>'
   + '<button type="button" class="rb-mi" onclick="rbGuide(true)"><span>📘</span>Panduan pemakaian lengkap</button>'
   + '</div>'
-  + '<div class="rb-dfoot"><button type="button" class="btn red full" id="rbLogout" onclick="rbLogout()">Keluar dari akun</button>'
-  + '<div class="small mut" style="margin-top:10px;line-height:1.55">Ruang Belajar · pelajaran, bahasa, dan trading dalam satu tempat.</div></div>'
+  + '<div class="rb-dfoot"><button type="button" class="btn red full" id="rbLogout" onclick="rbLogout()">Keluar dari akun</button></div>'
   + '</aside>');
 
 /* ---------- panduan ---------- */
@@ -143,7 +137,7 @@ var RB_GUIDE = [
     + '<li>Pilih seksi di tab bawah: <b>Beranda</b>, <b>Belajar</b>, <b>Bahasa</b>, atau <b>Trading</b>.</li>'
     + '<li>Di Belajar, pilih pelajaran lewat dropdown, lalu mulai dari <b>Latihan</b>.</li>'
     + '<li>Semua hasil, soal, catatan, dan riwayat tersimpan di akunmu.</li></ol>'
-    + '<div class="rb-gtip">💡 Buka tombol <b>Menu</b> di bar akun untuk mengganti tema, membuka panduan ini, atau keluar dari akun. Saat belum masuk, gunakan tautan <b>Panduan &amp; tema</b> di halaman masuk.</div>'],
+    + '<div class="rb-gtip">💡 Tombol <b>Menu</b> ada di kanan atas dan hanya berisi tiga hal: mode terang/gelap, panduan ini, dan keluar dari akun. Halaman masuk tidak lagi menampilkan tautan tema/panduan.</div>'],
   ['beranda', '🏠 Beranda & konsistensi',
     '<h3>Angka di atas</h3><ul>'
     + '<li><b>Menit belajar</b>, <b>soal dikerjakan</b>, <b>akurasi</b>, dan <b>streak</b> dihitung dari aktivitasmu.</li>'
@@ -199,6 +193,7 @@ var RB_GUIDE = [
   ['trading', '📈 Trading & Alchemist',
     '<h3>Tab Trading</h3><ul>'
     + '<li><b>News</b> — kalender dan analisis berita; ringkasan bisa disalin.</li>'
+    + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time (SL 30 pip, TP 1:2) dari candle M15 + konfirmasi M5/M1, H1/D1, DXY, yield, spot emas, dan kalender; entry MARKET atau LIMIT di POI; chart TradingView gratis.</li>'
     + '<li><b>Alchemist</b> — kurikulum lengkap dari pemula sampai mahir.</li>'
     + '<li><b>Tutor</b> — tanya konsep, model entry, atau manajemen risiko.</li>'
     + '<li><b>Jurnal</b> — catatan trade dan kalkulator lot.</li></ul>'
@@ -211,7 +206,8 @@ var RB_GUIDE = [
     + '<div class="rb-gwarn">⚠️ Semua materi trading adalah edukasi, bukan sinyal atau saran finansial. Uji di akun demo dan batasi risiko.</div>'],
   ['menu', '⚙️ Menu, tema, dan akun',
     '<ul>'
-    + '<li>Tombol <b>Menu</b> di bar akun membuka menu: akun, tema, navigasi cepat, panduan, dan keluar.</li>'
+    + '<li>Tombol <b>Menu</b> ada di <b>kanan atas</b>. Isinya hanya: mode <b>Terang/Gelap</b>, <b>Panduan</b>, dan <b>Keluar dari akun</b>.</li>'
+    + '<li>Tidak ada lagi tombol <b>Keluar</b> di samping Menu dan tidak ada navigasi lain di dalam menu.</li>'
     + '<li><b>Terang/Gelap</b> langsung berubah dan diingat di perangkat ini.</li>'
     + '<li><b>Keluar dari akun</b> hanya mengakhiri sesi. Soal, riwayat, dan catatan tetap tersimpan di akun.</li>'
     + '<li>Tekan <b>Esc</b> atau area gelap untuk menutup menu/panduan.</li></ul>'],
@@ -278,6 +274,7 @@ function rbThemeSet(mode) {
   var meta = document.getElementById('v22tc');
   if (meta) meta.setAttribute('content', t === 'light' ? '#f6f7fb' : '#090b10');
   rbThemeSync();
+  try { if (typeof sigTv === 'function' && document.getElementById('sigTV')) sigTv(); } catch (e) { }
   if (typeof v21Toast === 'function') v21Toast(t === 'light' ? 'Mode terang aktif' : 'Mode gelap aktif');
 }
 function rbDrawer(open) {
@@ -338,3 +335,41 @@ document.addEventListener('keydown', function (e) {
   if (rbDrawerOpen) rbDrawer(false);
 });
 rbThemeSync();
+
+/* Navigasi utama: selalu menempel di atas, ukuran fluid untuk semua lebar HP. */
+document.head.insertAdjacentHTML('beforeend', '<style id="rbNavTop">'
+  + '.tabs{position:sticky;top:0;left:auto;right:auto;bottom:auto;z-index:90;display:flex;gap:4px;margin:0 0 14px;padding:6px;border:1px solid var(--line);border-top:0;border-radius:0 0 16px 16px;background:var(--nav);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 14px 30px -26px rgba(0,0,0,.9);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}'
+  + '.tabs::-webkit-scrollbar{display:none}'
+  + '.tabs button{flex:1 0 auto;min-width:0;min-height:44px;padding:8px clamp(4px,1.5vw,12px);font-size:clamp(.72rem,2.6vw,.92rem)!important;line-height:1.15;border-radius:10px}'
+  + '.tabs .tb-ico{font-size:1.05em;line-height:1}'
+  + '@media(max-width:640px){.tabs{padding:5px;border-radius:0 0 14px 14px}.tabs button{min-height:46px;padding:7px 5px}.stabs{top:calc(58px + env(safe-area-inset-top))}#app{scroll-margin-top:66px}}'
+  + '@media(max-width:520px){.tabs .tb-ico{display:none}.tabs button{font-size:clamp(.76rem,3.5vw,1rem)!important;padding:7px 4px!important}}'
+  + '@media(min-width:641px){.tabs button{min-height:44px}}'
+  + '.topbar{position:static;top:auto}'
+  + '.sig-tv-int.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}'
+  + '</style>');
+
+/* Emoji tab dipisah ke span agar bisa disembunyikan di HP sempit; label tetap besar. */
+function rbTabIcons() {
+  var tabs = document.querySelector('.tabs');
+  if (!tabs) return;
+  var bs = tabs.querySelectorAll('button');
+  for (var i = 0; i < bs.length; i++) {
+    var b = bs[i];
+    if (b.querySelector('.tb-ico')) continue;
+    var t = (b.textContent || '').trim(), m = t.match(/^(\S+)\s+(.+)$/);
+    if (!m) continue;
+    var ico = false;
+    var cs = Array.from ? Array.from(m[1]) : m[1].split('');
+    for (var j = 0; j < cs.length; j++) if (cs[j].codePointAt(0) > 0x2100) ico = true;
+    if (ico) b.innerHTML = '<span class="tb-ico" aria-hidden="true">' + m[1] + '</span> ' + m[2];
+  }
+}
+rbTabIcons();
+try {
+  if (typeof MutationObserver !== 'undefined') {
+    var rbTabEl = document.querySelector('.tabs');
+    if (rbTabEl) new MutationObserver(rbTabIcons).observe(rbTabEl, { childList: true, subtree: true });
+  }
+} catch (e) { }
+window.addEventListener('resize', rbTabIcons);

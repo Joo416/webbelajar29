@@ -10,7 +10,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 /* ---------- 1. Kerangka & tipografi fluid ---------- */
 :root{--rb-max:1120px;--rb-radius:20px;--rb-gap:14px}
 html{-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
-body{overflow-x:hidden;font-size:clamp(14.5px,1.55vw,16px)}
+body{overflow-x:clip;font-size:clamp(14.5px,1.55vw,16px)}
 .wrap{width:100%;max-width:var(--rb-max);margin:0 auto;padding:clamp(14px,2vw,26px) clamp(12px,2.4vw,24px) calc(120px + env(safe-area-inset-bottom))}
 img,svg,video,canvas{max-width:100%;height:auto}
 .card,.msg,.exp,.item,.gi,.q,.opt,.warn,.hint,.note,td,th,.v21-nm{min-width:0}
@@ -321,8 +321,8 @@ function homeBase() {
   }
   if (S.sec === 'trading') {
     S.mapel = 'Trading';
-    if (['xau', 'tutor', 'alchemist', 'jurnal'].indexOf(S.tab) < 0) S.tab = 'xau';
-    const T = [['xau', '🎯 News Analisis'], ['alchemist', '⚗️ Strategi Alchemist'], ['tutor', '🤖 Tutor'], ['jurnal', '📒 Jurnal']];
+    if (['xau', 'signal', 'alchemist', 'tutor', 'jurnal'].indexOf(S.tab) < 0) S.tab = 'xau';
+    const T = [['xau', '🎯 News Analisis'], ['signal', '⚡ Signal Entry'], ['alchemist', '⚗️ Strategi Alchemist'], ['tutor', '🤖 Tutor'], ['jurnal', '📒 Jurnal']];
     $('app').innerHTML = '<div class="stabs">' + T.map(function (x) {
       return '<button class="' + (S.tab === x[0] ? 'on' : '') + '" onclick="S.tab=\'' + x[0] + '\';home()">' + x[1] + '</button>';
     }).join('') + '</div><div id="pane"></div>';
@@ -344,6 +344,7 @@ function pane() {
     latihan: pLatihan, tryout: pTryout, tutor: pTutor,
     soal: (typeof pSoal === 'function' ? pSoal : pLatihan),
     buat: pBuat, bank: pBank, jurnal: pJurnal, xau: pXauNews,
+    signal: (typeof pSignalEntry === 'function' ? pSignalEntry : pXauNews),
     alchemist: (typeof pAlchemist === 'function' ? pAlchemist : pXauNews)
   };
   const f = map[S.tab];
