@@ -2217,6 +2217,26 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     }
   }
 
+  /* OTE 62-79% dari leg impuls M5: entry di retracement, stop di luar leg. */
+  {
+    const leg5 = m5rows ? m5rows.slice(-24) : [];
+    if (leg5.length > 5) {
+      const legHi5 = Math.max(...leg5.map(r => r.h)), legLo5 = Math.min(...leg5.map(r => r.l));
+      const legRange5 = legHi5 - legLo5, legBuf5 = Math.max(SGP.pip * 3, (atr5 || 3) * 0.15);
+      if (isFinite(legRange5) && legRange5 > Math.max(legBuf5 * 3, (atr5 || 0) * 1.2)) {
+        const dir = biasDir;
+        const ote = dir === 'BUY' ? legHi5 - legRange5 * 0.705 : legLo5 + legRange5 * 0.705;
+        const stop = dir === 'BUY' ? legLo5 - legBuf5 : legHi5 + legBuf5;
+        mkSetup({
+          id: 'm5ote', method: 'M5 OTE 62-79% (Alchemist)', dir, entry: sh(ote), sl: sh(stop),
+          tp: sh(dir === 'BUY' ? ote + legRange5 * 1.5 : ote - legRange5 * 1.5),
+          why: 'Retracement 62-79% dari leg impuls M5 ' + sgN(legLo5) + '-' + sgN(legHi5) + ' searah bias; entry di OTE, bukan mengejar harga.',
+          conf: 2, bias: biasOk(dir), zone: zoneOk(dir)
+        });
+      }
+    }
+  }
+
   if (SB.length < 5) {
     ['BUY', 'SELL'].forEach(dir => {
       const lvl = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
