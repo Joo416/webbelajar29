@@ -4,18 +4,18 @@
    ========================================================================== */
 
 const ALCH_LABELS = {
-  mulai: '🚀 Mulai', dasar: '🌱 Dasar Pasar', roadmap: '🗺 Roadmap', istilah: '📖 Istilah',
-  story: '🧭 Storyline', level: '📐 Level', topdown: '🔬 Top-down', sesi: '⏰ Sesi',
-  entry: '🎯 Playbook', kasus: '🔍 Studi Kasus', posisi: '📊 Manajemen Posisi',
-  risiko: '🛡 Risiko', kalkulator: '🧮 Kalkulator', cek: '✅ Checklist',
-  psiko: '🧠 Psikologi', backtest: '📈 Backtest', rencana: '📝 Rencana', kuis: '🎓 Kuis'
+  mulai: ' Mulai', dasar: ' Dasar Pasar', roadmap: ' Roadmap', istilah: ' Istilah',
+  story: ' Storyline', level: ' Level', topdown: ' Top-down', sesi: ' Sesi',
+  entry: ' Playbook', kasus: ' Studi Kasus', posisi: ' Manajemen Posisi',
+  tfmap: ' Peta Timeframe', m5: ' Konfirmasi M5', risiko: ' Risiko', kalkulator: ' Kalkulator', cek: '✅ Checklist',
+  psiko: ' Psikologi', backtest: ' Backtest', rencana: ' Rencana', kuis: ' Kuis'
 };
 const ALCH_GROUPS = [
-  { id: 'pemula', label: '🌱 Pemula', tabs: ['mulai', 'dasar', 'roadmap', 'istilah', 'story', 'level'] },
-  { id: 'analisa', label: '🧭 Analisa', tabs: ['topdown', 'sesi', 'entry', 'kasus'] },
-  { id: 'eksekusi', label: '⚡ Eksekusi', tabs: ['posisi', 'risiko', 'kalkulator', 'cek'] },
-  { id: 'mahir', label: '🧠 Mahir', tabs: ['psiko', 'backtest', 'rencana'] },
-  { id: 'uji', label: '🎓 Uji', tabs: ['kuis'] }
+  { id: 'pemula', label: ' Pemula', tabs: ['mulai', 'dasar', 'roadmap', 'istilah', 'story', 'level'] },
+  { id: 'analisa', label: ' Analisa', tabs: ['topdown', 'sesi', 'entry', 'kasus'] },
+  { id: 'eksekusi', label: ' Eksekusi', tabs: ['tfmap', 'm5', 'posisi', 'risiko', 'kalkulator', 'cek'] },
+  { id: 'mahir', label: ' Mahir', tabs: ['psiko', 'backtest', 'rencana'] },
+  { id: 'uji', label: ' Uji', tabs: ['kuis'] }
 ];
 
 /* ---------- tambahan istilah ---------- */
@@ -55,6 +55,42 @@ ALCH_TERMS.push(
   ['Over-trading', 'Terlalu banyak entry', 'Membuka posisi melebihi rencana karena bosan atau balas dendam.', 'Musuh utama konsistensi.'],
   ['FOMO', 'Takut ketinggalan', 'Entry setelah harga bergerak jauh karena takut kehilangan momen.', 'Entry menjadi jauh dari invalidasi.'],
   ['Slippage', 'Selisih eksekusi', 'Harga eksekusi berbeda dari harga yang diminta.', 'Membesar saat berita dan pasar tipis.']
+);
+
+/* ---------- istilah lanjutan + timeframe pemakaian (V31) ---------- */
+ALCH_TERMS.push(
+  ['Turtle soup', 'Sapuan stop', 'Sapuan high/low lama lalu harga balik cepat; jebakan breakout.', 'Entry reversal setelah sweep + MSS M5.', 'M15 · M5'],
+  ['Power of Three', 'AMD', 'Accumulation–Manipulation–Distribution: range harian, lalu sapuan, lalu distribusi.', 'Menentukan kapan sweep harian biasanya terjadi.', 'D1 · H4 · M15'],
+  ['IPDA', 'Interbank Price Delivery Algorithm', 'Kerangka pengiriman harga antarbank dengan siklus 20/40/60 hari untuk likuiditas.', 'Menentukan target waktu dan draw on liquidity.', 'MN · W1 · D1'],
+  ['Draw on liquidity', 'DOL', 'Level likuiditas yang sedang dituju harga.', 'Menentukan arah storyline dan TPmax.', 'D1 · H4'],
+  ['Dealing range', 'Range kerja', 'Range swing terakhir antara high dan low yang relevan.', 'Membagi premium/discount untuk memilih POI.', 'H4 · H1'],
+  ['Premium / discount', 'PD', 'Harga di atas 50% dealing range = premium; di bawah = discount.', 'Beli di discount, jual di premium saat trend.', 'H4 · H1 · M15'],
+  ['PD array', 'Kumpulan zona', 'Order block, FVG, breaker, mitigation, dan liquidity void.', 'Memilih POI yang paling logis, bukan semua zona.', 'H1 · M15 · M5'],
+  ['Break of Structure', 'BOS', 'Penembusan struktur searah tren.', 'Konfirmasi tren berlanjut, bukan reversal.', 'M15 · M5'],
+  ['Market Structure Shift', 'MSS', 'Penembusan struktur melawan tren yang disertai displacement.', 'Pemicu entry utama setelah sapuan likuiditas.', 'M15 · M5'],
+  ['Change of Character', 'CHoCH', 'Sinyal awal perubahan karakter tren sebelum MSS penuh.', 'Peringatan dini; butuh konfirmasi displacement.', 'M15 · M5'],
+  ['Displacement', 'Impuls', 'Candle body besar di atas ATR yang meninggalkan imbalance.', 'Bukti niat institusional; syarat FVG valid.', 'M5 · M15'],
+  ['Fair Value Gap', 'FVG', 'Celah tiga candle akibat displacement yang belum diisi.', 'Zona entry di 50% (consequent encroachment).', 'M5 · M15'],
+  ['Consequent encroachment', 'CE 50%', 'Titik tengah FVG yang sering menjadi lokasi entry presisi.', 'Limit entry dengan stop lebih ketat.', 'M5'],
+  ['Order block', 'OB', 'Candle berlawanan terakhir sebelum pergerakan impulsif.', 'Zona retest institusional untuk entry.', 'H1 · M15 · M5'],
+  ['Breaker block', 'BB', 'Order block yang gagal lalu dipakai dari arah berlawanan.', 'Zona entry setelah struktur berubah.', 'H1 · M15'],
+  ['Mitigation block', 'MB', 'Zona tempat posisi lama ditutup sebelum harga lanjut.', 'Retest sebelum melanjutkan tren.', 'H1 · M15'],
+  ['Liquidity void', 'LV', 'Area yang dilewati terlalu cepat sehingga tipis transaksi.', 'Target rebalance atau TP antara.', 'M15 · M5'],
+  ['Equal highs / lows', 'EQH / EQL', 'Dua high atau low hampir sama tempat stop trader berkumpul.', 'Target sapuan sebelum entry.', 'H1 · M15'],
+  ['Optimal Trade Entry', 'OTE', 'Zona retracement 62–79% dari impuls terakhir.', 'Entry lanjutan dengan RR besar.', 'M15 · M5'],
+  ['Killzone', 'Jam aktif', 'Jendela likuiditas tinggi: London 07–10 UTC, New York 12–15 UTC.', 'Waktu terbaik untuk eksekusi.', 'M15 · M5 (jam)'],
+  ['Silver bullet', 'SB', 'Jendela 10–11 dan 14–15 UTC dengan setup FVG di M5.', 'Model intraday populer di kalangan trader ICT.', 'M5'],
+  ['Judas swing', 'Sapuan sesi', 'Gerakan palsu awal sesi yang menyapu range Asia lalu berbalik.', 'Entry reversal setelah sapuan.', 'M15 · M5'],
+  ['SMT divergence', 'Divergensi', 'Emas dan DXY/yield tidak saling mengonfirmasi ekstrem baru.', 'Petunjuk kelemahan gerakan.', 'M15 · H1'],
+  ['Real yield', 'Yield riil', 'Yield nominal dikurangi inflasi; lawan utama harga emas.', 'Konteks makro XAUUSD.', 'D1 · W1'],
+  ['DXY', 'Indeks dolar', 'Kekuatan USD terhadap sekeranjang mata uang utama.', 'Korelasi terbalik dengan emas.', 'H1 · D1'],
+  ['COT report', 'Posisi spekulan', 'Laporan CFTC posisi managed money pada emas.', 'Konteks mingguan, bukan sinyal timing.', 'W1'],
+  ['News blackout', 'Zona larangan berita', 'Tidak entry 30 menit sebelum/sesudah rilis High impact.', 'Melindungi dari spread melebar dan slippage.', 'Kalender (semua TF)'],
+  ['Risk of ruin', 'Risiko bangkrut', 'Peluang kehilangan modal karena risiko per trade terlalu besar.', 'Dasar batas risiko 0,5–1% per trade.', 'Manajemen (semua TF)'],
+  ['TP ladder', 'TP berjenjang', 'TP1/TP2/TPmax dengan partial dan runner.', 'Mengunci profit tanpa memotong tren.', 'Eksekusi (semua TF)'],
+  ['Backtest sample', 'Sampel uji', 'Minimal 100 trade satu model agar statistik valid.', 'Membuktikan edge sebelum uang riil.', 'Manajemen (semua TF)'],
+  ['Session liquidity', 'Likuiditas sesi', 'Volume berbeda tiap sesi: Asia tipis, London/New York tebal.', 'Menentukan besar target yang realistis.', 'M15 · M5 (jam)'],
+  ['Multi-timeframe alignment', 'Konfluensi TF', 'Semua timeframe menunjuk arah dan zona yang sama.', 'Filter agar hanya mengambil setup A+.', 'D1 · H4 · H1 · M15 · M5']
 );
 
 /* ---------- tambahan model entry ---------- */
@@ -106,6 +142,17 @@ ALCH_MODELS.push(
   }
 );
 
+/* ---------- model konfirmasi M5 (V31) ---------- */
+ALCH_MODELS.push({
+  name: '11. M5 sweep → MSS → FVG/OB (konfirmasi baku)',
+  ctx: 'Model konfirmasi entry yang paling banyak dipakai trader profesional: likuiditas disapu di M5, struktur berubah, lalu harga kembali ke FVG 50% atau order block.',
+  cond: ['Level H4/H1 sudah ditandai dan storyline searah.', 'Sapuan high/low jelas di M5 dengan close kembali ke dalam range.', 'MSS/CHoCH M5 terkonfirmasi dan ada displacement (body di atas ATR M5).', 'FVG/OB dari impuls konfirmasi belum terisi.'],
+  entry: 'Limit di 50% FVG atau tepi OB setelah candle konfirmasi close. Market hanya bila harga sudah menyentuh zona dan ditolak.',
+  sl: 'Di luar swing pelindung atau ekstrem sapuan ditambah buffer ATR; minimal 30 pip pada XAUUSD.',
+  tp: 'TP1 minimal 100 pip (partial), TP2 minimal 200 pip, TPmax ke sisi berlawanan range atau high/low 20 hari.',
+  inval: 'FVG ditembus close, MSS gagal, atau harga membuat ekstrem baru searah sapuan.'
+});
+
 /* ---------- tambahan kuis ---------- */
 ALCH_QUIZ.push(
   { q: 'Nilai 1 pip EURUSD untuk 1 lot standar adalah …', o: ['$0,10', '$1', '$10', '$100'], a: 2, e: '1 lot standar = 100.000 unit. 0,0001 × 100.000 = $10 per pip.', lv: 'Pemula' },
@@ -139,7 +186,7 @@ function alSteps(items) { return '<div class="rb-flow" style="margin-top:10px">'
 
 /* ---------- modul baru ---------- */
 function alDasarHtml() {
-  return alCard('🌱 Dasar pasar yang wajib dipahami',
+  return alCard(' Dasar pasar yang wajib dipahami',
     '<div class="rb-note">Sebelum belajar entry, pahami dulu apa yang sebenarnya kamu beli dan jual. Sebagian besar kerugian pemula berasal dari salah ukuran posisi, bukan salah arah.</div>'
     + alSteps([
       ['Pair & quote', 'EURUSD berarti nilai EUR diukur dalam USD. XAUUSD adalah emas terhadap USD. Base = yang diperdagangkan, quote = mata uang pembanding.'],
@@ -158,11 +205,11 @@ function alDasarHtml() {
     + '</tbody></table></div>'
     + '<div class="rb-callout"><b>Contoh hitung cepat:</b> saldo $1.000, risiko 1% = $10. Stop 20 pip EURUSD. Lot = 10 ÷ (20 × 10) = 0,05 lot. Bukan 0,5 lot.</div>'
     + '<div class="rb-callout warn"><b>Aturan pemula:</b> demo minimal 30 hari, maksimal 1% risiko per trade, dan satu model entry saja sampai konsisten.</div>'
-    + '<button class="btn alt full" type="button" onclick="alSet(\'kalkulator\')">🧮 Buka kalkulator risiko</button>');
+    + '<button class="btn alt full" type="button" onclick="alSet(\'kalkulator\')"> Buka kalkulator risiko</button>');
 }
 
 function alRoadmapHtml() {
-  return alCard('🗺 Roadmap 8 minggu: pemula → mahir',
+  return alCard(' Roadmap 8 minggu: pemula → mahir',
     '<div class="rb-note">Ikuti berurutan. Jangan lompat ke strategi mahir sebelum 20 trade satu model tercatat di jurnal. Setiap minggu punya bukti belajar yang bisa diperiksa.</div>'
     + '<div class="rb-accordion">' + ALCH_ROADMAP.map(function (r, i) {
       return '<details' + (i === 0 ? ' open' : '') + '><summary>' + r.w + ' · ' + r.t + ' <span class="rb-pill" style="margin-left:6px">' + r.lv + '</span></summary>'
@@ -174,7 +221,7 @@ function alRoadmapHtml() {
 }
 
 function alTopdownHtml() {
-  return alCard('🔬 Analisis top-down (kerangka kerja harian)',
+  return alCard(' Analisis top-down (kerangka kerja harian)',
     '<div class="rb-note">Alchemist selalu dari besar ke kecil. Arah dari HTF, level dari H4/H1, pemicu dari M15/M5. Jangan pernah entry hanya karena TF kecil terlihat bagus.</div>'
     + alSteps([
       ['1. Konteks MN/W', 'Tren besar atau range? Di mana harga terhadap range tahunan? Ini menentukan apakah layak mencari buy atau sell.'],
@@ -192,7 +239,7 @@ function alTopdownHtml() {
     + '<tr><td>Roadblock tebal sebelum target</td><td>Kecilkan target atau lewati setup.</td></tr>'
     + '<tr><td>Tidak ada POI fresh</td><td>Tidak ada trade. Ini keputusan yang benar.</td></tr>'
     + '</tbody></table></div>'
-    + '<div class="rb-card-head" style="margin-top:12px"><h3 style="font-size:.94rem">Template analisis</h3><button class="x" type="button" onclick="alCopyText(alTopdownTemplate(),this)">📋 Salin</button></div>'
+    + '<div class="rb-card-head" style="margin-top:12px"><h3 style="font-size:.94rem">Template analisis</h3><button class="x" type="button" onclick="alCopyText(alTopdownTemplate(),this)"> Salin</button></div>'
     + '<textarea class="rb-plan" id="alTdText" style="min-height:190px">' + rb26Safe(alTopdownTemplate()) + '</textarea>'
     + '<div class="rb-note">Salin ke jurnal sebelum entry. Bila ada kolom yang tidak bisa diisi, berarti setup belum siap.</div>');
 }
@@ -202,7 +249,7 @@ function alTopdownTemplate() {
 }
 
 function alPosisiHtml() {
-  return alCard('📊 Manajemen posisi setelah entry',
+  return alCard(' Manajemen posisi setelah entry',
     '<div class="rb-note">Entry yang benar bisa menjadi rugi bila posisi dikelola buruk. Aturan di bawah harus ditulis sebelum entry, bukan diputuskan saat harga bergerak.</div>'
     + alSteps([
       ['Partial 50% di 1R', 'Ambil separuh posisi saat untung 1× risiko. Sisa posisi dibiarkan mengejar target utama.'],
@@ -223,7 +270,7 @@ function alPosisiHtml() {
 }
 
 function alPsikoHtml() {
-  return alCard('🧠 Psikologi & disiplin eksekusi',
+  return alCard(' Psikologi & disiplin eksekusi',
     '<div class="rb-note">Strategi yang sama bisa menghasilkan hasil berbeda tergantung siapa yang menjalankannya. Kelola diri seperti mengelola risiko.</div>'
     + '<div class="rb-scroll"><table class="rb-table"><thead><tr><th>Masalah</th><th>Tanda</th><th>Penawar</th></tr></thead><tbody>'
     + '<tr><td><b>FOMO</b></td><td>Entry setelah harga jauh bergerak</td><td>Aturan: hanya entry di POI; bila terlewat, tunggu setup berikutnya.</td></tr>'
@@ -238,7 +285,7 @@ function alPsikoHtml() {
 }
 
 function alBacktestHtml() {
-  return alCard('📈 Backtest & ukur sistemmu',
+  return alCard(' Backtest & ukur sistemmu',
     '<div class="rb-note">Backtest bukan mencari masa lalu yang sempurna, tetapi mengumpulkan bukti apakah aturanmu punya edge. Lakukan manual dulu agar mata terlatih.</div>'
     + alSteps([
       ['Pilih 1 model', 'Contoh: CRT bullish + FVG, hanya sesi London. Jangan campur 5 model.'],
@@ -256,8 +303,8 @@ function alBacktestHtml() {
     + '<tr><td>Max drawdown</td><td>Penurunan puncak ekuitas</td><td>&lt; 10%</td></tr>'
     + '</tbody></table></div>'
     + '<div class="rb-callout ok"><b>Tantangan 30 trade:</b> satu model, satu sesi, risiko tetap. Setelah 30 trade, baru lihat statistik. Bila expectancy negatif, periksa konsistensi aturan sebelum menyalahkan strategi.</div>'
-    + '<div class="rb-note">Jurnal trade tersedia di tab <b>📒 Jurnal</b>. Isi alasan entry dan kesalahan, bukan hanya hasil.</div>'
-    + '<button class="btn alt full" type="button" onclick="alSet(\'rencana\')">📝 Lanjut ke rencana trading</button>');
+    + '<div class="rb-note">Jurnal trade tersedia di tab <b> Jurnal</b>. Isi alasan entry dan kesalahan, bukan hanya hasil.</div>'
+    + '<button class="btn alt full" type="button" onclick="alSet(\'rencana\')"> Lanjut ke rencana trading</button>');
 }
 
 const ALC_PAIRS = {
@@ -270,7 +317,7 @@ const ALC_PAIRS = {
 };
 function alCalcHtml() {
   const opts = Object.keys(ALC_PAIRS).map(function (k) { return '<option value="' + k + '">' + ALC_PAIRS[k].label + '</option>'; }).join('');
-  return alCard('🧮 Kalkulator risiko & ukuran lot',
+  return alCard(' Kalkulator risiko & ukuran lot',
     '<div class="rb-note">Hitung lot dari risiko yang kamu terima, bukan dari target profit. Nilai pip adalah perkiraan; cocokkan dengan spesifikasi broker sebelum eksekusi.</div>'
     + '<div class="row" style="margin-top:10px"><div><label style="margin-top:0">Saldo (USD)</label><input id="alcBal" inputmode="decimal" value="1000" oninput="alCalc()"></div>'
     + '<div><label style="margin-top:0">Risiko per trade (%)</label><input id="alcRisk" inputmode="decimal" value="1" oninput="alCalc()"></div></div>'
@@ -346,11 +393,11 @@ function alPlanHtml() {
   let txt = '';
   try { txt = localStorage.getItem('rb_alch_plan') || ''; } catch (e) { }
   if (!txt) txt = alPlanDefault();
-  return alCard('📝 Rencana trading & rutinitas',
+  return alCard(' Rencana trading & rutinitas',
     '<div class="rb-note">Rencana yang tidak ditulis hanyalah niat. Isi template ini, simpan, lalu jalankan minimal 20 trade sebelum mengubah aturan.</div>'
     + '<div class="rb-accordion"><details open><summary>Template rencana (bisa diedit)</summary><div class="rb-acc-body">'
     + '<textarea id="alPlanText" class="rb-plan" oninput="alPlanSave(this.value)">' + rb26Safe(txt) + '</textarea>'
-    + '<div class="row" style="margin-top:8px"><button class="btn alt" type="button" onclick="alPlanCopy(this)">📋 Salin rencana</button><button class="btn alt" type="button" onclick="alPlanReset()">↺ Kembalikan template</button></div>'
+    + '<div class="row" style="margin-top:8px"><button class="btn alt" type="button" onclick="alPlanCopy(this)"> Salin rencana</button><button class="btn alt" type="button" onclick="alPlanReset()">↺ Kembalikan template</button></div>'
     + '<div class="small mut" id="alPlanStat" style="margin-top:8px">Tersimpan otomatis di perangkat ini.</div>'
     + '</div></details></div>'
     + '<div class="rb-card-head" style="margin-top:10px"><h3 style="font-size:.94rem">Rutinitas harian</h3></div>'
@@ -444,7 +491,7 @@ function alCasePick(n) { ALCH.caseN = n; pAlchemist(); }
 function alCaseHtml() {
   const n = ALCH.caseN || 1;
   const pill = function (i, label) { return '<button type="button" class="x" style="' + (n === i ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-soft)' : '') + '" onclick="alCasePick(' + i + ')">' + label + '</button>'; };
-  const head = '<div class="card"><div class="rb-card-head"><h3>🔍 Studi kasus</h3><span class="rb-pill">Edukasi</span></div>'
+  const head = '<div class="card"><div class="rb-card-head"><h3> Studi kasus</h3><span class="rb-pill">Edukasi</span></div>'
     + '<div class="rb-note">Tiga skenario untuk melatih mata: satu berhasil, satu berhasil dari sisi jual, satu gagal. Perhatikan urutannya, bukan angka pastinya.</div>'
     + '<div class="rb-pill-row" style="gap:6px">' + pill(1, 'Bullish CRT') + pill(2, 'Bearish CRT') + pill(3, 'Gagal') + '</div></div>';
   if (n === 2) {
@@ -495,7 +542,7 @@ function alQuizHtml() {
   const done = Object.keys(ALCH.quiz).length;
   const right = ALCH_QUIZ.filter(function (q, i) { return ALCH.quiz[i] === q.a; }).length;
   const pass = Math.ceil(ALCH_QUIZ.length * 0.75);
-  return '<div class="card"><div class="rb-card-head"><h3>🎓 Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
+  return '<div class="card"><div class="rb-card-head"><h3> Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
     + '<div class="rb-note">' + ALCH_QUIZ.length + ' pertanyaan dari pemula sampai mahir. Pembahasan muncul setelah memilih. Ambang lulus: ' + pass + '/' + ALCH_QUIZ.length + '.</div>'
     + '<div style="margin-top:10px">' + ALCH_QUIZ.map(function (q, i) {
       const pick = ALCH.quiz[i];
@@ -539,7 +586,8 @@ function pAlchemist() {
     mulai: alStartHtml, dasar: alDasarHtml, roadmap: alRoadmapHtml, istilah: function () { return '<div id="alchterms">' + alTermsHtml() + '</div>'; },
     story: alStoryHtml, level: alLevelHtml, topdown: alTopdownHtml, sesi: alSessionHtml, entry: alEntryHtml,
     kasus: alCaseHtml, posisi: alPosisiHtml, risiko: alRiskHtml, kalkulator: alCalcHtml, cek: alCheckHtml,
-    psiko: alPsikoHtml, backtest: alBacktestHtml, rencana: alPlanHtml, kuis: alQuizHtml
+    psiko: alPsikoHtml, backtest: alBacktestHtml, rencana: alPlanHtml, kuis: alQuizHtml,
+    tfmap: alTfMapHtml, m5: alM5Html
   };
   const body = (B[ALCH.tab] || alStartHtml)();
   const groups = ALCH_GROUPS.map(function (g) {
@@ -549,13 +597,13 @@ function pAlchemist() {
     return '<button type="button" class="' + (ALCH.tab === id ? 'on' : '') + '" onclick="alSet(\'' + id + '\')">' + (ALCH_LABELS[id] || id) + '</button>';
   }).join('');
   $('pane').innerHTML = '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · kurikulum</div><h2>⚗️ Strategi Alchemist</h2>'
+    + '<div class="rb-eyebrow">Trading · kurikulum</div><h2> Strategi Alchemist</h2>'
     + '<div class="rb-note">Jalur lengkap dari pemula sampai mahir: dasar pasar, storyline MSNR, level, playbook entry, manajemen posisi, risiko, psikologi, backtest, dan rencana eksekusi.</div>'
     + '<div class="rb-pill-row"><span class="rb-pill y">Edukasi</span><span class="rb-pill">MSNR</span><span class="rb-pill">SMC / ICT</span><span class="rb-pill">CRT</span><span class="rb-pill">QM</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>' + total + '</b><span>modul</span></div></div></div></div>'
     + '<div class="rb-achg">' + groups + '</div>'
     + '<div class="stabs" style="margin-bottom:12px">' + tabs + '</div>'
     + '<div>' + body + '</div>'
-    + '<div class="card"><h3>⚖️ Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, Candle Range Theory, dan Quasimodo.</div></div>';
+    + '<div class="card"><h3> Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, Candle Range Theory, dan Quasimodo.</div></div>';
   if (ALCH.tab === 'kalkulator' && typeof alCalc === 'function') setTimeout(alCalc, 0);
 }

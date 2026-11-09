@@ -1,7 +1,7 @@
 /* ==========================================================================
    RUANG BELAJAR — V26 CONTENT
-   1. 📚 Belajar Soal  : belajar & melatih soal yang sudah kamu buat, dibantu AI
-   2. ⚗️ Strategi Alchemist : kurikulum lengkap MSNR + SMC/CRT (istilah, level,
+   1.  Belajar Soal  : belajar & melatih soal yang sudah kamu buat, dibantu AI
+   2.  Strategi Alchemist : kurikulum lengkap MSNR + SMC/CRT (istilah, level,
       storyline, model entry, sesi, risiko, checklist, studi kasus, kuis)
    ========================================================================== */
 
@@ -21,19 +21,19 @@ function bsoKeyHtml(q) {
     + (q.e ? '<div style="margin-top:6px"><b>Rubrik:</b> ' + fmt(q.e) + '</div>' : '') + '</div>';
   const opts = (q.o || []).map(function (o, i) {
     const right = Array.isArray(q.a) ? q.a.indexOf(i) >= 0 : i === q.a;
-    return '<div style="padding:3px 0;color:' + (right ? 'var(--ok)' : 'var(--mut)') + '">' + (right ? '✔ ' : '• ') + rb26Safe(String.fromCharCode(65 + i) + '. ' + o) + '</div>';
+    return '<div style="padding:3px 0;color:' + (right ? 'var(--ok)' : 'var(--mut)') + '">' + (right ? ' ' : '• ') + rb26Safe(String.fromCharCode(65 + i) + '. ' + o) + '</div>';
   }).join('');
-  return '<div class="rb-q-body"><div><b>Kunci:</b></div>' + opts + (q.e ? '<div class="exp" style="margin-top:8px">💡 ' + fmt(q.e) + '</div>' : '') + '</div>';
+  return '<div class="rb-q-body"><div><b>Kunci:</b></div>' + opts + (q.e ? '<div class="exp" style="margin-top:8px"> ' + fmt(q.e) + '</div>' : '') + '</div>';
 }
 function pSoal() {
   if (typeof isUmum === 'function' && isUmum()) {
-    $('pane').innerHTML = '<div class="card"><h3>📚 Belajar Soal</h3><div class="rb-muted-box">Mapel <b>Umum (Trivia Dunia)</b> membuat soal otomatis dari data global, jadi tidak punya bank soal sendiri. Pilih pelajaran lain di atas untuk belajar dari soal yang kamu buat.</div></div>';
+    $('pane').innerHTML = '<div class="card"><h3> Belajar Soal</h3><div class="rb-muted-box">Mapel <b>Umum (Trivia Dunia)</b> membuat soal otomatis dari data global, jadi tidak punya bank soal sendiri. Pilih pelajaran lain di atas untuk belajar dari soal yang kamu buat.</div></div>';
     return;
   }
-  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3>📚 Belajar Soal — ' + rb26Safe(S.mapel) + '</h3>'
-    + '<div class="rb-mode"><button type="button" class="' + (BSO.view === 'daftar' ? 'on' : '') + '" onclick="bsoSetView(\'daftar\')">📖 Daftar</button>'
-    + '<button type="button" class="' + (BSO.view === 'kartu' ? 'on' : '') + '" onclick="bsoSetView(\'kartu\')">🎴 Kartu</button></div></div>'
-    + '<div class="rb-note">Semua soal yang kamu buat di tab <b>✨ Buat Soal</b> muncul di sini. Baca pembahasannya, minta penjelasan AI, lalu latih hanya soal yang kamu pilih.</div>'
+  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3> Belajar Soal — ' + rb26Safe(S.mapel) + '</h3>'
+    + '<div class="rb-mode"><button type="button" class="' + (BSO.view === 'daftar' ? 'on' : '') + '" onclick="bsoSetView(\'daftar\')"> Daftar</button>'
+    + '<button type="button" class="' + (BSO.view === 'kartu' ? 'on' : '') + '" onclick="bsoSetView(\'kartu\')"> Kartu</button></div></div>'
+    + '<div class="rb-note">Semua soal yang kamu buat di tab <b> Buat Soal</b> muncul di sini. Baca pembahasannya, minta penjelasan AI, lalu latih hanya soal yang kamu pilih.</div>'
     + '<div class="row" style="margin-top:10px"><div style="flex:2 1 220px"><label style="margin-top:0">Cari soal</label><input id="bsoq" placeholder="kata kunci..." autocomplete="off" oninput="BSO.q=this.value;bsoRender()" value="' + rb26Safe(BSO.q) + '"></div>'
     + '<div><label style="margin-top:0">Tingkat</label><select id="bsolv" onchange="BSO.lv=this.value;bsoRender()"><option value="">Semua tingkat</option>'
     + (typeof lvOptions === 'function' ? lvOptions() : []).map(function (l) { return '<option ' + (BSO.lv === l ? 'selected' : '') + '>' + rb26Safe(l) + '</option>'; }).join('')
@@ -41,15 +41,15 @@ function pSoal() {
     + '<div><label style="margin-top:0">Jenis</label><select id="bsoty" onchange="BSO.type=this.value;bsoRender()">'
     + [['', 'Semua jenis'], ['pg', 'Pilihan ganda'], ['bs', 'Benar/Salah'], ['multi', 'Pilih semua'], ['essay', 'Essay']].map(function (x) { return '<option value="' + x[0] + '" ' + (BSO.type === x[0] ? 'selected' : '') + '>' + x[1] + '</option>'; }).join('')
     + '</select></div></div>'
-    + '<div class="rb-toolbar"><button class="btn" type="button" onclick="bsoTrainSel()">🎯 Latih soal terpilih</button>'
-    + '<button class="btn alt" type="button" onclick="bsoRandom()">🎲 Acak 10 soal</button>'
-    + '<button class="btn alt" type="button" onclick="bsoGen()">✨ Buat soal baru (AI)</button></div>'
+    + '<div class="rb-toolbar"><button class="btn" type="button" onclick="bsoTrainSel()"> Latih soal terpilih</button>'
+    + '<button class="btn alt" type="button" onclick="bsoRandom()"> Acak 10 soal</button>'
+    + '<button class="btn alt" type="button" onclick="bsoGen()"> Buat soal baru (AI)</button></div>'
     + '<div id="bsoact" class="rb-note"></div></div>'
-    + '<div class="card"><div class="rb-card-head"><h3>✨ Buat soal dengan AI</h3><button class="x" type="button" onclick="bsoGen()">Generator lengkap ›</button></div>'
+    + '<div class="card"><div class="rb-card-head"><h3> Buat soal dengan AI</h3><button class="x" type="button" onclick="bsoGen()">Generator lengkap ›</button></div>'
       + '<div class="rb-note">Buat soal latihan tambahan langsung dari tab ini. Soal yang jadi otomatis masuk bank dan daftar di bawah.</div>'
       + '<div class="row" style="margin-top:10px"><div style="flex:2 1 200px"><label style="margin-top:0">Topik</label><input id="bsotopic" placeholder="kosong = acak sesuai tingkat" autocomplete="off"></div>'
       + '<div><label style="margin-top:0">Jumlah</label><select id="bson"><option>5</option><option selected>10</option><option>15</option></select></div></div>'
-      + '<button class="btn full" type="button" id="bsogenbtn" onclick="bsoGenInline()">Buat soal ✨</button>'
+      + '<button class="btn full" type="button" id="bsogenbtn" onclick="bsoGenInline()">Buat soal </button>'
       + '<div id="bsogen" class="rb-note" style="margin-top:9px"></div></div>'
     + '<div id="bsolist"><div class="card mut small">Memuat soal...</div></div>';
   bsoLoad();
@@ -89,8 +89,8 @@ function bsoRender() {
     ? rb26Num(rows.length) + ' dari ' + rb26Num(BSO.bank.length) + ' soal ditampilkan • <b>' + n + '</b> dipilih'
     : '';
   if (!BSO.bank.length) {
-    box.innerHTML = '<div class="card"><div class="rb-muted-box">Belum ada soal untuk <b>' + rb26Safe(S.mapel) + '</b>. Buat dulu dengan AI di tab <b>✨ Buat Soal</b> — soalnya otomatis muncul di sini.</div>'
-      + '<button class="btn full" onclick="bsoGen()">✨ Buat soal sekarang</button></div>';
+    box.innerHTML = '<div class="card"><div class="rb-muted-box">Belum ada soal untuk <b>' + rb26Safe(S.mapel) + '</b>. Buat dulu dengan AI di tab <b> Buat Soal</b> — soalnya otomatis muncul di sini.</div>'
+      + '<button class="btn full" onclick="bsoGen()"> Buat soal sekarang</button></div>';
     return;
   }
   if (BSO.view === 'kartu') return bsoRenderCard(box, rows);
@@ -107,32 +107,32 @@ function bsoItemHtml(x) {
     + '<div class="rb-q-top"><input class="rb-check" type="checkbox" ' + (sel ? 'checked' : '') + ' onchange="bsoSel(\'' + rb26Safe(id) + '\',this.checked)" aria-label="Pilih soal">'
     + '<div class="rb-q-main"><div class="rb-q-t" onclick="bsoOpen(\'' + rb26Safe(id) + '\')" style="cursor:pointer">' + rb26Safe(String(x.q || '').slice(0, 300)) + '</div>'
     + '<div class="rb-q-meta"><span class="rb-tag">' + bsoTag(tip) + '</span>'
-    + (x.tingkat ? '<span class="rb-tag">🎓 ' + rb26Safe(x.tingkat) + '</span>' : '')
-    + (x.teks ? '<span class="rb-tag">📖 bacaan</span>' : '')
-    + (x.sub ? '<span class="rb-tag">🏷 ' + rb26Safe(x.sub) + '</span>' : '')
-    + (x.sumber === 'ai' ? '<span class="rb-tag warn">🤖 AI</span>' : '')
+    + (x.tingkat ? '<span class="rb-tag"> ' + rb26Safe(x.tingkat) + '</span>' : '')
+    + (x.teks ? '<span class="rb-tag"> bacaan</span>' : '')
+    + (x.sub ? '<span class="rb-tag"> ' + rb26Safe(x.sub) + '</span>' : '')
+    + (x.sumber === 'ai' ? '<span class="rb-tag warn"> AI</span>' : '')
     + '</div></div>'
     + '<button class="x" type="button" onclick="bsoOpen(\'' + rb26Safe(id) + '\')">' + (open ? '▲' : '▼') + '</button></div>'
     + (open ? '<div id="bsob_' + rb26Safe(id) + '">'
-      + (x.teks ? '<div class="exp" style="margin-bottom:8px">📖 ' + fmt(x.teks) + '</div>' : '')
+      + (x.teks ? '<div class="exp" style="margin-bottom:8px"> ' + fmt(x.teks) + '</div>' : '')
       + bsoKeyHtml(x)
-      + '<div class="rb-toolbar" style="margin-bottom:0"><button class="btn alt" type="button" onclick="bsoExplain(\'' + rb26Safe(id) + '\')">🤖 Jelaskan & cara berpikir</button>'
-      + '<button class="btn alt" type="button" onclick="bsoAskTutor(\'' + rb26Safe(id) + '\')">💬 Tanya Tutor</button></div>'
+      + '<div class="rb-toolbar" style="margin-bottom:0"><button class="btn alt" type="button" onclick="bsoExplain(\'' + rb26Safe(id) + '\')"> Jelaskan & cara berpikir</button>'
+      + '<button class="btn alt" type="button" onclick="bsoAskTutor(\'' + rb26Safe(id) + '\')"> Tanya Tutor</button></div>'
       + '<div id="bsoai_' + rb26Safe(id) + '"></div></div>' : '') + '</div>';
 }
 function bsoRenderCard(box, rows) {
   if (!rows.length) { box.innerHTML = '<div class="card mut small">Tidak ada soal untuk filter ini.</div>'; return; }
   if (BSO.flash >= rows.length) BSO.flash = 0;
   const x = rows[BSO.flash];
-  box.innerHTML = '<div class="card"><div class="rb-card-head"><h3 style="font-size:.94rem">🎴 Kartu ' + (BSO.flash + 1) + ' / ' + rows.length + '</h3>'
+  box.innerHTML = '<div class="card"><div class="rb-card-head"><h3 style="font-size:.94rem"> Kartu ' + (BSO.flash + 1) + ' / ' + rows.length + '</h3>'
     + '<span class="rb-tag">' + bsoTag(x.tipe) + '</span></div>'
-    + (x.teks ? '<details style="margin-bottom:10px"><summary class="rb-note" style="cursor:pointer">📖 Lihat teks bacaan</summary><div class="exp" style="margin-top:8px">' + fmt(x.teks) + '</div></details>' : '')
+    + (x.teks ? '<details style="margin-bottom:10px"><summary class="rb-note" style="cursor:pointer"> Lihat teks bacaan</summary><div class="exp" style="margin-top:8px">' + fmt(x.teks) + '</div></details>' : '')
     + '<div class="q">' + fmt(String(x.q || '')) + '</div>'
-    + (BSO.flip ? bsoKeyHtml(x) + '<button class="btn alt full" style="margin-top:8px" type="button" onclick="bsoExplainCard(\'' + rb26Safe(x.id) + '\')">🤖 Penjelasan langkah demi langkah</button><div id="bsoai_card"></div>' : '<div class="rb-muted-box">Pikirkan jawabanmu dulu, lalu buka kunci.</div>')
+    + (BSO.flip ? bsoKeyHtml(x) + '<button class="btn alt full" style="margin-top:8px" type="button" onclick="bsoExplainCard(\'' + rb26Safe(x.id) + '\')"> Penjelasan langkah demi langkah</button><div id="bsoai_card"></div>' : '<div class="rb-muted-box">Pikirkan jawabanmu dulu, lalu buka kunci.</div>')
     + '<div class="rb-toolbar" style="margin-top:12px"><button class="btn alt" type="button" onclick="bsoFlash(-1)">← Sebelumnya</button>'
-    + '<button class="btn" type="button" onclick="bsoFlipCard()">' + (BSO.flip ? '🙈 Sembunyikan kunci' : '👁 Buka kunci') + '</button>'
+    + '<button class="btn" type="button" onclick="bsoFlipCard()">' + (BSO.flip ? ' Sembunyikan kunci' : ' Buka kunci') + '</button>'
     + '<button class="btn alt" type="button" onclick="bsoFlash(1)">Berikutnya →</button></div>'
-    + (x.tipe === 'pg' || x.tipe === 'multi' || x.tipe === 'bs' ? '<button class="btn alt full" type="button" onclick="bsoPracticeOne(\'' + rb26Safe(x.id) + '\')">🎯 Latih soal ini saja</button>' : '')
+    + (x.tipe === 'pg' || x.tipe === 'multi' || x.tipe === 'bs' ? '<button class="btn alt full" type="button" onclick="bsoPracticeOne(\'' + rb26Safe(x.id) + '\')"> Latih soal ini saja</button>' : '')
     + '</div>';
 }
 function bsoSetView(v) {
@@ -165,7 +165,7 @@ async function bsoExplainCard(id) {
   box.innerHTML = '<div class="exp" style="margin-top:9px">⏳ Menyusun penjelasan...</div>';
   try {
     const text = await explainAI('Jelaskan soal ini langkah demi langkah dan kenapa kunci jawabannya benar.\nSoal: ' + q.q + '\nPilihan: ' + (q.o || []).map(function (o, i) { return String.fromCharCode(65 + i) + '. ' + o; }).join(' | ') + '\nKunci: ' + rb26AnswerKey(q));
-    box.innerHTML = '<div class="exp" style="margin-top:9px">🤖 ' + fmt(text) + '</div>';
+    box.innerHTML = '<div class="exp" style="margin-top:9px"> ' + fmt(text) + '</div>';
   } catch (e) {
     box.innerHTML = '<div class="exp" style="margin-top:9px">' + fmt(rb26ExplainQuestion(q, null)) + '</div>';
   }
@@ -273,7 +273,7 @@ async function bsoGenInline() {
   } catch (e) {
     if (box) box.innerHTML = '⚠️ ' + rb26Safe((e && e.message) || e) + '. AI server belum bisa dipakai saat ini. Kamu tetap bisa memakai <b>Generator lengkap</b> atau belajar dari ' + BSO.bank.length + ' soal yang sudah ada.';
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Buat soal ✨'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Buat soal '; }
   }
 }
 
@@ -491,7 +491,7 @@ function alStudyCaseSvg() {
 }
 
 function pAlchemist() {
-  const tabs = [['mulai', '🚀 Mulai'], ['istilah', '📖 Istilah'], ['story', '🧭 Storyline'], ['level', '📐 Level & Zona'], ['entry', '🎯 Model Entry'], ['sesi', '⏰ Sesi'], ['risiko', '🛡 Risiko'], ['cek', '✅ Checklist'], ['kasus', '🔍 Studi Kasus'], ['kuis', '🎓 Kuis']];
+  const tabs = [['mulai', ' Mulai'], ['istilah', ' Istilah'], ['story', ' Storyline'], ['level', ' Level & Zona'], ['entry', ' Model Entry'], ['sesi', ' Sesi'], ['risiko', ' Risiko'], ['cek', '✅ Checklist'], ['kasus', ' Studi Kasus'], ['kuis', ' Kuis']];
   const body = ALCH.tab === 'istilah' ? '<div id="alchterms">' + alTermsHtml() + '</div>'
     : ALCH.tab === 'story' ? alStoryHtml()
       : ALCH.tab === 'level' ? alLevelHtml()
@@ -504,7 +504,7 @@ function pAlchemist() {
                     : alStartHtml();
 
   $('pane').innerHTML = '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · kurikulum</div><h2>⚗️ Strategi Alchemist</h2>'
+    + '<div class="rb-eyebrow">Trading · kurikulum</div><h2> Strategi Alchemist</h2>'
     + '<div class="rb-note">Gabungan Malaysian SNR (MSNR), SMC/ICT, Candle Range Theory, dan Quasimodo: cara membaca storyline, menandai level, menentukan entry, lalu mengeksekusi dengan risiko terkendali.</div>'
     + '<div class="rb-pill-row"><span class="rb-pill y">Edukasi</span><span class="rb-pill">MSNR</span><span class="rb-pill">SMC / ICT</span><span class="rb-pill">CRT</span><span class="rb-pill">QM</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>10</b><span>modul</span></div></div></div></div>'
@@ -512,7 +512,7 @@ function pAlchemist() {
       return '<button type="button" class="' + (ALCH.tab === x[0] ? 'on' : '') + '" onclick="alSet(\'' + x[0] + '\')">' + x[1] + '</button>';
     }).join('') + '</div>'
     + '<div>' + body + '</div>'
-    + '<div class="card"><h3>⚖️ Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, dan Candle Range Theory (lihat tautan di modul Mulai).</div></div>';
+    + '<div class="card"><h3> Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, dan Candle Range Theory (lihat tautan di modul Mulai).</div></div>';
 }
 function alStartHtml() {
   return '<div class="rb-grid">'
@@ -535,7 +535,7 @@ function alStartHtml() {
       + '<div class="rb-accordion"><details><summary>Alat yang perlu disiapkan</summary><div class="rb-acc-body"><ul>'
         + '<li>Chart dengan TF D1, H4, H1, M15, M5.</li><li>Alat gambar: kotak/zona, garis horizontal, dan pengukur risiko.</li>'
         + '<li>Jurnal: tanggal, pair, sesi, model entry, RR rencana vs hasil, kesalahan.</li>'
-        + '<li>Kalkulator lot di tab 📒 Jurnal untuk ukuran posisi.</li></ul></div></details></div>'
+        + '<li>Kalkulator lot di tab  Jurnal untuk ukuran posisi.</li></ul></div></details></div>'
       + '<div class="rb-accordion"><details><summary>Sumber konsep (global)</summary><div class="rb-acc-body"><div class="rb-src">'
         + '<a href="https://www.tradingview.com/script/ANCSINu0-Wonra-Alchemist-SNR-Engine" target="_blank" rel="noopener noreferrer">Wonra Alchemist SNR Engine — aturan MSNR, storyline, SBR/RBS, QM, OCL (TradingView)</a>'
         + '<a href="https://glasp.co/youtube/dPlIsJ-YYKU" target="_blank" rel="noopener noreferrer">Komepips — Alchemist (MSNR) step by step: D1 → H4 → M30/H1, FVG, CRT</a>'
@@ -547,7 +547,7 @@ function alStartHtml() {
     + '</div>';
 }
 function alStoryHtml() {
-  return '<div class="card"><h3>🧭 Storyline — arah sebelum segalanya</h3>'
+  return '<div class="card"><h3> Storyline — arah sebelum segalanya</h3>'
     + '<div class="rb-note">Storyline adalah "cerita" yang diceritakan level TF tinggi. Tanpa storyline, level hanya garis tanpa arti.</div>'
     + '<div class="rb-flow" style="margin-top:10px">'
       + '<div class="rb-step"><b>1. Baca level HTF dari body</b>Gunakan close candle, bukan ujung wick. Tandai S/R pada D1, W1, lalu MN.</div>'
@@ -562,7 +562,7 @@ function alStoryHtml() {
     + '</div>';
 }
 function alLevelHtml() {
-  return '<div class="card"><h3>📐 Level &amp; zona ala MSNR</h3>'
+  return '<div class="card"><h3> Level &amp; zona ala MSNR</h3>'
     + '<div class="rb-note">Bedanya MSNR dengan S/R biasa: level dibuat dari pertemuan <b>close</b> satu candle dan <b>open</b> candle berikutnya; wick diabaikan.</div>'
     + '<div class="rb-flow" style="margin-top:10px">'
       + '<div class="rb-step"><b>1. Tandai close–open</b>Bila close dan open berbeda, jaraknya adalah band level (OCL/gap). Sentuhan sah di tepi mana pun.</div>'
@@ -595,25 +595,25 @@ function alEntryHtml() {
   }).join('') + '<div class="rb-callout warn"><b>Catatan eksekusi:</b> tidak semua model cocok di semua kondisi. Pilih satu model, ulangi 50 kali di demo, baru evaluasi. Menumpuk banyak model sekaligus biasanya berakhir dengan entry paksa.</div>';
 }
 function alSessionHtml() {
-  return '<div class="card"><h3>⏰ Sesi &amp; killzone (WIB)</h3>'
+  return '<div class="card"><h3> Sesi &amp; killzone (WIB)</h3>'
     + '<div class="rb-scroll"><table class="rb-table"><thead><tr><th>Sesi</th><th>Jam (WIB)</th><th>Karakter</th></tr></thead><tbody>'
     + ALCH_SESSIONS.map(function (s) { return '<tr><td><b>' + rb26Safe(s[0]) + '</b></td><td>' + rb26Safe(s[1]) + '</td><td>' + rb26Safe(s[2]) + '</td></tr>'; }).join('')
     + '</tbody></table></div>'
     + '<div class="rb-callout" style="margin-top:12px"><b>Alur harian Alchemist:</b> sesi Asia membentuk range → London menyapu salah satu sisi → cari MSS M15 → entry di POI → target sisi berlawanan range atau level HTF berikutnya.</div>'
-    + '<div class="rb-callout warn"><b>Hindari:</b> 15 menit sebelum dan sesudah rilis data besar (NFP, CPI, FOMC). Spread melebar dan stop bisa tersentuh sebelum arah terbentuk. Cek kalender di tab 🎯 News Analisis.</div>'
+    + '<div class="rb-callout warn"><b>Hindari:</b> 15 menit sebelum dan sesudah rilis data besar (NFP, CPI, FOMC). Spread melebar dan stop bisa tersentuh sebelum arah terbentuk. Cek kalender di tab  News Analisis.</div>'
     + '<div class="rb-card-head" style="margin-top:6px"><h3 style="font-size:.94rem">Jam dunia</h3><button class="x" onclick="pKalender()">Buka kalender ›</button></div>'
     + '<div class="rb-note">Sesi di atas memakai WIB (UTC+7). Saat DST (musim panas), London/New York bergeser 1 jam lebih awal.</div>'
     + '</div>';
 }
 function alRiskHtml() {
-  return '<div class="card"><h3>🛡 Manajemen risiko &amp; ukuran posisi</h3>'
+  return '<div class="card"><h3> Manajemen risiko &amp; ukuran posisi</h3>'
     + '<div class="rb-flow" style="margin-top:8px">'
       + '<div class="rb-step"><b>1. Tentukan risiko</b>0,5–1% ekuitas per trade. Contoh: ekuitas $1.000 → risiko $10.</div>'
       + '<div class="rb-step"><b>2. Ukur stop</b>Jarak entry ke stop dalam pip/poin. Letakkan di luar struktur/zona, bukan di dalam noise.</div>'
       + '<div class="rb-step"><b>3. Hitung lot</b>Lot = risiko ÷ (stop × nilai per pip per lot). Bulatkan ke bawah sesuai langkah broker.</div>'
       + '<div class="rb-step"><b>4. Tetapkan batas</b>Maksimal 2–3 trade per hari dan stop setelah −3% ekuitas harian.</div>'
     + '</div>'
-    + '<div class="rb-callout"><b>Contoh XAUUSD:</b> risiko $10, stop 250 poin ($0,01 × 100 oz per lot → $2,5/poin per lot? gunakan nilai kontrak broker) — selalu pakai kalkulator lot di tab 📒 Jurnal agar angka mengikuti spesifikasi broker.</div>'
+    + '<div class="rb-callout"><b>Contoh XAUUSD:</b> risiko $10, stop 250 poin ($0,01 × 100 oz per lot → $2,5/poin per lot? gunakan nilai kontrak broker) — selalu pakai kalkulator lot di tab  Jurnal agar angka mengikuti spesifikasi broker.</div>'
     + '<div class="rb-scroll" style="margin-top:10px"><table class="rb-table"><thead><tr><th>RR</th><th>Win rate yang dibutuhkan agar BEP</th><th>Catatan</th></tr></thead><tbody>'
       + '<tr><td>1 : 1</td><td>50%</td><td>Rentan biaya spread.</td></tr>'
       + '<tr><td>1 : 2</td><td>33,4%</td><td>Titik awal yang sehat.</td></tr>'
@@ -635,7 +635,7 @@ function alCheckHtml() {
     + '</div>';
 }
 function alCaseHtml() {
-  return '<div class="card"><h3>🔍 Studi kasus: CRT bullish + FVG</h3>'
+  return '<div class="card"><h3> Studi kasus: CRT bullish + FVG</h3>'
     + '<div class="rb-note">Skenario edukasi pada XAUUSD H1. Perhatikan urutannya, bukan angka pastinya.</div>'
     + alStudyCaseSvg()
     + '<div class="rb-flow" style="margin-top:12px">'
@@ -652,7 +652,7 @@ function alCaseHtml() {
 function alQuizHtml() {
   const done = Object.keys(ALCH.quiz).length;
   const right = ALCH_QUIZ.filter(function (q, i) { return ALCH.quiz[i] === q.a; }).length;
-  return '<div class="card"><div class="rb-card-head"><h3>🎓 Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
+  return '<div class="card"><div class="rb-card-head"><h3> Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
     + '<div class="rb-note">Jawab semua pertanyaan. Pembahasan muncul langsung setelah memilih.</div>'
     + '<div style="margin-top:10px">' + ALCH_QUIZ.map(function (q, i) {
       const pick = ALCH.quiz[i];

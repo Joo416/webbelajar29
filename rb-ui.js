@@ -117,28 +117,28 @@ document.head.insertAdjacentHTML('beforeend', '<style id="rb27css">'
 document.body.insertAdjacentHTML('beforeend',
   '<div id="rbScrim" class="rb-scrim" onclick="rbDrawer(false)"></div>'
   + '<aside id="rbDrawer" class="rb-drawer" aria-hidden="true" aria-label="Menu akun dan tampilan">'
-  + '<div class="rb-dhead"><b>Menu</b><button type="button" class="x" onclick="rbDrawer(false)" aria-label="Tutup menu">✕</button></div>'
+  + '<div class="rb-dhead"><b>Menu</b><button type="button" class="x" onclick="rbDrawer(false)" aria-label="Tutup menu">Tutup</button></div>'
   + '<div class="rb-sec"><div class="rb-lab">Tampilan</div><div class="rb-theme">'
-  + '<button type="button" data-rbtheme="light" onclick="rbThemeSet(\'light\')">☀️ Terang</button>'
-  + '<button type="button" data-rbtheme="dark" onclick="rbThemeSet(\'dark\')">🌙 Gelap</button>'
+  + '<button type="button" data-rbtheme="light" onclick="rbThemeSet(\'light\')"> Terang</button>'
+  + '<button type="button" data-rbtheme="dark" onclick="rbThemeSet(\'dark\')"> Gelap</button>'
   + '</div></div>'
   + '<div class="rb-sec"><div class="rb-lab">Bantuan</div>'
-  + '<button type="button" class="rb-mi" onclick="rbGuide(true)"><span>📘</span>Panduan pemakaian lengkap</button>'
+  + '<button type="button" class="rb-mi" onclick="rbGuide(true)"><span></span>Panduan pemakaian lengkap</button>'
   + '</div>'
   + '<div class="rb-dfoot"><button type="button" class="btn red full" id="rbLogout" onclick="rbLogout()">Keluar dari akun</button></div>'
   + '</aside>');
 
 /* ---------- panduan ---------- */
 var RB_GUIDE = [
-  ['mulai', '🚀 Mulai cepat',
+  ['mulai', ' Mulai cepat',
     '<p>Ruang Belajar menyatukan latihan soal sekolah, bahasa Inggris/Jepang, dan edukasi trading dalam satu akun.</p>'
     + '<h3>Langkah pertama</h3><ol>'
     + '<li>Tekan <b>Masuk dengan Google</b>. Akun baru menunggu persetujuan admin; bila sudah disetujui tetapi masih tertahan, tekan <b>Cek lagi</b>.</li>'
     + '<li>Pilih seksi di tab bawah: <b>Beranda</b>, <b>Belajar</b>, <b>Bahasa</b>, atau <b>Trading</b>.</li>'
     + '<li>Di Belajar, pilih pelajaran lewat dropdown, lalu mulai dari <b>Latihan</b>.</li>'
     + '<li>Semua hasil, soal, catatan, dan riwayat tersimpan di akunmu.</li></ol>'
-    + '<div class="rb-gtip">💡 Tombol <b>Menu</b> ada di kanan atas dan hanya berisi tiga hal: mode terang/gelap, panduan ini, dan keluar dari akun. Halaman masuk tidak lagi menampilkan tautan tema/panduan.</div>'],
-  ['beranda', '🏠 Beranda & konsistensi',
+    + '<div class="rb-gtip"> Tombol <b>Menu</b> ada di kanan atas dan hanya berisi tiga hal: mode terang/gelap, panduan ini, dan keluar dari akun. Halaman masuk tidak lagi menampilkan tautan tema/panduan.</div>'],
+  ['beranda', ' Beranda & konsistensi',
     '<h3>Angka di atas</h3><ul>'
     + '<li><b>Menit belajar</b>, <b>soal dikerjakan</b>, <b>akurasi</b>, dan <b>streak</b> dihitung dari aktivitasmu.</li>'
     + '<li><b>Target harian</b> bisa diubah. Angka ini dipakai untuk cincin progres dan pengingat.</li></ul>'
@@ -149,7 +149,7 @@ var RB_GUIDE = [
     + '<h3>Peringkat</h3><ul>'
     + '<li>Pilih kategori <b>Sekolah</b>, <b>TKA</b>, atau <b>Umum</b>. Kategori ditentukan dari jenis soal yang kamu jawab, bukan dari menu yang terbuka.</li>'
     + '<li>Hanya jawaban benar yang menambah poin. Data lama dirapikan otomatis saat kamu membuka peringkat.</li></ul>'],
-  ['belajar', '🎓 Belajar',
+  ['belajar', ' Belajar',
     '<h3>Tab di dalam Belajar</h3><ul>'
     + '<li><b>Latihan</b> — jawab soal, lihat pembahasan, dan ulangi yang salah.</li>'
     + '<li><b>Tryout</b> — berwaktu, dengan navigasi nomor dan tombol ragu-ragu.</li>'
@@ -161,7 +161,7 @@ var RB_GUIDE = [
     + '<li>Mulai dari 10 soal. Setelah benar ≥ 80%, naikkan jumlah atau tingkat.</li>'
     + '<li>Baca pembahasan walau jawaban benar — sering ada trik yang lebih cepat.</li>'
     + '<li>Soal salah otomatis masuk antrean ulang pada sesi berikutnya.</li></ul>'],
-  ['tutor', '🤖 Tutor & AI',
+  ['tutor', ' Tutor & AI',
     '<h3>Cara kerja</h3><ul>'
     + '<li>Tutor hanya membahas mapel yang dipilih. Di Trading, ia membahas konsep, sesi, dan strategi — bukan sinyal.</li>'
     + '<li>Atur <b>tingkat penjelasan</b> (SD sampai Umum) dan <b>pemeriksaan jawaban</b> (teliti/cepat).</li>'
@@ -170,17 +170,17 @@ var RB_GUIDE = [
     + '<li>Tutor tetap menjawab dari materi dan bank soal di aplikasi (badge <b>Tutor lokal</b>).</li>'
     + '<li>Jawaban essay juga dinilai secara lokal bila server tidak tersedia.</li></ul>'
     + '<div class="rb-gwarn">⚠️ AI bisa keliru. Untuk soal hitungan, periksa langkahnya; untuk fakta, cek sumber yang ditampilkan.</div>'],
-  ['soal', '📚 Belajar Soal & pembuatan soal',
+  ['soal', ' Belajar Soal & pembuatan soal',
     '<p>Tab <b>Belajar Soal</b> ada di samping Tutor dan dipakai untuk mempelajari soal yang sudah kamu buat.</p>'
     + '<h3>Yang bisa dilakukan</h3><ul>'
     + '<li>Cari soal, filter tingkat dan jenis, lalu buka kartu untuk melihat kunci dan pembahasan.</li>'
     + '<li>Centang beberapa soal lalu <b>Latih terpilih</b>, atau <b>Acak 10</b> untuk sesi cepat.</li>'
     + '<li>Tombol <b>Penjelasan AI</b> membedah soal itu; <b>Tanya tutor</b> membuka tutor dengan soal sebagai konteks.</li></ul>'
     + '<h3>Buat soal dengan AI di tab ini</h3><ul>'
-    + '<li>Isi topik (boleh kosong) dan jumlah soal, lalu tekan <b>Buat soal ✨</b>.</li>'
+    + '<li>Isi topik (boleh kosong) dan jumlah soal, lalu tekan <b>Buat soal </b>.</li>'
     + '<li>Soal yang dihasilkan langsung tersimpan ke bank dan muncul di daftar.</li>'
     + '<li>Butuh <b>Generator lengkap</b>? Tombolnya ada di kanan judul kartu.</li></ul>'],
-  ['bahasa', '🌐 Bahasa',
+  ['bahasa', ' Bahasa',
     '<h3>English Coach & Sakura Sensei</h3><ul>'
     + '<li>Dua tutor khusus: Inggris dan Jepang. Riwayat percakapan tersimpan di perangkat.</li>'
     + '<li>Gunakan chip pertanyaan cepat atau tulis sendiri; Enter mengirim, Shift+Enter membuat baris baru.</li></ul>'
@@ -189,8 +189,8 @@ var RB_GUIDE = [
     + '<li><b>Verb</b>: V1–V2–V3, contoh kalimat, dan audio.</li>'
     + '<li><b>Flashcard</b> dan kuis untuk mengulang kata lemah.</li>'
     + '<li><b>Jepang</b>: hiragana, katakana, kanji N5–N4, kosakata, dan pola kalimat.</li></ul>'
-    + '<div class="rb-gtip">💡 Progres bahasa disimpan di perangkat ini, bukan di server. Reset lewat pengaturan di halaman progres.</div>'],
-  ['trading', '📈 Trading & Alchemist',
+    + '<div class="rb-gtip"> Progres bahasa disimpan di perangkat ini, bukan di server. Reset lewat pengaturan di halaman progres.</div>'],
+  ['trading', ' Trading & Alchemist',
     '<h3>Tab Trading</h3><ul>'
     + '<li><b>News</b> — kalender dan analisis berita; ringkasan bisa disalin.</li>'
     + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time (SL 30 pip, TP 1:2) dari candle M15 + konfirmasi M5/M1, H1/D1, DXY, yield, spot emas, dan kalender; entry MARKET atau LIMIT di POI; chart TradingView gratis.</li>'
@@ -204,20 +204,20 @@ var RB_GUIDE = [
     + '<li><b>Mahir</b>: Psikologi → Backtest → Rencana trading.</li>'
     + '<li><b>Uji</b>: kuis untuk memastikan pemahaman.</li></ol>'
     + '<div class="rb-gwarn">⚠️ Semua materi trading adalah edukasi, bukan sinyal atau saran finansial. Uji di akun demo dan batasi risiko.</div>'],
-  ['menu', '⚙️ Menu, tema, dan akun',
+  ['menu', ' Menu, tema, dan akun',
     '<ul>'
     + '<li>Tombol <b>Menu</b> ada di <b>kanan atas</b>. Isinya hanya: mode <b>Terang/Gelap</b>, <b>Panduan</b>, dan <b>Keluar dari akun</b>.</li>'
     + '<li>Tidak ada lagi tombol <b>Keluar</b> di samping Menu dan tidak ada navigasi lain di dalam menu.</li>'
     + '<li><b>Terang/Gelap</b> langsung berubah dan diingat di perangkat ini.</li>'
     + '<li><b>Keluar dari akun</b> hanya mengakhiri sesi. Soal, riwayat, dan catatan tetap tersimpan di akun.</li>'
     + '<li>Tekan <b>Esc</b> atau area gelap untuk menutup menu/panduan.</li></ul>'],
-  ['data', '🔒 Data & privasi',
+  ['data', ' Data & privasi',
     '<ul>'
     + '<li>Soal, hasil latihan, peringkat, catatan, dan riwayat chat disimpan di Firestore pada akunmu sendiri.</li>'
     + '<li>Progres bahasa dan tema disimpan di perangkat (localStorage).</li>'
     + '<li>Jangan memakai akun bersama: data latihan dan peringkat akan tercampur.</li>'
     + '<li>Peringkat hanya menampilkan nama dan poin, bukan jawaban atau catatanmu.</li></ul>'],
-  ['masalah', '🛠 Jika ada masalah',
+  ['masalah', ' Jika ada masalah',
     '<h3>AI lambat atau gagal</h3><ul><li>Coba lagi; server punya batas waktu. Tanpa konfigurasi server, tutor lokal tetap aktif.</li>'
     + '<li>Jika jawaban terasa aneh, minta tutor menjelaskan ulang atau gunakan tombol langkah penyelesaian.</li></ul>'
     + '<h3>Soal tidak muncul</h3><ul><li>Periksa pelajaran, kategori, dan filter tingkat/jenis. Soal lama dengan nama pelajaran berbeda tidak terbaca.</li></ul>'
@@ -228,7 +228,7 @@ var RB_GUIDE = [
 
 document.body.insertAdjacentHTML('beforeend',
   '<div id="rbGuide" class="rb-guide" role="dialog" aria-modal="true" aria-label="Panduan pemakaian">'
-  + '<div class="rb-gbar"><b>📘 Panduan pemakaian</b><button type="button" class="x" onclick="rbGuide(false)">Tutup</button></div>'
+  + '<div class="rb-gbar"><b> Panduan pemakaian</b><button type="button" class="x" onclick="rbGuide(false)">Tutup</button></div>'
   + '<div class="rb-gwrap"><div class="rb-gtoc" id="rbGtoc"></div><div class="rb-gbody" id="rbGbody"></div></div>'
   + '</div>');
 
@@ -252,14 +252,14 @@ function rbLockScroll() {
 function rbAcctHtml() {
   var u = (typeof user !== 'undefined') ? user : null;
   if (!u) {
-    return '<div class="rb-acct"><div class="rb-av">👤</div><div><div class="nm">Belum masuk</div><div class="em">Masuk untuk menyimpan progres</div></div></div>'
-      + '<button type="button" class="btn full" style="margin-top:9px" onclick="rbDrawer(false);if(typeof login===\'function\')login()">🔵 Masuk dengan Google</button>';
+    return '<div class="rb-acct"><div class="rb-av"></div><div><div class="nm">Belum masuk</div><div class="em">Masuk untuk menyimpan progres</div></div></div>'
+      + '<button type="button" class="btn full" style="margin-top:9px" onclick="rbDrawer(false);if(typeof login===\'function\')login()"> Masuk dengan Google</button>';
   }
   var nm = u.displayName || u.email || 'Pengguna';
   var em = u.email || '';
   var esc = (typeof window.rb26Safe === 'function') ? window.rb26Safe : function (x) { return String(x == null ? '' : x); };
   return '<div class="rb-acct">'
-    + (u.photoURL ? '<img src="' + esc(u.photoURL) + '" alt="" referrerpolicy="no-referrer">' : '<div class="rb-av">👤</div>')
+    + (u.photoURL ? '<img src="' + esc(u.photoURL) + '" alt="" referrerpolicy="no-referrer">' : '<div class="rb-av"></div>')
     + '<div style="min-width:0"><div class="nm">' + esc(nm) + '</div><div class="em">' + esc(em) + '</div></div></div>';
 }
 function rbThemeSync() {
@@ -272,7 +272,7 @@ function rbThemeSet(mode) {
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem('rb21_theme', t); } catch (e) { }
   var meta = document.getElementById('v22tc');
-  if (meta) meta.setAttribute('content', t === 'light' ? '#f6f7fb' : '#090b10');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#f6f7fa' : '#0b0d11');
   rbThemeSync();
   try { if (typeof sigTv === 'function' && document.getElementById('sigTV')) sigTv(); } catch (e) { }
   if (typeof v21Toast === 'function') v21Toast(t === 'light' ? 'Mode terang aktif' : 'Mode gelap aktif');
