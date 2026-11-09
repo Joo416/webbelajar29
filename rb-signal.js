@@ -10,10 +10,12 @@
 
 const SIG_ST = {
   data: null, ai: null, aiNotes: [], meta: null, tick: null, loading: false, loadingAI: false,
-  auto: false, timer: 0, tickTimer: 0, pip: 0.1, slMode: 'fixed', bal: '1000', risk: '1', err: '', msg: '',
+  auto: (function () { try { return localStorage.getItem('rb_sig_auto') !== '0'; } catch (e) { return true; } })(),
+  fresh: {}, timer: 0, tickTimer: 0, pip: 0.1, slMode: 'fixed', bal: '1000', risk: '1', err: '', msg: '',
   tvInt: (function () { try { var v = localStorage.getItem('rb_sig_tv'); return ['1', '5', '15'].indexOf(v) >= 0 ? v : '5'; } catch (e) { return '5'; } })()
 };
 const SIG_CACHE = 'rb_sig_last_v2', SIG_HIST = 'rb_sig_hist_v2';
+const SIG_STATES = 'rb_sig_states_v1', SIG_FRESH_MS = 10 * 60000, SIG_COOLDOWN = 5 * 60000, SIG_PREV_MAX = 6 * 3600000;
 
 function sigNum(v, d) {
   const n = Number(v);
@@ -21,6 +23,72 @@ function sigNum(v, d) {
 }
 function sigTime(iso) {
   try { return new Date(iso).toLocaleString('id-ID'); } catch (e) { return '—'; }
+}
+/* ---------- notifikasi transisi setup TUNGGU → SIAP ---------- */
+function sigNotifSupported() { try { return typeof Notification !== 'undefined'; } catch (e) { return false; } }
+function sigNotifPerm() { try { return sigNotifSupported() ? Notification.permission : 'unsupported'; } catch (e) { return 'unsupported'; } }
+function sigNotifLabel() {
+  const p = sigNotifPerm();
+  return p === 'granted' ? '🔔 Notifikasi aktif' : p === 'denied' ? '🔕 Notifikasi diblokir' : p === 'unsupported' ? '🔕 Tak didukung browser' : '🔔 Aktifkan notifikasi';
+}
+function sigNotifAsk() {
+  if (!sigNotifSupported()) { if (typeof v21Toast === 'function') v21Toast('Browser ini tidak mendukung notifikasi'); return; }
+  if (Notification.permission === 'granted') { if (typeof v21Toast === 'function') v21Toast('Notifikasi sudah aktif'); return; }
+  if (Notification.permission === 'denied') { if (typeof v21Toast === 'function') v21Toast('Notifikasi diblokir; izinkan lewat pengaturan situs di browser'); return; }
+  try {
+    let fired = false;
+    const done = function (p) {
+      if (fired) return;
+      fired = true;
+      if (typeof v21Toast === 'function') v21Toast(p === 'granted' ? '🔔 Notifikasi setup aktif' : 'Izin notifikasi tidak diberikan');
+      if (p === 'granted') { try { new Notification('Ruang Belajar', { body: 'Notifikasi aktif. Kamu akan diberi tahu saat setup Alchemist berubah TUNGGU → SIAP.' }); } catch (e) { } }
+      sigPaint();
+    };
+    const r = Notification.requestPermission(done);
+    if (r && typeof r.then === 'function') r.then(done).catch(function () { });
+  } catch (e) { }
+}
+function sigStatesGet() {
+  try { const o = JSON.parse(localStorage.getItem(SIG_STATES) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
+}
+function sigStatesSet(o) { try { localStorage.setItem(SIG_STATES, JSON.stringify(o)); } catch (e) { } }
+function sigFreshPrune() {
+  const now = Date.now(), f = SIG_ST.fresh || {};
+  Object.keys(f).forEach(function (k) { if (!(now - f[k] < SIG_FRESH_MS)) delete f[k]; });
+  SIG_ST.fresh = f;
+}
+function sigNotifyHits(hits) {
+  hits.forEach(function (s) {
+    const line = s.method + ' · ' + s.dir + ' · entry ' + sigNum(s.entry) + ' · SL ' + sigNum(s.sl) + ' · TP ' + sigNum(s.tp);
+    if (typeof v21Toast === 'function') v21Toast('🔔 ' + s.method + ' SIAP — ' + s.dir + ' ' + sigNum(s.entry));
+    try {
+      if (sigNotifPerm() === 'granted' && typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        const n = new Notification('Setup SIAP: ' + s.method, { body: line, tag: 'rb-sig-' + s.id, renotify: true });
+        n.onclick = function () { try { window.focus(); } catch (e) { } n.close(); };
+      }
+    } catch (e) { }
+  });
+}
+function sigCheckTransitions(pack) {
+  const arr = (pack && pack.setups) || [];
+  if (!arr.length) return [];
+  const prev = sigStatesGet(), now = Date.now(), hits = [];
+  sigFreshPrune();
+  arr.forEach(function (s) {
+    const old = prev[s.id];
+    const recent = old && old.at && (now - old.at < SIG_PREV_MAX);
+    if (recent && old.status === 'TUNGGU' && s.status === 'SIAP' && !(now - (old.notifiedAt || 0) < SIG_COOLDOWN)) {
+      hits.push(s);
+      SIG_ST.fresh[s.id] = now;
+      prev[s.id] = { status: s.status, at: now, notifiedAt: now };
+    } else {
+      prev[s.id] = { status: s.status, at: now, notifiedAt: old ? (old.notifiedAt || 0) : 0 };
+    }
+  });
+  Object.keys(prev).forEach(function (k) { if (!arr.some(function (s) { return s.id === k; })) delete prev[k]; });
+  sigStatesSet(prev);
+  if (hits.length) sigNotifyHits(hits);
+  return hits;
 }
 function sigHist() {
   try {
@@ -81,7 +149,7 @@ function pSignalEntry() {
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
     + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">🔄 Ambil data terbaru</button>'
     + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
-    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()">⏱ Auto 60 dtk: mati</button>'
+    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()">⏱ Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati') + '</button>'
     + '<button class="btn alt" type="button" onclick="sigCopy(this)">📋 Salin sinyal</button></div>'
     + '<div class="small mut" style="margin-top:8px">' + stale + '</div></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
@@ -101,6 +169,9 @@ function pSignalEntry() {
   sigTv();
   sigPaint();
   sigTickStart();
+  if (SIG_ST.auto) sigAutoStart();
+  const ab = $('sigAutoBtn');
+  if (ab) ab.textContent = '⏱ Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati');
   if (!fresh && !SIG_ST.loading) setTimeout(function () { sigLoad(true); }, 60);
 }
 function sigTv() {
@@ -133,6 +204,40 @@ function sigMsgBox() {
 }
 function sigKv(label, value, sub) {
   return '<div class="exp" style="color:var(--tx)"><div class="small mut">' + esc(label) + '</div><div style="font-weight:800">' + value + '</div>' + (sub ? '<div class="small mut">' + esc(sub) + '</div>' : '') + '</div>';
+}
+function sigMini(label, value) {
+  return '<div><div class="small mut">' + esc(label) + '</div><div style="font-weight:800">' + value + '</div></div>';
+}
+function sigSetupCard(d) {
+  const arr = d.setups || [];
+  if (!arr.length) return '';
+  const colOf = s => s.valid ? 'var(--ok)' : s.status === 'LEWAT' ? 'var(--mut)' : 'var(--warn)';
+  const freshOf = s => !!(SIG_ST.fresh && SIG_ST.fresh[s.id] && Date.now() - SIG_ST.fresh[s.id] < SIG_FRESH_MS);
+  const freshN = arr.filter(freshOf).length;
+  return '<div class="card"><div class="rb-card-head"><h3>🎯 ' + arr.length + ' Entry Alchemist — entry · SL · TP</h3>'
+    + '<span class="rb-pill">' + (freshN ? '🔔 ' + freshN + ' baru SIAP' : d.dataValid ? '✅ data valid' : '⚠️ data terbatas') + '</span></div>'
+    + '<div class="rb-note" style="margin-bottom:8px">Semua level dihitung dari candle M15/M5/M1 + spot live, diurutkan dari skor tertinggi. SL struktur dibatasi <b>30–60 pip</b> dan TP <b>1:2</b>. <b>SIAP</b> = harga dekat level, <b>TUNGGU</b> = limit belum tersentuh, <b>LEWAT</b> = harga sudah melewati level (jangan kejar).</div>'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px">'
+    + '<button class="x" type="button" onclick="sigNotifAsk()">' + esc(sigNotifLabel()) + '</button>'
+    + '<span class="small mut">Auto 60 dtk: <b>' + (SIG_ST.auto ? 'aktif' : 'mati') + '</b> · penanda muncul saat setup berubah TUNGGU → SIAP · notifikasi browser saat tab tidak aktif.</span></div>'
+    + arr.map((s, i) => {
+      const isFresh = freshOf(s);
+      return '<div class="exp" style="margin-bottom:8px;border-color:' + ((i === 0 || isFresh) ? 'var(--accent)' : 'var(--line)') + '">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+        + '<b>' + (s.dir === 'BUY' ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + (i === 0 ? ' <span class="rb-pill" style="color:var(--accent)">paling valid</span>' : '') + '</b>'
+        + '<span><span class="rb-pill" style="color:' + colOf(s) + '">' + esc(s.status) + ' · ' + s.score + '/5</span>'
+        + (isFresh ? ' <span class="rb-pill" style="color:var(--accent);border-color:var(--accent)">🔔 BARU SIAP</span>' : '') + '</span></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;margin-top:7px">'
+        + sigMini('Entry · ' + esc(s.type), sigNum(s.entry))
+        + sigMini('SL · ' + s.slPips + ' pip', '<span style="color:var(--no)">' + sigNum(s.sl) + '</span>')
+        + sigMini('TP · 1:' + s.rr, '<span style="color:var(--ok)">' + sigNum(s.tp) + '</span>')
+        + sigMini('Risiko / 1.00 lot', '$' + sigNum(s.riskPerLot))
+        + '</div>'
+        + '<div class="small mut" style="margin-top:5px">' + esc(s.why || '') + '</div>'
+        + '<div class="small" style="margin-top:4px;color:' + colOf(s) + '">' + (s.valid ? '✅ Level valid — ' : '⚠️ Belum valid — ') + esc(s.need) + '</div>'
+        + '</div>';
+    }).join('')
+    + '</div>';
 }
 function sigPaint() {
   const box = $('sigBox');
@@ -232,7 +337,8 @@ function sigPaint() {
     + (d.notes && d.notes.length ? '<div class="warn" style="margin-top:8px">' + d.notes.map(x => esc(x)).join('<br>') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(s => (s.ok ? '✅ ' : '⚠️ ') + esc(s.name)).join(' · ') + '</div></div>';
 
-  box.innerHTML = planCard + ctx + calc + cek + aiCard + basis + qual;
+  const setupsCard = sigSetupCard(d);
+  box.innerHTML = planCard + setupsCard + ctx + calc + cek + aiCard + basis + qual;
   sigHistPaint();
   sigCalc();
   sigLivePaint();
@@ -288,6 +394,7 @@ async function sigLoad(dataOnly) {
     if (r && r.error) throw new Error(r.error);
     if (!r || !r.signal) throw new Error('Server tidak mengirim data sinyal.');
     SIG_ST.data = r.signal; SIG_ST.ai = null; SIG_ST.aiNotes = []; SIG_ST.meta = null;
+    sigCheckTransitions(r.signal);
     SIG_ST.msg = '✅ Data diperbarui ' + new Date().toLocaleTimeString('id-ID') + ' · arah ' + (r.signal.direction || 'WAIT') + ' · konfirmasi ' + (r.signal.confirms == null ? '—' : r.signal.confirms + '/6') + ' · ' + (r.signal.dataValid ? 'data valid' : 'data terbatas');
     sigCacheSave(r.signal); sigHistSave();
   } catch (e) {
@@ -348,16 +455,19 @@ function sigTickStart() {
   }, 15000);
   sigTick();
 }
+function sigAutoStart() {
+  if (SIG_ST.timer) return;
+  SIG_ST.timer = setInterval(function () {
+    if (!document.getElementById('sigBox')) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; return; }
+    if (!SIG_ST.loading && !SIG_ST.loadingAI) sigLoad(true);
+  }, 60000);
+}
+function sigAutoStop() { if (SIG_ST.timer) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; } }
 function sigAuto() {
+  SIG_ST.auto = !SIG_ST.auto;
+  try { localStorage.setItem('rb_sig_auto', SIG_ST.auto ? '1' : '0'); } catch (e) { }
+  if (SIG_ST.auto) sigAutoStart(); else sigAutoStop();
   const btn = $('sigAutoBtn');
-  if (SIG_ST.timer) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; SIG_ST.auto = false; }
-  else {
-    SIG_ST.auto = true;
-    SIG_ST.timer = setInterval(function () {
-      if (!document.getElementById('sigBox')) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; SIG_ST.auto = false; return; }
-      if (!SIG_ST.loading && !SIG_ST.loadingAI) sigLoad(true);
-    }, 60000);
-  }
   if (btn) btn.textContent = '⏱ Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati');
   if (typeof v21Toast === 'function') v21Toast(SIG_ST.auto ? 'Auto-refresh 60 detik aktif' : 'Auto-refresh dimatikan');
 }
@@ -372,6 +482,7 @@ function sigCopy(btn) {
     + (d.poi ? 'POI: FVG ' + d.poi.kind + ' ' + d.poi.lo + '-' + d.poi.hi + '\n' : '')
     + 'Sesi: ' + (d.session ? d.session.ses + (d.session.kill ? ' / ' + d.session.kill : '') : '—') + '\n'
     + 'Checklist: ' + (d.checklist || []).filter(c => c.ok).length + '/' + (d.checklist || []).length + ' OK\n'
+    + ((d.setups || []).length ? 'Setup: ' + d.setups.map(s => s.method + ' ' + s.dir + ' E' + s.entry + ' SL' + s.sl + ' TP' + s.tp).join(' | ') + '\n' : '')
     + 'Edukasi, bukan saran finansial.';
   const done = function () {
     if (btn) { const o = btn.textContent; btn.textContent = '✅ Tersalin'; setTimeout(function () { btn.textContent = o; }, 1600); }
