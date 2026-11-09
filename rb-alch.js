@@ -205,7 +205,7 @@ function alDasarHtml() {
     + '</tbody></table></div>'
     + '<div class="rb-callout"><b>Contoh hitung cepat:</b> saldo $1.000, risiko 1% = $10. Stop 20 pip EURUSD. Lot = 10 ÷ (20 × 10) = 0,05 lot. Bukan 0,5 lot.</div>'
     + '<div class="rb-callout warn"><b>Aturan pemula:</b> demo minimal 30 hari, maksimal 1% risiko per trade, dan satu model entry saja sampai konsisten.</div>'
-    + '<button class="btn alt full" type="button" onclick="alSet(\'kalkulator\')"> Buka kalkulator risiko</button>');
+    + '<button class="btn alt full" type="button" onclick="alSet(\'kalkulator\')">🧮 Buka kalkulator risiko</button>');
 }
 
 function alRoadmapHtml() {
@@ -239,7 +239,7 @@ function alTopdownHtml() {
     + '<tr><td>Roadblock tebal sebelum target</td><td>Kecilkan target atau lewati setup.</td></tr>'
     + '<tr><td>Tidak ada POI fresh</td><td>Tidak ada trade. Ini keputusan yang benar.</td></tr>'
     + '</tbody></table></div>'
-    + '<div class="rb-card-head" style="margin-top:12px"><h3 style="font-size:.94rem">Template analisis</h3><button class="x" type="button" onclick="alCopyText(alTopdownTemplate(),this)"> Salin</button></div>'
+    + '<div class="rb-card-head" style="margin-top:12px"><h3 style="font-size:.94rem">Template analisis</h3><button class="x" type="button" onclick="alCopyText(alTopdownTemplate(),this)">📋 Salin</button></div>'
     + '<textarea class="rb-plan" id="alTdText" style="min-height:190px">' + rb26Safe(alTopdownTemplate()) + '</textarea>'
     + '<div class="rb-note">Salin ke jurnal sebelum entry. Bila ada kolom yang tidak bisa diisi, berarti setup belum siap.</div>');
 }
@@ -303,8 +303,8 @@ function alBacktestHtml() {
     + '<tr><td>Max drawdown</td><td>Penurunan puncak ekuitas</td><td>&lt; 10%</td></tr>'
     + '</tbody></table></div>'
     + '<div class="rb-callout ok"><b>Tantangan 30 trade:</b> satu model, satu sesi, risiko tetap. Setelah 30 trade, baru lihat statistik. Bila expectancy negatif, periksa konsistensi aturan sebelum menyalahkan strategi.</div>'
-    + '<div class="rb-note">Jurnal trade tersedia di tab <b> Jurnal</b>. Isi alasan entry dan kesalahan, bukan hanya hasil.</div>'
-    + '<button class="btn alt full" type="button" onclick="alSet(\'rencana\')"> Lanjut ke rencana trading</button>');
+    + '<div class="rb-note">Jurnal trade tersedia di tab <b>📒 Jurnal</b>. Isi alasan entry dan kesalahan, bukan hanya hasil.</div>'
+    + '<button class="btn alt full" type="button" onclick="alSet(\'rencana\')">▶️ Lanjut ke rencana trading</button>');
 }
 
 const ALC_PAIRS = {
@@ -397,7 +397,7 @@ function alPlanHtml() {
     '<div class="rb-note">Rencana yang tidak ditulis hanyalah niat. Isi template ini, simpan, lalu jalankan minimal 20 trade sebelum mengubah aturan.</div>'
     + '<div class="rb-accordion"><details open><summary>Template rencana (bisa diedit)</summary><div class="rb-acc-body">'
     + '<textarea id="alPlanText" class="rb-plan" oninput="alPlanSave(this.value)">' + rb26Safe(txt) + '</textarea>'
-    + '<div class="row" style="margin-top:8px"><button class="btn alt" type="button" onclick="alPlanCopy(this)"> Salin rencana</button><button class="btn alt" type="button" onclick="alPlanReset()">↺ Kembalikan template</button></div>'
+    + '<div class="row" style="margin-top:8px"><button class="btn alt" type="button" onclick="alPlanCopy(this)">📋 Salin rencana</button><button class="btn alt" type="button" onclick="alPlanReset()">↺ Kembalikan template</button></div>'
     + '<div class="small mut" id="alPlanStat" style="margin-top:8px">Tersimpan otomatis di perangkat ini.</div>'
     + '</div></details></div>'
     + '<div class="rb-card-head" style="margin-top:10px"><h3 style="font-size:.94rem">Rutinitas harian</h3></div>'
@@ -491,7 +491,7 @@ function alCasePick(n) { ALCH.caseN = n; pAlchemist(); }
 function alCaseHtml() {
   const n = ALCH.caseN || 1;
   const pill = function (i, label) { return '<button type="button" class="x" style="' + (n === i ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-soft)' : '') + '" onclick="alCasePick(' + i + ')">' + label + '</button>'; };
-  const head = '<div class="card"><div class="rb-card-head"><h3> Studi kasus</h3><span class="rb-pill">Edukasi</span></div>'
+  const head = '<div class="card"><div class="rb-card-head"><h3>🔬 Studi kasus</h3><span class="rb-pill">Edukasi</span></div>'
     + '<div class="rb-note">Tiga skenario untuk melatih mata: satu berhasil, satu berhasil dari sisi jual, satu gagal. Perhatikan urutannya, bukan angka pastinya.</div>'
     + '<div class="rb-pill-row" style="gap:6px">' + pill(1, 'Bullish CRT') + pill(2, 'Bearish CRT') + pill(3, 'Gagal') + '</div></div>';
   if (n === 2) {
@@ -542,7 +542,7 @@ function alQuizHtml() {
   const done = Object.keys(ALCH.quiz).length;
   const right = ALCH_QUIZ.filter(function (q, i) { return ALCH.quiz[i] === q.a; }).length;
   const pass = Math.ceil(ALCH_QUIZ.length * 0.75);
-  return '<div class="card"><div class="rb-card-head"><h3> Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
+  return '<div class="card"><div class="rb-card-head"><h3>🧠 Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
     + '<div class="rb-note">' + ALCH_QUIZ.length + ' pertanyaan dari pemula sampai mahir. Pembahasan muncul setelah memilih. Ambang lulus: ' + pass + '/' + ALCH_QUIZ.length + '.</div>'
     + '<div style="margin-top:10px">' + ALCH_QUIZ.map(function (q, i) {
       const pick = ALCH.quiz[i];
@@ -604,6 +604,6 @@ function pAlchemist() {
     + '<div class="rb-achg">' + groups + '</div>'
     + '<div class="stabs" style="margin-bottom:12px">' + tabs + '</div>'
     + '<div>' + body + '</div>'
-    + '<div class="card"><h3> Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, Candle Range Theory, dan Quasimodo.</div></div>';
+    + '<div class="card"><h3>⚠️ Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, Candle Range Theory, dan Quasimodo.</div></div>';
   if (ALCH.tab === 'kalkulator' && typeof alCalc === 'function') setTimeout(alCalc, 0);
 }

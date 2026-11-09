@@ -8,7 +8,7 @@
   --font-ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --font-display:var(--font-ui);
   --bg:#0b0d11;--bg2:#0f1218;--card:#12161d;--card2:#171c25;--field:#0e1219;
-  --line:#232935;--line2:#34404f;--tx:#eef1f6;--mut:#9aa4b2;--a:#ffffff;--b:#cfd7e3;--bad:#8b95a3;
+  --line:#232935;--line2:#34404f;--tx:#eef1f6;--mut:#aeb8c6;--a:#ffffff;--b:#d5dce7;--bad:#9aa5b4;
   --accent:#7c8cff;--accent2:#5eead4;--accent-soft:rgba(124,140,255,.14);
   --action:#4f5fe8;--action2:#7c5cff;
   --ok:#3ddc97;--ok-soft:rgba(61,220,151,.12);
@@ -18,7 +18,7 @@
 }
 html[data-theme=light]{
   --bg:#f6f7fa;--bg2:#ffffff;--card:#ffffff;--card2:#f1f4f9;--field:#f7f9fc;
-  --line:#e4e8ef;--line2:#cfd6e2;--tx:#101521;--mut:#5d6878;--a:#101521;--b:#2c3441;--bad:#8b939f;
+  --line:#e4e8ef;--line2:#cfd6e2;--tx:#101521;--mut:#46505f;--a:#101521;--b:#2c3441;--bad:#6b7482;
   --accent:#4356e0;--accent2:#0d9488;--accent-soft:rgba(67,86,224,.09);
   --action:#4356e0;--action2:#6d4bd8;
   --ok:#0b8a5c;--ok-soft:rgba(11,138,92,.09);
@@ -217,3 +217,8 @@ textarea{font-size:16px}
   html{scroll-behavior:auto}
   *,*::before,*::after{transition:none!important;animation:none!important}
 }
+
+/* Kontras teks bantu & placeholder di kedua mode */
+::placeholder{color:var(--mut);opacity:1}
+.rb-achg .n{opacity:.85}
+[style*="color:#8f8f8f"],[style*="color:#8a8a8a"],[style*="color:#b5b5b5"],[style*="color:#9a9a9a"],[style*="color:#a0a0a0"]{color:var(--mut)!important}

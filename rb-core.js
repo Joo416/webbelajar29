@@ -502,27 +502,27 @@ function pBeranda() {
       + '<div class="ring" style="--p:' + pct + '" aria-label="Target harian ' + pct + '%"><div class="ring-in"><b>' + today.n + '</b><span>/' + tg + '</span></div></div>'
     + '</div>'
     + '<div class="rb-actions">'
-      + '<button class="btn" onclick="v21Go(\'latihan\')"> Latihan</button>'
-      + '<button class="btn alt" onclick="v21Go(\'tryout\')"> Tryout</button>'
-      + '<button class="btn alt" onclick="v21Go(\'soal\')"> Belajar Soal</button>'
-      + '<button class="btn alt" onclick="v21Go(\'tutor\')"> Tutor</button>'
+      + '<button class="btn" onclick="v21Go(\'latihan\')">🎯 Latihan</button>'
+      + '<button class="btn alt" onclick="v21Go(\'tryout\')">📝 Tryout</button>'
+      + '<button class="btn alt" onclick="v21Go(\'soal\')">📘 Belajar Soal</button>'
+      + '<button class="btn alt" onclick="v21Go(\'tutor\')">💬 Tutor</button>'
     + '</div>'
     + '<div class="v21-target"><span>Target harian</span><select aria-label="Target harian" onchange="v21SetTarget(this.value)">'
       + [10, 20, 30, 50, 100].map(function (n) { return '<option value="' + n + '"' + (n === tg ? ' selected' : '') + '>' + n + ' soal</option>'; }).join('')
     + '</select><span style="margin-left:auto">terbaik ' + best + ' hari</span></div></div>'
 
     + '<div class="rb-grid">'
-      + '<div class="rb-span card"><div class="rb-card-head"><h3> Kalender belajar &amp; jam dunia</h3><span class="rb-live">real time</span></div>'
+      + '<div class="rb-span card"><div class="rb-card-head"><h3>🗓️ Kalender belajar &amp; jam dunia</h3><span class="rb-live">real time</span></div>'
         + '<div class="rb-note" style="margin-bottom:8px">Riwayat konsistensi dari latihan yang benar-benar kamu kerjakan. Tanggal mengikuti zona waktu perangkatmu.</div>'
         + '<div id="rbcal" class="rb-calwrap">' + rb26CalHtml() + '</div>'
-        + '<div style="margin-top:14px"><div class="rb-card-head"><h3 style="font-size:.94rem"> Jam dunia</h3><button class="x" onclick="pKalender()">Detail ›</button></div>' + rb26ClocksHtml() + '</div>'
+        + '<div style="margin-top:14px"><div class="rb-card-head"><h3 style="font-size:.94rem">🕒 Jam dunia</h3><button class="x" onclick="pKalender()">Detail ›</button></div>' + rb26ClocksHtml() + '</div>'
       + '</div>'
 
       + '<div class="card"><div class="rb-card-head"><h3> 7 hari terakhir</h3><span class="rb-pill">' + rb26Num((typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0)) + ' soal</span></div>'
         + '<div class="v21-bars">' + rb26WeekBars() + '</div>'
         + '<div class="rb-note" style="margin-top:10px">' + rb26Num(sum) + ' soal total • ' + rb26Num(ok) + ' benar • streak terbaik ' + best + ' hari</div></div>'
 
-      + '<div class="card"><div class="rb-card-head"><h3> Peringkat</h3><button class="x" onclick="v21Go(\'papan\')">Semua ›</button></div>'
+      + '<div class="card"><div class="rb-card-head"><h3>🏆 Peringkat</h3><button class="x" onclick="v21Go(\'papan\')">Semua ›</button></div>'
         + (typeof v21CatButtons === 'function' ? v21CatButtons() : '')
         + '<div class="rb-note rb-board-note">Soal sekolah selalu masuk kategori Sekolah, termasuk saat mode tryout.</div>'
         + '<div id="v21mini" class="mut small">Memuat...</div></div>'
@@ -546,7 +546,7 @@ function pKalender() {
   }).join('') : '<div class="rb-muted-box">Belum ada riwayat. Kerjakan latihan pertama, kalender akan terisi otomatis.</div>';
 
   $('pane').innerHTML =
-    '<div class="card"><div class="rb-card-head"><h3> Kalender konsistensi</h3><div style="display:flex;gap:6px"><button class="x" onclick="v21Home()">← Beranda</button><button class="x" onclick="v21Go(\'papan\')"> Peringkat</button></div></div>'
+    '<div class="card"><div class="rb-card-head"><h3>🗓️ Kalender konsistensi</h3><div style="display:flex;gap:6px"><button class="x" onclick="v21Home()">← Beranda</button><button class="x" onclick="v21Go(\'papan\')">🏆 Peringkat</button></div></div>'
       + '<div class="rb-note" style="margin-bottom:10px">Setiap kotak adalah satu hari. Warna makin terang berarti makin banyak soal yang dikerjakan.</div>'
       + '<div id="rbcal">' + rb26CalHtml() + '</div>'
       + '<div class="rb-kpis" style="margin-top:12px">'
@@ -556,7 +556,7 @@ function pKalender() {
         + '<div class="rb-kpi"><b>' + rb26Num(cal.n) + '</b><span>soal bulan ini</span></div>'
       + '</div></div>'
     + '<div class="rb-grid">'
-      + '<div class="card"><div class="rb-card-head"><h3> Jam dunia</h3><span class="rb-live">real time</span></div>' + rb26ClocksHtml()
+      + '<div class="card"><div class="rb-card-head"><h3>🕒 Jam dunia</h3><span class="rb-live">real time</span></div>' + rb26ClocksHtml()
         + '<div class="rb-note" style="margin-top:9px">Berguna untuk menyelaraskan jadwal belajar dengan sesi pasar (London/New York) atau kelas online.</div></div>'
       + '<div class="card"><div class="rb-card-head"><h3> 14 hari terakhir</h3></div>' + list + '</div>'
     + '</div>';
@@ -575,19 +575,19 @@ function v21CatButtons() {
 async function pPapan() {
   const req = ++v21PapanReq;
   const label = (typeof v21CatLabel === 'function' ? v21CatLabel(v21BoardCat) : 'Sekolah');
-  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3> Peringkat ' + rb26Safe(label) + '</h3>'
+  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3>🏆 Peringkat ' + rb26Safe(label) + '</h3>'
     + '<div style="display:flex;gap:6px"><button class="x" onclick="v21Home()">← Beranda</button><button class="x" onclick="pPapan()">Tutup</button></div></div>'
     + '<div class="rb-note">Diurutkan dari jumlah jawaban benar. Setiap akun Google aktif otomatis masuk peringkat.</div>'
     + v21CatButtons()
     + '<div id="v21board" class="mut small rb-ranklist">Memuat...</div></div>'
-    + '<div class="card"><h3> Statistikku</h3><div id="v21mine" class="mut small">Memuat...</div></div>';
+    + '<div class="card"><h3>📊 Statistikku</h3><div id="v21mine" class="mut small">Memuat...</div></div>';
 
   const a = rb26Act(), st = (typeof v21Streak === 'function' ? v21Streak(a) : 0), t = (typeof v21Today === 'function' ? v21Today(a) : { n: 0, ok: 0 });
   const days = Object.values(a.days || {}), sum = days.reduce(function (s, x) { return s + (+x.n || 0); }, 0), ok = days.reduce(function (s, x) { return s + (+x.ok || 0); }, 0);
   const mine = $('v21mine');
-  if (mine) mine.innerHTML = '<div class="item"><span> Streak</span><b>' + st + ' hari</b></div>'
-    + '<div class="item"><span> XP</span><b>' + rb26Num(a.xp || 0) + '</b></div>'
-    + '<div class="item"><span> Hari ini</span><b>' + t.n + ' / ' + (typeof v21Target === 'function' ? v21Target() : 20) + ' soal</b></div>'
+  if (mine) mine.innerHTML = '<div class="item"><span>🔥 Streak</span><b>' + st + ' hari</b></div>'
+    + '<div class="item"><span>⚡ XP</span><b>' + rb26Num(a.xp || 0) + '</b></div>'
+    + '<div class="item"><span>📅 Hari ini</span><b>' + t.n + ' / ' + (typeof v21Target === 'function' ? v21Target() : 20) + ' soal</b></div>'
     + '<div class="item"><span> 7 hari</span><b>' + (typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0) + ' soal</b></div>'
     + '<div class="item"><span>✅ Akurasi total</span><b>' + (sum ? Math.round(ok / sum * 100) : 0) + '%</b></div>';
 
@@ -875,7 +875,7 @@ function drawChat() {
     let meta = '';
     if (m.role === 'assistant' && m.meta) {
       meta = m.meta.local
-        ? '<div class="small mut" style="margin-top:8px"> Tutor lokal · materi &amp; bank soalmu</div>'
+        ? '<div class="small mut" style="margin-top:8px">💬 Tutor lokal · materi &amp; bank soalmu</div>'
         : (typeof metaHtml18 === 'function' ? metaHtml18(m.meta) : '');
     }
     return '<div class="msg ' + m.role + '">' + fmt(m.content) + meta + '</div>';
@@ -891,15 +891,15 @@ async function pTutor() {
   const vf = (typeof tutorVerify18 === 'function' ? tutorVerify18() : true);
   const verSel = '<div><label>Pemeriksaan jawaban</label><select onchange="tverSet18(this.value)"><option value="1" ' + (vf ? 'selected' : '') + '>Teliti (periksa silang)</option><option value="0" ' + (vf ? '' : 'selected') + '>Cepat</option></select></div>';
   const lvSel = trade ? '' : '<div><label>Tingkat penjelasan</label><select onchange="tlvSet18(this.value)">' + (typeof LV18 !== 'undefined' ? LV18 : ['SD', 'SMP', 'SMA', 'TKA / UTBK', 'Umum']).map(function (x) { return '<option ' + (x === lv ? 'selected' : '') + '>' + rb26Safe(x) + '</option>'; }).join('') + '</select></div>';
-  const alch = trade ? '<button class="btn alt" style="margin-top:8px" onclick="S.tab=\'alchemist\';home()"> Buka materi Strategi Alchemist</button>' : '';
-  $('pane').innerHTML = '<div class="card"><h3> Tutor ' + rb26Safe(S.mapel) + '</h3>'
+  const alch = trade ? '<button class="btn alt" style="margin-top:8px" onclick="S.tab=\'alchemist\';home()">📘 Buka materi Strategi Alchemist</button>' : '';
+  $('pane').innerHTML = '<div class="card"><h3>💬 Tutor ' + rb26Safe(S.mapel) + '</h3>'
     + '<div class="rb-focus"><span class="chip"> Fokus: ' + rb26Safe(S.mapel) + '</span><span class="chip"> Materi + bank soal</span><span class="chip"> Server AI bila tersedia</span></div>'
     + '<div class="row">' + lvSel + verSel + '</div>'
     + '<div id="chat" style="margin-top:10px"></div>'
     + '<div class="rb-chatbar"><input id="ci" placeholder="' + (trade ? 'Tanya konsep trading, sesi, atau strategi...' : 'Tanya materi, minta contoh, atau minta langkah penyelesaian...') + '" onkeydown="if(event.key===\'Enter\')send2()"><button class="btn" onclick="send2()">Kirim</button></div>'
-    + '<div class="rb-suggest" style="margin-top:8px"><button class="x" type="button" onclick="rb26Quick(\'ringkas\')"> Ringkas materi</button><button class="x" type="button" onclick="rb26Quick(\'contoh\')"> Contoh soal</button><button class="x" type="button" onclick="rb26Quick(\'langkah\')"> Langkah penyelesaian</button></div>'
+    + '<div class="rb-suggest" style="margin-top:8px"><button class="x" type="button" onclick="rb26Quick(\'ringkas\')">✨ Ringkas materi</button><button class="x" type="button" onclick="rb26Quick(\'contoh\')"> Contoh soal</button><button class="x" type="button" onclick="rb26Quick(\'langkah\')">🧭 Langkah penyelesaian</button></div>'
     + alch
-    + '<button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat();if(user)saveChat()"> Hapus percakapan</button>'
+    + '<button class="btn alt full" style="margin-top:8px" onclick="S.chat[S.mapel]=[];drawChat();if(user)saveChat()">🗑️ Hapus percakapan</button>'
     + '<div class="rb-ai-note">' + (trade
       ? 'Tutor Trading memakai data pasar tervalidasi bila server AI aktif. Bila server belum dikonfigurasi, tutor menjawab dari materi Alchemist/risiko di aplikasi ini. Edukasi, bukan saran finansial.'
       : 'Tutor fokus pada ' + rb26Safe(S.mapel) + '. Jika server AI belum aktif, jawaban disusun dari materi Ruang Belajar dan bank soalmu sehingga fitur tetap bisa dipakai.')

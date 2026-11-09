@@ -30,13 +30,13 @@ function pXauNews() {
   let c = null;
   try { c = JSON.parse(localStorage.getItem('xau_last') || 'null'); } catch (e) { }
   $('pane').innerHTML = '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · berita global XAUUSD</div><h2> News Analisis — NFP · CPI · PPI · FOMC</h2>'
+    + '<div class="rb-eyebrow">Trading · berita global XAUUSD</div><h2>📰 News Analisis — NFP · CPI · PPI · FOMC</h2>'
     + '<div class="rb-note">Fokus tunggal XAUUSD. Mesin menarik <b>semua berita yang menyentuh emas</b>: NFP, CPI, PPI, FOMC, plus rilis lain yang jatuh di waktu yang sama (±48 jam). Sumber: jadwal resmi <b>BLS</b> &amp; <b>federalreserve.gov</b>, angka resmi BLS/FRED, EFFR NY Fed, yield Treasury &amp; yield riil, DXY, CFTC, dan kantor berita besar (Reuters/Bloomberg/CNBC/WSJ). Setiap analisis wajib menyebut <b>mengapa datanya valid</b> (sumber + periode + kesegaran + verifikasi silang) dan <b>ke mana XAUUSD bergerak</b> menjelang serta saat rilis.</div>'
     + '<div class="rb-pill-row"><span class="rb-pill y">NFP</span><span class="rb-pill y">CPI</span><span class="rb-pill y">PPI</span><span class="rb-pill y">FOMC</span><span class="rb-pill">+ berita bersamaan</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
-    + '<div class="rb-actions"><button class="btn" type="button" id="xbtn" onclick="runXau()"> Ambil data global terbaru &amp; analisis</button>'
-    + '<button class="btn alt" type="button" onclick="retryXauAI()"> Nilai ulang AI</button>'
-    + '<button class="btn alt" type="button" onclick="xauHistPaint()"> Riwayat</button></div>'
+    + '<div class="rb-actions"><button class="btn" type="button" id="xbtn" onclick="runXau()">📡 Ambil data global terbaru &amp; analisis</button>'
+    + '<button class="btn alt" type="button" onclick="retryXauAI()">🤖 Nilai ulang AI</button>'
+    + '<button class="btn alt" type="button" onclick="xauHistPaint()">🕘 Riwayat</button></div>'
     + '<div class="small mut" style="margin-top:8px">Setiap klik mengambil ulang data tanpa cache. Data resmi ditampilkan lebih dulu; AI menyusun arah setelahnya.</div></div>'
     + '<div id="xmsg" class="mut small" style="margin:0 0 10px"></div>'
     + '<div id="xhist"></div><div id="xres"></div>';
@@ -67,7 +67,7 @@ window.renderXau = function renderXau(j, stale) {
     return '<div class="item"><span><a href="' + esc(s.uri) + '" target="_blank" rel="noopener" style="color:var(--b)">' + esc(s.title || s.domain || 'sumber') + '</a><div class="small mut">' + esc(s.domain || '') + (s.tier ? ' · tingkat ' + esc(String(s.tier)) : '') + (s.ageH != null ? ' · ' + (s.ageH < 48 ? s.ageH + ' jam' : Math.round(s.ageH / 24) + ' hari') + ' lalu' : '') + '</div></span><span class="small mut">' + (s.official ? ' resmi' : '') + '</span></div>';
   }).join('');
 
-  add += '<div class="card"><div class="rb-card-head"><h3> Mengapa data ini valid</h3><span class="rb-pill">' + esc(fresh) + '</span></div>'
+  add += '<div class="card"><div class="rb-card-head"><h3>✅ Mengapa data ini valid</h3><span class="rb-pill">' + esc(fresh) + '</span></div>'
     + '<div class="rb-note">Validitas = sumber resmi/tepercaya + periode data jelas + kesegaran + verifikasi silang. Ini yang dipakai untuk memprediksi arah emas, bukan opini.</div>'
     + (validRows.length ? validRows.join('') : '<div class="mut small">AI belum mengirim validitas per rilis.</div>')
     + ((x.validity || []).length ? '<div class="exp" style="color:var(--tx)"><b>Ringkasan validitas data:</b>' + x.validity.map(function (v) { return '<div class="small" style="margin-top:3px">• ' + esc(v) + '</div>'; }).join('') + '</div>' : '')
@@ -75,7 +75,7 @@ window.renderXau = function renderXau(j, stale) {
     + (srcRows ? '<div style="margin-top:8px"><b class="small">Sumber yang dipakai</b>' + srcRows + '</div>' : '')
     + '</div>';
 
-  add += '<div class="card"><h3> Prediksi jalur XAUUSD</h3>'
+  add += '<div class="card"><h3>📈 Prediksi jalur XAUUSD</h3>'
     + (x.gold_path ? '<div class="exp" style="color:var(--tx);line-height:1.6">' + fmtMd(x.gold_path) + '</div>'
       : '<div class="mut small">AI belum mengirim jalur harga ringkas. Lihat skenario per rilis di atas: setiap rilis sudah memuat skenario naik &amp; turun.</div>')
     + '<div class="small mut" style="margin-top:8px">Prediksi ini bersyarat pada angka rilis dan reaksi yield riil/USD. Bukan jaminan dan bukan saran finansial.</div></div>';
@@ -109,7 +109,7 @@ function xauPlanHtml(sig) {
       + '</div>';
   }
   return '<div class="card" style="border-left:5px solid ' + col + '">'
-    + '<div class="rb-card-head"><h3> Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL ≥30 · TP1 ≥100 · TP2 ≥200</span></div>'
+    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL ≥30 · TP1 ≥100 · TP2 ≥200</span></div>'
     + '<div style="font-weight:900;font-size:1.2rem;color:' + col + ';letter-spacing:-.02em">'
     + (dir === 'BUY' ? '🟢 BUY XAUUSD' : dir === 'SELL' ? '🔴 SELL XAUUSD' : '🟡 WAIT — belum ada konfluensi') + '</div>'
     + (levels || '<div class="small" style="margin-top:6px">Mesin menolak memaksa entry. ' + ((sig.gates || []).length ? 'Ditahan karena: ' + sig.gates.map(esc).join(' · ') + '.' : 'Tunggu checklist terpenuhi.') + '</div>')
@@ -246,7 +246,7 @@ function rb31Card(s, price) {
 function rb31ActiveHtml(price) {
   const act = rb31Active();
   const sorted = act.slice().sort(function (a, b) { return (a.status === 'TP1' ? 0 : 1) - (b.status === 'TP1' ? 0 : 1) || (b.openedAt || 0) - (a.openedAt || 0); });
-  return '<div class="card"><div class="rb-card-head"><h3> Sinyal aktif (' + act.length + '/' + RB31_MAX + ')</h3>'
+  return '<div class="card"><div class="rb-card-head"><h3>🟢 Sinyal aktif (' + act.length + '/' + RB31_MAX + ')</h3>'
     + '<span class="rb-pill">' + (act.length >= RB31_MIN ? '✅ ' + act.length + ' sinyal berjalan' : '⏳ menunggu sinyal baru') + '</span></div>'
     + '<div class="rb-note">Sinyal <b>tidak diganti</b> selama belum terkena SL/TP. Setelah selesai (SL/TP1/TP2/TPmax), mesin mencari sinyal baru pada refresh berikutnya. Tidak ada tombol mematikan refresh: data + AI diperbarui otomatis tiap 5 menit.</div>'
     + (act.length ? sorted.map(function (s) { return rb31Card(s, price); }).join('')
@@ -257,7 +257,7 @@ function rb31ClosedPaint() {
   const el = $('sigHist');
   if (!el) return;
   const done = rb31Closed().slice(0, 6);
-  el.innerHTML = '<div class="card"><div class="rb-card-head"><h3> Sinyal selesai (SL/TP)</h3>'
+  el.innerHTML = '<div class="card"><div class="rb-card-head"><h3>🏁 Sinyal selesai (SL/TP)</h3>'
     + (done.length ? '<button class="x" type="button" onclick="rb31ClearClosed()">Hapus riwayat</button>' : '') + '</div>'
     + (done.length ? done.map(function (s) {
       const win = s.result === 'WIN';
@@ -280,24 +280,24 @@ function pSignalEntry() {
   const stale = d && d.generatedAt ? '<span class="mut small">Data tersimpan ' + esc(sigTime(d.generatedAt)) + '</span>' : '';
   $('pane').innerHTML =
     '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · sinyal eksekusi XAUUSD</div><h2> Signal Entry Alchemist</h2>'
-    + '<div class="rb-note">Mesin membaca chart <b>live</b> (spot emas + candle M15 struktur, M5 konfirmasi, M1 tick, bias H1/D1), lalu memilih <b>5–10 setup</b> paling akurat. Konfirmasi entry memakai model Alchemist yang paling banyak dipakai trader profesional: <b>sapuan likuiditas → MSS/CHoCH → entry di FVG 50% atau order block M5</b>. Aturan level: <b>SL minimal 30 pip</b>, <b>TP1 minimal 100 pip</b>, <b>TP2 minimal 200 pip</b>, <b>TPmax</b> mengikuti target struktur/global (range, high/low 20 hari, range Asia). Sinyal bertahan sampai SL/TP, lalu diganti sinyal baru. Data + AI diperbarui otomatis <b>setiap 5 menit</b>.</div>'
+    + '<div class="rb-eyebrow">Trading · sinyal eksekusi XAUUSD</div><h2>🎯 Signal Entry Alchemist</h2>'
+    + '<div class="rb-note">Mesin membaca chart <b>live</b> (spot emas + candle M15 struktur, M5 konfirmasi, M1 tick, bias H1/D1), lalu memilih <b>5–10 setup</b> paling akurat. Konfirmasi entry memakai model Alchemist yang paling banyak dipakai trader profesional: <b>sapuan likuiditas → MSS/CHoCH → entry di FVG 50%, order block, atau OTE 62–79% M5</b>. Aturan level: <b>SL minimal 30 pip</b>, <b>TP1 minimal 100 pip</b>, <b>TP2 minimal 200 pip</b>, <b>TPmax</b> mengikuti target struktur/global (range, high/low 20 hari, range Asia). Sinyal bertahan sampai SL/TP, lalu diganti sinyal baru. Data + AI diperbarui otomatis <b>setiap 5 menit</b>.</div>'
     + '<div class="rb-pill-row"><span class="rb-pill y">SL ≥30 pip</span><span class="rb-pill y">TP1 ≥100 pip</span><span class="rb-pill y">TP2 ≥200 pip</span><span class="rb-pill">5–10 sinyal</span><span class="rb-pill">Auto 5 menit</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
-    + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)"> Ambil data terbaru</button>'
-    + '<button class="btn alt" type="button" onclick="sigRunAI()"> Nilai ulang AI</button>'
-    + '<button class="btn alt" type="button" onclick="sigCopy(this)"> Salin sinyal</button>'
+    + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
+    + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
+    + '<button class="btn alt" type="button" onclick="sigCopy(this)">📋 Salin sinyal</button>'
     + '<button class="btn alt" type="button" onclick="sigNotifAsk()">' + esc(sigNotifLabel()) + '</button></div>'
     + '<div class="small mut" style="margin-top:8px"> Auto-refresh <b>5 menit</b>: selalu aktif (ambil data terbaru → nilai ulang AI). ' + stale + '</div></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
     + '<div id="sigBox"></div>'
-    + '<div class="card"><div class="rb-card-head"><h3> Chart XAUUSD — TradingView real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
+    + '<div class="card"><div class="rb-card-head"><h3>📈 Chart XAUUSD — TradingView real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
     + '<div class="rb-note" style="margin-bottom:8px">Chart resmi TradingView (tanpa login). Pakai untuk <b>memverifikasi</b> level mesin: sapuan, MSS, FVG/OB. Sinyal dihitung dari data harga live + candle server, jadi tetap sinkron walau chart diganti timeframe.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
     + '<button class="x" type="button" data-sigtv="1" onclick="sigTvInt(1)">1m</button>'
     + '<button class="x" type="button" data-sigtv="5" onclick="sigTvInt(5)">5m</button>'
     + '<button class="x" type="button" data-sigtv="15" onclick="sigTvInt(15)">15m</button>'
-    + '<button class="x" type="button" onclick="sigTv()"> Muat ulang chart</button></div>'
+    + '<button class="x" type="button" onclick="sigTv()">🔄 Muat ulang chart</button></div>'
     + '<div style="border-radius:14px;overflow:hidden;height:clamp(300px,54vh,460px);border:1px solid var(--line)" id="sigTV"></div>'
     + '<div class="small mut" style="margin-top:6px"><a href="https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD" target="_blank" rel="noopener" style="color:var(--b)">Buka chart penuh di TradingView ↗</a></div></div>'
     + '<div id="sigHist"></div>';
@@ -357,7 +357,7 @@ function rb31PaintNow() {
   const col = dir === 'BUY' ? 'var(--ok)' : dir === 'SELL' ? 'var(--no)' : 'var(--warn)';
   const lbl = dir === 'BUY' ? '🟢 BUY XAUUSD' : dir === 'SELL' ? '🔴 SELL XAUUSD' : '🟡 WAIT — konfluensi belum cukup';
   const planCard = '<div class="card" style="border-left:5px solid ' + col + '">'
-    + '<div class="rb-card-head"><h3> Rencana mesin</h3><span class="rb-pill">' + esc(d.timeframe || 'M15') + ' · M5 · M1</span></div>'
+    + '<div class="rb-card-head"><h3>🗺️ Rencana mesin</h3><span class="rb-pill">' + esc(d.timeframe || 'M15') + ' · M5 · M1</span></div>'
     + '<div style="font-size:1.35rem;font-weight:900;color:' + col + ';letter-spacing:-.02em;margin:2px 0 6px">' + lbl + '</div>'
     + '<div class="small mut" id="sigLive">live: —</div>'
     + (lv ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:8px;margin-top:8px">'
@@ -373,7 +373,7 @@ function rb31PaintNow() {
     + '</div>';
 
   const pool = (d.setups || []);
-  const cand = '<div class="card"><div class="rb-card-head"><h3> Kandidat sinyal terbaru (' + pool.length + ')</h3><span class="rb-pill">' + (d.dataValid ? '✅ data valid' : '⚠️ data terbatas') + '</span></div>'
+  const cand = '<div class="card"><div class="rb-card-head"><h3>🎯 Kandidat sinyal terbaru (' + pool.length + ')</h3><span class="rb-pill">' + (d.dataValid ? '✅ data valid' : '⚠️ data terbatas') + '</span></div>'
     + '<details><summary class="small" style="cursor:pointer;color:var(--b)">Lihat semua kandidat, level, dan alasannya</summary>'
     + (pool.length ? pool.map(function (s) {
       const buy = s.dir === 'BUY';
@@ -384,7 +384,7 @@ function rb31PaintNow() {
     }).join('') : '<div class="mut small" style="margin-top:8px">Mesin belum memberi setup.</div>')
     + '</details></div>';
 
-  const ctx = '<div class="card"><div class="rb-card-head"><h3> Konteks pasar</h3><span class="rb-pill">live spot + candle</span></div>'
+  const ctx = '<div class="card"><div class="rb-card-head"><h3>🌍 Konteks pasar</h3><span class="rb-pill">live spot + candle</span></div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px">'
     + sigKv('Harga', sigNum(d.price), d.candleAt ? sigTime(d.candleAt) : '')
     + sigKv('Struktur M15', esc(d.structure || '—'), d.bos ? d.bos.kind + ' ' + d.bos.dir : 'belum BOS')
@@ -410,7 +410,7 @@ function rb31PaintNow() {
     + '</div>';
 
   const ai = SIG_ST.ai;
-  const aiCard = '<div class="card"><div class="rb-card-head"><h3> Penilaian AI</h3>'
+  const aiCard = '<div class="card"><div class="rb-card-head"><h3>🤖 Penilaian AI</h3>'
     + (SIG_ST.loadingAI ? '<span class="rb-pill">menganalisis…</span>' : ai ? '<span class="rb-pill" style="color:' + (ai.verdict === 'CONFIRM' ? 'var(--ok)' : ai.verdict === 'REJECT' ? 'var(--no)' : 'var(--warn)') + '">' + esc(ai.verdict) + '</span>' : '<span class="rb-pill">belum ada</span>')
     + '</div>'
     + (ai ? '<div class="exp" style="color:var(--tx);line-height:1.6">' + fmtMd(ai.summary || '') + '</div>'
@@ -423,9 +423,9 @@ function rb31PaintNow() {
       : '<div class="mut small">' + (SIG_ST.loadingAI ? 'AI menilai checklist, konfirmasi M5, dan risiko rilis…' : 'Tekan “Nilai ulang AI” untuk penilaian kualitas. Sinyal dan level tetap bisa dipakai tanpa AI.') + '</div>')
     + '</div>';
 
-  const basis = (d.basis || []).length ? '<div class="card"><h3> Dasar skor (transparan)</h3>' + d.basis.map(function (b) { return '<div class="item"><span>' + (b.w > 0 ? '🟢 +' : '🔴 ') + b.w + ' · ' + esc(b.why) + '</span></div>'; }).join('') + '<div class="small mut">≥ +2,0 → BUY; ≤ −2,0 → SELL; selain itu WAIT.</div></div>' : '';
+  const basis = (d.basis || []).length ? '<div class="card"><h3>📊 Dasar skor (transparan)</h3>' + d.basis.map(function (b) { return '<div class="item"><span>' + (b.w > 0 ? '🟢 +' : '🔴 ') + b.w + ' · ' + esc(b.why) + '</span></div>'; }).join('') + '<div class="small mut">≥ +2,0 → BUY; ≤ −2,0 → SELL; selain itu WAIT.</div></div>' : '';
 
-  const qual = '<div class="card"><h3> Kualitas &amp; validitas data</h3>' + (d.quality || []).map(function (q) { return '<div class="item"><span>' + (q.ok ? '✅' : '⚠️') + ' ' + esc(q.k) + '</span><span class="mut small">' + esc(q.d || 'tidak tersedia') + '</span></div>'; }).join('')
+  const qual = '<div class="card"><h3>✅ Kualitas &amp; validitas data</h3>' + (d.quality || []).map(function (q) { return '<div class="item"><span>' + (q.ok ? '✅' : '⚠️') + ' ' + esc(q.k) + '</span><span class="mut small">' + esc(q.d || 'tidak tersedia') + '</span></div>'; }).join('')
     + ((d.validation || []).length ? '<div class="small mut" style="margin-top:8px">Validasi: ' + d.validation.map(function (v) { return (v.ok ? '✅ ' : '⚠️ ') + esc(v.k) + ' — ' + esc(v.d); }).join(' · ') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(function (s) { return (s.ok ? '✅ ' : '⚠️ ') + esc(s.name); }).join(' · ') + '</div></div>';
 
@@ -461,7 +461,7 @@ function sigCopy(btn) {
 function pJurnal() {
   const brOpts = Object.keys(BROKERS).map(function (k) { return '<option value="' + k + '"' + (k === 'exness' ? ' selected' : '') + '>' + esc(BROKERS[k].n) + '</option>'; }).join('');
   const pairOpts = Object.keys(RB31_PAIRS).map(function (p) { return '<option' + (p === 'XAUUSD' ? ' selected' : '') + '>' + p + '</option>'; }).join('');
-  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3> Kalkulator lot akurat</h3><span class="rb-pill">USD · Cent · IDR</span></div>'
+  $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3>🧮 Kalkulator lot akurat</h3><span class="rb-pill">USD · Cent · IDR</span></div>'
     + '<div class="rb-note">Hitung ukuran lot dari risiko, atau masukkan lot yang benar-benar akan kamu pakai untuk melihat risiko aktualnya. Nilai pip emas 1 lot = $10 per 0,1 (100 oz), sesuai kontrak standar.</div>'
     + '<div class="row"><div><label>Broker</label><select id="rb31br" onchange="rb31Calc()">' + brOpts + '</select></div>'
     + '<div><label>Jenis akun</label><select id="rb31cur" onchange="rb31Calc()"><option value="usd">USD ($)</option><option value="cent">Cent (¢)</option><option value="idr">IDR (Rp)</option></select></div></div>'
@@ -475,9 +475,9 @@ function pJurnal() {
     + '<div class="exp" id="rb31kout" style="color:var(--tx);margin-top:12px">Menghitung…</div>'
     + '<div class="small mut" style="margin-top:8px">Rumus: lot maks = risiko akun ÷ (SL pip × nilai pip per lot). Untuk akun Cent, saldo dalam sen (1/100 USD); untuk IDR dipakai kurs USD/IDR live. Nilai pip tiap broker bisa sedikit berbeda — cocokkan kontrak sebelum order.</div></div>'
 
-    + '<div class="card"><div class="rb-card-head"><h3> Jurnal trade</h3><span class="rb-pill">riwayat tersimpan</span></div><div id="jlist" class="mut">Memuat...</div></div>'
+    + '<div class="card"><div class="rb-card-head"><h3>📒 Jurnal trade</h3><span class="rb-pill">riwayat tersimpan</span></div><div id="jlist" class="mut">Memuat...</div></div>'
 
-    + '<div class="card"><h3> Catatan news</h3><div class="mut small">Ringkasan NFP/CPI/PPI/FOMC, berita pasar, dan analisis XAUUSD.</div><textarea id="catn" style="margin-top:10px" placeholder="Contoh: NFP lebih kuat, yield naik, XAUUSD SELL..."></textarea><button class="btn alt full" onclick="saveNote(\'news\')">Simpan catatan news</button><div id="notesNews" class="mut small" style="margin-top:10px"></div></div>';
+    + '<div class="card"><h3>📝 Catatan news</h3><div class="mut small">Ringkasan NFP/CPI/PPI/FOMC, berita pasar, dan analisis XAUUSD.</div><textarea id="catn" style="margin-top:10px" placeholder="Contoh: NFP lebih kuat, yield naik, XAUUSD SELL..."></textarea><button class="btn alt full" onclick="saveNote(\'news\')">Simpan catatan news</button><div id="notesNews" class="mut small" style="margin-top:10px"></div></div>';
   rb31Calc();
   loadJ();
   loadNotes();
@@ -589,7 +589,7 @@ function alM5Html() {
     + '<div class="rb-step"><b>2. Tunggu sapuan likuiditas</b>Harga menyapu high/low tersebut lalu <b>close kembali</b> ke dalam range. Sapuan tanpa close balik bukan sweep, itu breakout.</div>'
     + '<div class="rb-step"><b>3. Konfirmasi MSS di M5</b>Setelah sapuan, M5 harus mencetak MSS/CHoCH: higher high + higher low (bullish) atau lower high + lower low (bearish). Ini bukti struktur berubah, bukan tebakan.</div>'
     + '<div class="rb-step"><b>4. Wajib ada displacement</b>Candle impuls dengan body jauh di atas ATR M5 yang meninggalkan FVG. Tanpa displacement, MSS hanya koreksi biasa.</div>'
-    + '<div class="rb-step"><b>5. Entry di POI, bukan di titik sapuan</b>Limit di <b>50% FVG</b> atau tepi order block yang menciptakan impuls. Entry di titik sapuan = stop terlalu jauh dan RR buruk.</div>'
+    + '<div class="rb-step"><b>5. Entry di POI, bukan di titik sapuan</b>Limit di <b>50% FVG</b>, tepi order block, atau <b>OTE 62–79%</b> dari leg impuls. Entry di titik sapuan = stop terlalu jauh dan RR buruk.</div>'
     + '<div class="rb-step"><b>6. Stop di luar struktur</b>Di luar swing pelindung / ekstrem sapuan + buffer ATR. Mesin membatasi SL <b>minimal 30 pip</b> agar tidak terkena noise.</div>'
     + '<div class="rb-step"><b>7. TP berjenjang</b>TP1 <b>minimal 100 pip</b> (amankan sebagian), TP2 <b>minimal 200 pip</b>, TPmax mengikuti target struktur: sisi berlawanan range, high/low 20 hari, atau range Asia.</div>'
     + '<div class="rb-step"><b>8. Kelola, jangan pindahkan stop</b>Setelah TP1: stop ke break-even, biarkan sisa berjalan ke TP2/TPmax. Sinyal dianggap selesai hanya saat SL/TP kena.</div>'

@@ -143,29 +143,29 @@ function pSignalEntry() {
   const stale = SIG_ST.data && SIG_ST.data.generatedAt ? '<span class="mut small">Data tersimpan ' + esc(sigTime(SIG_ST.data.generatedAt)) + '</span>' : '';
   $('pane').innerHTML =
     '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · sinyal eksekusi</div><h2> Signal Entry XAUUSD</h2>'
+    + '<div class="rb-eyebrow">Trading · sinyal eksekusi</div><h2>🎯 Signal Entry XAUUSD</h2>'
     + '<div class="rb-note">Mesin Alchemist membaca <b>M15 (struktur) + M5 (konfirmasi) + M1 (tick)</b>, bias H1/D1, lalu dikonfirmasi DXY, yield 10Y, <b>spot emas live + validasi silang PAXG</b>, dan kalender rilis global. Aturan tetap: <b>risiko 30 pip</b>, <b>TP 1:2</b>. Entry dipilih MARKET atau LIMIT di POI; entry ditahan bila data usang atau quote global tidak konsisten. AI hanya menilai kualitas setup — level tidak boleh diubah AI.</div>'
     + '<div class="rb-pill-row"><span class="rb-pill y">SL 30 pip</span><span class="rb-pill">TP 1:2</span><span class="rb-pill">M15 · M5 · M1</span><span class="rb-pill">XAUUSD saja</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
-    + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)"> Ambil data terbaru</button>'
-    + '<button class="btn alt" type="button" onclick="sigRunAI()"> Nilai ulang AI</button>'
-    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()"> Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati') + '</button>'
-    + '<button class="btn alt" type="button" onclick="sigCopy(this)"> Salin sinyal</button></div>'
+    + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
+    + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
+    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()">⏱️ Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati') + '</button>'
+    + '<button class="btn alt" type="button" onclick="sigCopy(this)">📋 Salin sinyal</button></div>'
     + '<div class="small mut" style="margin-top:8px">' + stale + '</div></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
     + '<div id="sigBox"></div>'
-    + '<div class="card"><div class="rb-card-head"><h3> Chart XAUUSD — real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
+    + '<div class="card"><div class="rb-card-head"><h3>📈 Chart XAUUSD — real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
     + '<div class="rb-note" style="margin-bottom:8px">Chart TradingView resmi (tanpa login, bukan akun TradingView-mu). Pilih timeframe sesuai gaya entry; chart tetap sinkron dengan mesin: <b>M15 struktur, M5 konfirmasi, M1 tick</b>.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
     + '<button class="x sig-tv-int" data-sigtv="1" type="button" onclick="sigTvInt(1)">1m</button>'
     + '<button class="x sig-tv-int" data-sigtv="5" type="button" onclick="sigTvInt(5)">5m</button>'
     + '<button class="x sig-tv-int" data-sigtv="15" type="button" onclick="sigTvInt(15)">15m</button>'
-    + '<button class="x" type="button" onclick="sigTv()"> Muat ulang chart</button>'
+    + '<button class="x" type="button" onclick="sigTv()">🔄 Muat ulang chart</button>'
     + '</div>'
     + '<div style="border-radius:14px;overflow:hidden;height:clamp(300px,54vh,460px);border:1px solid var(--line)" id="sigTV"></div>'
     + '<div class="small mut" style="margin-top:6px"><a href="https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD" target="_blank" rel="noopener" style="color:var(--b)">Buka chart penuh di TradingView ↗</a></div></div>'
     + '<div id="sigHist"></div>'
-    + '<div class="card"><h3> Batas</h3><div class="rb-note">Sinyal ini edukasi berbasis data publik, bukan saran finansial. Pasar bisa gap saat berita, spread melebar, dan stop 30 pip bisa tersentuh noise. Uji di demo, catat di Jurnal, maksimal 1% risiko per trade.</div></div>';
+    + '<div class="card"><h3>⚠️ Batas</h3><div class="rb-note">Sinyal ini edukasi berbasis data publik, bukan saran finansial. Pasar bisa gap saat berita, spread melebar, dan stop 30 pip bisa tersentuh noise. Uji di demo, catat di Jurnal, maksimal 1% risiko per trade.</div></div>';
   sigTv();
   sigPaint();
   sigTickStart();
@@ -279,7 +279,7 @@ function sigPaint() {
       + (d.poi ? '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>POI terdekat:</b> FVG ' + (d.poi.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + d.poi.lo + '–' + d.poi.hi + ' (mid ' + d.poi.mid + ')</div>' : '')
       + '</div>';
 
-  const ctx = '<div class="card"><div class="rb-card-head"><h3> Konteks pasar yang dibaca mesin</h3><span class="rb-pill">' + esc(d.timeframe || 'M15') + ' · M5 · M1</span></div>'
+  const ctx = '<div class="card"><div class="rb-card-head"><h3>🌍 Konteks pasar yang dibaca mesin</h3><span class="rb-pill">' + esc(d.timeframe || 'M15') + ' · M5 · M1</span></div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:8px">'
     + sigKv('Harga', sigNum(d.price), d.candleAt ? sigTime(d.candleAt) : '')
     + sigKv('Struktur M15', esc(d.structure), d.bos ? d.bos.kind + ' ' + d.bos.dir : 'belum BOS')
@@ -300,7 +300,7 @@ function sigPaint() {
     + (d.news && d.news.length ? '<div class="warn" style="margin-top:8px">⚠️ Rilis High impact ≤90 menit: ' + d.news.map(n => esc(n.title) + ' (' + n.inMin + ' menit)').join(' · ') + '</div>' : '<div class="small mut" style="margin-top:8px">✅ Tidak ada rilis USD High impact dalam 90 menit.</div>')
     + '</div>';
 
-  const calc = '<div class="card"><h3> Ukuran lot (risiko ' + (lv ? lv.slPips : 30) + ' pip)</h3>'
+  const calc = '<div class="card"><h3>🧮 Ukuran lot (risiko ' + (lv ? lv.slPips : 30) + ' pip)</h3>'
     + '<div class="row" style="margin-top:6px"><div><label style="margin-top:0">Saldo (USD)</label><input id="sigBal" inputmode="decimal" value="' + esc(SIG_ST.bal) + '" oninput="SIG_ST.bal=this.value;sigCalc()"></div>'
     + '<div><label style="margin-top:0">Risiko per trade (%)</label><input id="sigRisk" inputmode="decimal" value="' + esc(SIG_ST.risk) + '" oninput="SIG_ST.risk=this.value;sigCalc()"></div>'
     + '<div><label style="margin-top:0">Pip XAUUSD</label><select id="sigPip" onchange="SIG_ST.pip=parseFloat(this.value)||0.1;sigPaint()">'
@@ -316,7 +316,7 @@ function sigPaint() {
     + '<div class="small mut" style="margin-top:6px">Entry hanya sah bila arah mesin bukan WAIT, minimal 2 konfirmasi Alchemist, dan tidak ada syarat inti yang gagal. Syarat gagal = alasan melewati setup.</div></div>';
 
   const ai = SIG_ST.ai;
-  const aiCard = '<div class="card"><div class="rb-card-head"><h3> Penilaian AI</h3>'
+  const aiCard = '<div class="card"><div class="rb-card-head"><h3>🤖 Penilaian AI</h3>'
     + (SIG_ST.loadingAI ? '<span class="rb-pill">menganalisis…</span>' : ai ? '<span class="rb-pill" style="color:' + (ai.verdict === 'CONFIRM' ? 'var(--ok)' : ai.verdict === 'REJECT' ? 'var(--no)' : 'var(--warn)') + '">' + esc(ai.verdict) + '</span>' : '<span class="rb-pill">belum ada</span>')
     + '</div>'
     + (ai
@@ -330,9 +330,9 @@ function sigPaint() {
       : '<div class="mut small">' + (SIG_ST.loadingAI ? 'AI sedang menilai checklist, struktur, dan risiko rilis…' : 'Tekan “Nilai ulang AI” untuk penilaian kualitas setup. Sinyal dan level tetap bisa dipakai tanpa AI.') + (SIG_ST.aiNotes && SIG_ST.aiNotes.length ? ' Catatan: ' + esc(SIG_ST.aiNotes.join(' | ')) : '') + '</div>')
     + '</div>';
 
-  const basis = (d.basis || []).length ? '<div class="card"><h3> Dasar skor (transparan)</h3>' + d.basis.map(b => '<div class="item"><span>' + (b.w > 0 ? '🟢 +' : '🔴 ') + b.w + ' · ' + esc(b.why) + '</span></div>').join('') + '<div class="small mut">Skor = jumlah bobot. ≥ +2,0 → BUY; ≤ −2,0 → SELL; selain itu WAIT. Tidak ada angka yang dikarang.</div></div>' : '';
+  const basis = (d.basis || []).length ? '<div class="card"><h3>📊 Dasar skor (transparan)</h3>' + d.basis.map(b => '<div class="item"><span>' + (b.w > 0 ? '🟢 +' : '🔴 ') + b.w + ' · ' + esc(b.why) + '</span></div>').join('') + '<div class="small mut">Skor = jumlah bobot. ≥ +2,0 → BUY; ≤ −2,0 → SELL; selain itu WAIT. Tidak ada angka yang dikarang.</div></div>' : '';
 
-  const qual = '<div class="card"><h3> Kualitas data</h3>' + (d.quality || []).map(q => '<div class="item"><span>' + (q.ok ? '✅' : '⚠️') + ' ' + esc(q.k) + '</span><span class="mut small">' + esc(q.d || 'tidak tersedia') + '</span></div>').join('')
+  const qual = '<div class="card"><h3>✅ Kualitas data</h3>' + (d.quality || []).map(q => '<div class="item"><span>' + (q.ok ? '✅' : '⚠️') + ' ' + esc(q.k) + '</span><span class="mut small">' + esc(q.d || 'tidak tersedia') + '</span></div>').join('')
     + ((d.validation || []).length ? '<div class="small mut" style="margin-top:8px">Validasi: ' + d.validation.map(v => (v.ok ? '✅ ' : '⚠️ ') + esc(v.k) + ' — ' + esc(v.d) + '').join(' · ') + '</div>' : '')
     + (d.notes && d.notes.length ? '<div class="warn" style="margin-top:8px">' + d.notes.map(x => esc(x)).join('<br>') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(s => (s.ok ? '✅ ' : '⚠️ ') + esc(s.name)).join(' · ') + '</div></div>';
@@ -347,7 +347,7 @@ function sigHistPaint() {
   const el = $('sigHist');
   if (!el) return;
   const h = sigHist();
-  el.innerHTML = '<div class="card"><div class="rb-card-head"><h3> Riwayat sinyal</h3><button class="x" type="button" onclick="sigHistClear()">Hapus</button></div>'
+  el.innerHTML = '<div class="card"><div class="rb-card-head"><h3>🕘 Riwayat sinyal</h3><button class="x" type="button" onclick="sigHistClear()">Hapus</button></div>'
     + '<div class="mut small" style="margin-bottom:6px">Maks 12 sinyal terakhir di perangkat ini. Level disimpan apa adanya saat dibuat.</div>'
     + (h.length ? h.map(x => '<div class="item" style="align-items:center;gap:8px"><div style="min-width:0"><div><b>' + (x.dir === 'BUY' ? '🟢 BUY' : x.dir === 'SELL' ? '🔴 SELL' : '🟡 WAIT') + '</b> <span class="mut small">' + esc(sigTime(x.at)) + ' · ' + esc(x.tf || '') + (x.entryType ? ' · ' + esc(x.entryType) : '') + '</span></div><div class="small mut">harga ' + sigNum(x.price) + ' · keyakinan ' + (x.conf == null ? '—' : x.conf + '%') + (x.sl != null ? ' · SL ' + sigNum(x.sl) + ' · TP ' + sigNum(x.tp) : '') + '</div></div></div>').join('')
       : '<div class="mut small">Belum ada riwayat.</div>')
@@ -510,7 +510,7 @@ function xauPlanHtml(sig) {
   const col = dir === 'BUY' ? 'var(--ok)' : dir === 'SELL' ? 'var(--no)' : 'var(--warn)';
   const ok = (sig.checklist || []).filter(c => c.ok).length, n = (sig.checklist || []).length;
   return '<div class="card" style="border-left:5px solid ' + col + '">'
-    + '<div class="rb-card-head"><h3> Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL 30 pip · TP 1:2</span></div>'
+    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL 30 pip · TP 1:2</span></div>'
     + '<div style="font-weight:900;font-size:1.2rem;color:' + col + ';letter-spacing:-.02em">'
     + (dir === 'BUY' ? '🟢 BUY XAUUSD' : dir === 'SELL' ? '🔴 SELL XAUUSD' : '🟡 WAIT — belum ada konfluensi') + '</div>'
     + (lv

@@ -119,11 +119,11 @@ document.body.insertAdjacentHTML('beforeend',
   + '<aside id="rbDrawer" class="rb-drawer" aria-hidden="true" aria-label="Menu akun dan tampilan">'
   + '<div class="rb-dhead"><b>Menu</b><button type="button" class="x" onclick="rbDrawer(false)" aria-label="Tutup menu">Tutup</button></div>'
   + '<div class="rb-sec"><div class="rb-lab">Tampilan</div><div class="rb-theme">'
-  + '<button type="button" data-rbtheme="light" onclick="rbThemeSet(\'light\')"> Terang</button>'
-  + '<button type="button" data-rbtheme="dark" onclick="rbThemeSet(\'dark\')"> Gelap</button>'
+  + '<button type="button" data-rbtheme="light" onclick="rbThemeSet(\'light\')">☀️ Terang</button>'
+  + '<button type="button" data-rbtheme="dark" onclick="rbThemeSet(\'dark\')">🌙 Gelap</button>'
   + '</div></div>'
   + '<div class="rb-sec"><div class="rb-lab">Bantuan</div>'
-  + '<button type="button" class="rb-mi" onclick="rbGuide(true)"><span></span>Panduan pemakaian lengkap</button>'
+  + '<button type="button" class="rb-mi" onclick="rbGuide(true)"><span>🧭</span>Panduan pemakaian lengkap</button>'
   + '</div>'
   + '<div class="rb-dfoot"><button type="button" class="btn red full" id="rbLogout" onclick="rbLogout()">Keluar dari akun</button></div>'
   + '</aside>');
@@ -228,7 +228,7 @@ var RB_GUIDE = [
 
 document.body.insertAdjacentHTML('beforeend',
   '<div id="rbGuide" class="rb-guide" role="dialog" aria-modal="true" aria-label="Panduan pemakaian">'
-  + '<div class="rb-gbar"><b> Panduan pemakaian</b><button type="button" class="x" onclick="rbGuide(false)">Tutup</button></div>'
+  + '<div class="rb-gbar"><b>🧭 Panduan pemakaian</b><button type="button" class="x" onclick="rbGuide(false)">Tutup</button></div>'
   + '<div class="rb-gwrap"><div class="rb-gtoc" id="rbGtoc"></div><div class="rb-gbody" id="rbGbody"></div></div>'
   + '</div>');
 
@@ -253,7 +253,7 @@ function rbAcctHtml() {
   var u = (typeof user !== 'undefined') ? user : null;
   if (!u) {
     return '<div class="rb-acct"><div class="rb-av"></div><div><div class="nm">Belum masuk</div><div class="em">Masuk untuk menyimpan progres</div></div></div>'
-      + '<button type="button" class="btn full" style="margin-top:9px" onclick="rbDrawer(false);if(typeof login===\'function\')login()"> Masuk dengan Google</button>';
+      + '<button type="button" class="btn full" style="margin-top:9px" onclick="rbDrawer(false);if(typeof login===\'function\')login()">🔑 Masuk dengan Google</button>';
   }
   var nm = u.displayName || u.email || 'Pengguna';
   var em = u.email || '';
