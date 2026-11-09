@@ -1612,6 +1612,8 @@ function sanitizeXau(o, opts) {
 // ✏️ [TEKS BISA DIUBAH] [PROMPT AI] aiXau: Perintah AI untuk analisis news XAUUSD (NFP/PPI/CPI/FOMC) dan format JSON-nya.
 async function aiXau(g, t0) {
   const text = dataText(g, true), fxPack = xauFocus(g);
+  let sigText = '';
+  try { sigText = signalText(await xauSignalPack()); } catch (e) { sigText = '[SG] SIGNAL ENTRY: tidak tersedia (' + msg(e, 120) + ').'; }
   const sys = `Kamu analis makroekonomi dan trader emas (XAUUSD) bergaya desk institusional. Waktu sekarang: ${new Date().toUTCString()}. Tugas: menentukan ke mana XAUUSD bergerak menjelang dan saat rilis NFP, PPI, CPI, dan FOMC, memakai HANYA data di bawah.
 
 ATURAN KERAS:
@@ -1627,9 +1629,12 @@ ATURAN KERAS:
 10. WAJIB memilih arah eksekusi XAUUSD: "action":"BUY" atau "SELL" berdasarkan gabungan SEMUA data global (BLS, FRED, yield, dolar, CFTC, bank sentral, berita). "WAIT" hanya bila data benar-benar saling bertentangan; jelaskan alasannya di action_reason.
 11. events WAJIB memuat keempat tag NFP, PPI, CPI, dan FOMC, termasuk rilis yang jadwalnya belum terbaca. Jangan biarkan satu tag kosong.
 12. "related" dalam [XF] berisi rilis lain di waktu berdekatan (≤48 jam). Jelaskan efek gabungannya di clusters dan action_reason.
+13. Rencana entry [SG] berasal dari mesin deterministik (SL 30 pip, TP 1:2). Jangan mengubah entry/SL/TP. Bila arah AI berbeda dengan mesin, sebut alasannya di action_reason dan turunkan keyakinan.
 
 PAKET RILIS FOKUS [XF] (hasil pengelompokan server; jangan menambah rilis di luar ini):
 ${JSON.stringify(fxPack).slice(0, 14000)}
+
+${sigText}
 
 ${text}
 
@@ -1661,6 +1666,454 @@ OUTPUT: HANYA JSON valid tanpa markdown, semua teks Bahasa Indonesia, backslash 
   }
   return payload;
 }
+/* =====================================================================
+   SIGNAL ENTRY XAUUSD — mesin Alchemist deterministik + penilaian AI
+   Data: candle intraday Yahoo Finance (M1/M5/M15/H1/D1), spot gold-api.com,
+   DXY (DX-Y.NYB) & yield 10Y (^TNX), kalender rilis Forex Factory.
+   Aturan tetap: SL 30 pip, TP 1:2, 1 pip XAUUSD = 0.1 harga.
+   ===================================================================== */
+const SGP = { pip: 0.1, slPips: 30, rr: 2 };
+const sgN = v => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : null);
+async function sgYahoo(sym, range, interval, t = 9000) {
+  let last;
+  for (const h of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+    try {
+      const r = await fetch(`https://${h}/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=${interval}&includePrePost=false`, { headers: { 'User-Agent': BUA, Accept: 'application/json' }, signal: AbortSignal.timeout(t) });
+      if (!r.ok) throw new Error('Yahoo membalas ' + r.status);
+      const j = await r.json(), x = j && j.chart && j.chart.result && j.chart.result[0];
+      const q = x && x.indicators && x.indicators.quote && x.indicators.quote[0];
+      if (!x || !q || !Array.isArray(x.timestamp)) throw new Error('data kosong');
+      const rows = x.timestamp.map((ts, i) => ({ t: ts * 1000, o: q.open && q.open[i], h: q.high && q.high[i], l: q.low && q.low[i], c: q.close && q.close[i] }))
+        .filter(v => v && [v.o, v.h, v.l, v.c].every(Number.isFinite) && v.c > 0);
+      if (rows.length < 25) throw new Error('bar terlalu sedikit (' + rows.length + ')');
+      rows.sort((a, b) => a.t - b.t);
+      return { rows, sym, host: h };
+    } catch (e) { last = e; }
+  }
+  throw last || new Error('Yahoo tidak terbaca');
+}
+const sigCandles = () => memoize('sigcd', 45000, async () => {
+  const errs = [];
+  let m15 = null, h1 = null;
+  for (const sym of ['GC=F', 'XAUUSD=X']) {
+    if (!m15) { try { m15 = await sgYahoo(sym, '5d', '15m'); } catch (e) { errs.push(sym + ' M15: ' + msg(e, 60)); } }
+    if (!h1) { try { h1 = await sgYahoo(sym, '1mo', '1h'); } catch (e) { errs.push(sym + ' H1: ' + msg(e, 60)); } }
+    if (m15 && h1) break;
+  }
+  let degraded = !m15;
+  if (!m15) {
+    try {
+      const d = (await pxStooq('xauusd')).map(r => ({ t: Date.parse(r.d + 'T00:00:00Z'), o: r.o, h: r.h, l: r.l, c: r.c })).filter(r => isFinite(r.t));
+      if (d.length >= 30) { m15 = { rows: d, sym: 'stooq xauusd (harian)', host: 'stooq.com' }; h1 = null; }
+    } catch (e) { errs.push('Stooq D1: ' + msg(e, 60)); }
+  }
+  if (!m15) throw new Error('candle XAUUSD tidak tersedia: ' + errs.slice(0, 2).join(' | '));
+  let m5 = null, m1 = null, dxy = null, day = null;
+  if (!degraded) {
+    const [a, b, c, d] = await Promise.allSettled([
+      sgYahoo(m15.sym, '5d', '5m', 7000), sgYahoo(m15.sym, '1d', '1m', 7000),
+      sgYahoo('DX-Y.NYB', '5d', '15m', 7000), sgYahoo(m15.sym, '6mo', '1d', 7000)
+    ]);
+    m5 = a.status === 'fulfilled' ? a.value : null;
+    m1 = b.status === 'fulfilled' ? b.value : null;
+    dxy = c.status === 'fulfilled' ? c.value : null;
+    day = d.status === 'fulfilled' ? d.value : null;
+    if (!m5) errs.push('M5: ' + msg(a.reason, 60));
+    if (!m1) errs.push('M1: ' + msg(b.reason, 60));
+    if (!dxy) errs.push('DXY intraday: ' + msg(c.reason, 60));
+    if (!day) errs.push('D1: ' + msg(d.reason, 60));
+  }
+  return { m15, h1, day, m5, m1, dxy, degraded, errs };
+});
+function sgEma(a, n) { if (!a || !a.length) return null; const k = 2 / (n + 1); let e = a[0]; for (let i = 1; i < a.length; i++) e = a[i] * k + e * (1 - k); return e; }
+function sgRsi(c, n = 14) {
+  if (!c || c.length < n + 1) return null;
+  let g = 0, l = 0;
+  for (let i = 1; i <= n; i++) { const d = c[i] - c[i - 1]; if (d >= 0) g += d; else l -= d; }
+  g /= n; l /= n;
+  for (let i = n + 1; i < c.length; i++) { const d = c[i] - c[i - 1]; g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n; }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+function sgAtr(rows, n = 14) {
+  if (!rows || rows.length < n + 1) return null;
+  const tr = [];
+  for (let i = 1; i < rows.length; i++) tr.push(Math.max(rows[i].h - rows[i].l, Math.abs(rows[i].h - rows[i - 1].c), Math.abs(rows[i].l - rows[i - 1].c)));
+  const w = tr.slice(-n);
+  return w.reduce((a, b) => a + b, 0) / w.length;
+}
+function sgPivots(rows, k = 2) {
+  const hi = [], lo = [];
+  for (let i = k; i < rows.length - k; i++) {
+    let isH = true, isL = true;
+    for (let j = 1; j <= k; j++) {
+      if (rows[i].h <= rows[i - j].h || rows[i].h <= rows[i + j].h) isH = false;
+      if (rows[i].l >= rows[i - j].l || rows[i].l >= rows[i + j].l) isL = false;
+    }
+    if (isH) hi.push({ i, p: rows[i].h, t: rows[i].t });
+    if (isL) lo.push({ i, p: rows[i].l, t: rows[i].t });
+  }
+  return { hi, lo };
+}
+function sgFvg(rows) {
+  const out = [];
+  for (let i = 2; i < rows.length; i++) {
+    const a = rows[i - 2], c = rows[i];
+    if (c.l > a.h) out.push({ kind: 'bull', lo: a.h, hi: c.l, i });
+    else if (c.h < a.l) out.push({ kind: 'bear', lo: c.h, hi: a.l, i });
+  }
+  return out.filter(z => {
+    for (let j = z.i + 1; j < rows.length; j++) {
+      if (z.kind === 'bull' && rows[j].c < z.lo) return false;
+      if (z.kind === 'bear' && rows[j].c > z.hi) return false;
+    }
+    return true;
+  }).slice(-6);
+}
+function sgSweep(rows) {
+  const n = rows.length;
+  if (n < 22) return null;
+  const win = rows.slice(-21, -1), hi = Math.max(...win.map(r => r.h)), lo = Math.min(...win.map(r => r.l)), s = rows.slice(-6);
+  const up = s.find(r => r.h > hi && r.c < hi), dn = s.find(r => r.l < lo && r.c > lo);
+  if (dn) return { kind: 'bull', level: sgN(lo), why: 'low 20 candle disapu lalu close kembali di atas' };
+  if (up) return { kind: 'bear', level: sgN(hi), why: 'high 20 candle disapu lalu close kembali di bawah' };
+  return null;
+}
+function sgStructure(rows) {
+  const { hi, lo } = sgPivots(rows, 2), H = hi.slice(-4), L = lo.slice(-4);
+  const hh = H.length >= 2 && H[H.length - 1].p > H[H.length - 2].p;
+  const hl = L.length >= 2 && L[L.length - 1].p > L[L.length - 2].p;
+  const lh = H.length >= 2 && H[H.length - 1].p < H[H.length - 2].p;
+  const ll = L.length >= 2 && L[L.length - 1].p < L[L.length - 2].p;
+  const trend = hh && hl ? 'BULLISH' : lh && ll ? 'BEARISH' : 'RANGE';
+  const c = rows[rows.length - 1].c, lastHi = H.length ? H[H.length - 1] : null, lastLo = L.length ? L[L.length - 1] : null;
+  let bos = null;
+  if (lastHi && c > lastHi.p) bos = { dir: 'BULLISH', kind: 'BOS', level: sgN(lastHi.p) };
+  else if (lastLo && c < lastLo.p) bos = { dir: 'BEARISH', kind: 'BOS', level: sgN(lastLo.p) };
+  return { trend, bos, lastHi: lastHi ? sgN(lastHi.p) : null, lastLo: lastLo ? sgN(lastLo.p) : null };
+}
+function sgDaily(rows) {
+  if (!rows || rows.length < 60) return null;
+  const c = rows.map(r => r.c), e20 = sgEma(c.slice(-100), 20), e50 = sgEma(c.slice(-200), 50);
+  const w = rows.slice(-20);
+  return { last: sgN(c[c.length - 1]), asOf: new Date(rows[rows.length - 1].t).toISOString().slice(0, 10), rsi: sgN(sgRsi(c)), trend: e20 != null && e50 != null ? (e20 > e50 ? 'naik' : 'turun') : null, hi20: sgN(Math.max(...w.map(r => r.h))), lo20: sgN(Math.min(...w.map(r => r.l))) };
+}
+function sgOb(rows, atr) {
+  if (!rows || rows.length < 10 || !(atr > 0)) return null;
+  for (let i = rows.length - 2; i >= Math.max(2, rows.length - 40); i--) {
+    const c = rows[i], n = rows[i + 1], body = n.c - n.o;
+    if (c.c < c.o && body > atr * 1.1) return { kind: 'bull', lo: sgN(c.l), hi: sgN(c.o) };
+    if (c.c > c.o && -body > atr * 1.1) return { kind: 'bear', lo: sgN(c.o), hi: sgN(c.h) };
+  }
+  return null;
+}
+function sgDisp(rows, atr) {
+  if (!rows || rows.length < 4 || !(atr > 0)) return null;
+  for (let i = rows.length - 1; i >= rows.length - 4; i--) {
+    const c = rows[i], body = Math.abs(c.c - c.o);
+    if (body > atr * 1.1) return { kind: c.c > c.o ? 'bull' : 'bear', body: sgN(body) };
+  }
+  return null;
+}
+function sgSession() {
+  const d = new Date(), h = d.getUTCHours() + d.getUTCMinutes() / 60;
+  const kill = (h >= 0 && h < 3) ? 'Asia killzone' : (h >= 7 && h < 10) ? 'London killzone' : (h >= 12 && h < 15) ? 'New York killzone' : null;
+  const ses = h < 7 ? 'Asia' : h < 12 ? 'London' : h < 16 ? 'London / New York' : h < 21 ? 'New York' : 'Sejuk';
+  return { ses, kill, hUTC: sgN(h) };
+}
+function sgAsia(rows) {
+  const now = new Date(), start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0), end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 7, 0);
+  const seg = rows.filter(r => r.t >= start && r.t <= end);
+  if (seg.length < 8) return null;
+  const hi = Math.max(...seg.map(r => r.h)), lo = Math.min(...seg.map(r => r.l)), after = rows.filter(r => r.t > end);
+  const sweptUp = after.some(r => r.h > hi), sweptDn = after.some(r => r.l < lo);
+  return { hi: sgN(hi), lo: sgN(lo), sweptUp, sweptDn, judas: sweptUp !== sweptDn ? (sweptDn ? 'bull' : 'bear') : null };
+}
+function sgSMT(gold, dxy) {
+  if (!gold || !dxy || gold.length < 30 || dxy.length < 30) return null;
+  const g = gold.slice(-30), d = dxy.slice(-30);
+  const gPrevLow = Math.min(...g.slice(0, 15).map(r => r.l)), gLow = Math.min(...g.slice(15).map(r => r.l));
+  const gPrevHigh = Math.max(...g.slice(0, 15).map(r => r.h)), gHigh = Math.max(...g.slice(15).map(r => r.h));
+  const dPrevHigh = Math.max(...d.slice(0, 15).map(r => r.h)), dHigh = Math.max(...d.slice(15).map(r => r.h));
+  const dPrevLow = Math.min(...d.slice(0, 15).map(r => r.l)), dLow = Math.min(...d.slice(15).map(r => r.l));
+  if (gLow < gPrevLow && dHigh > dPrevHigh) return { kind: 'bull', why: 'gold lower-low vs DXY higher-high (divergensi)' };
+  if (gHigh > gPrevHigh && dLow < dPrevLow) return { kind: 'bear', why: 'gold higher-high vs DXY lower-low (divergensi)' };
+  return null;
+}
+function sgOCL(dayRows) {
+  if (!dayRows || dayRows.length < 2) return null;
+  const p = dayRows[dayRows.length - 2];
+  return { open: sgN(p.o), close: sgN(p.c), hi: sgN(p.h), lo: sgN(p.l) };
+}
+const liveSpot = () => memoize('sigspot', 12000, async () => {
+  const j = await getJ('https://api.gold-api.com/price/XAU', 6000), p = Number(j && j.price);
+  if (!isFinite(p) || p <= 0) throw new Error('spot emas kosong');
+  return { price: +p.toFixed(2), at: String((j && j.updatedAt) || new Date().toISOString()) };
+});
+/* Validasi silang harga emas global: PAXG (token emas 24/7) di Binance, cadangan CoinGecko.
+   Dipakai HANYA untuk memastikan quote spot tidak menyimpang, bukan sebagai harga entry. */
+const paxgSpot = () => memoize('sigpaxg', 60000, async () => {
+  try {
+    const j = await getJ('https://data-api.binance.vision/api/v3/ticker/price?symbol=PAXGUSDT', 6000), p = Number(j && j.price);
+    if (isFinite(p) && p > 0) return { price: +p.toFixed(2), src: 'PAXG Binance' };
+  } catch (e) { }
+  try {
+    const j = await getJ('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd', 7000), p = Number(j && j['pax-gold'] && j['pax-gold'].usd);
+    if (isFinite(p) && p > 0) return { price: +p.toFixed(2), src: 'PAXG CoinGecko' };
+  } catch (e) { }
+  return null;
+});
+const xauSignalPack = () => memoize('xausig', 30000, async () => {
+  const cd = await sigCandles();
+  const rows = cd.m15.rows.slice(-320), last = rows[rows.length - 1], closes = rows.map(r => r.c);
+  const tf = cd.degraded ? 'D1' : 'M15';
+  const atr = sgAtr(rows, 14), rsi = sgRsi(closes, 14), ema20 = sgEma(closes.slice(-120), 20), ema50 = sgEma(closes.slice(-200), 50);
+  const st = sgStructure(rows), sw = sgSweep(rows), fvg = sgFvg(rows);
+  const m5rows = cd.m5 ? cd.m5.rows.slice(-200) : null, m1rows = cd.m1 ? cd.m1.rows.slice(-90) : null;
+  const atr5 = m5rows ? sgAtr(m5rows, 14) : null, st5 = m5rows ? sgStructure(m5rows) : null, sw5 = m5rows ? sgSweep(m5rows) : null, fvg5 = m5rows ? sgFvg(m5rows) : [];
+  const disp = sgDisp(rows, atr), ob = sgOb(rows, atr);
+  const sesi = sgSession(), asia = cd.degraded ? null : sgAsia(rows);
+  const smt = (cd.dxy && !cd.degraded) ? sgSMT(rows, cd.dxy.rows) : null;
+  const ocl = sgOCL(cd.day ? cd.day.rows : null);
+  const swings = rows.slice(-80), rangeHi = Math.max(...swings.map(r => r.h)), rangeLo = Math.min(...swings.map(r => r.l));
+  const pos = rangeHi > rangeLo ? Math.round((last.c - rangeLo) / (rangeHi - rangeLo) * 100) : null;
+  let h1dir = 0;
+  if (cd.h1 && cd.h1.rows.length > 60) { const hc = cd.h1.rows.map(r => r.c), a = sgEma(hc.slice(-100), 20), b = sgEma(hc.slice(-180), 50); h1dir = a != null && b != null ? (a > b ? 1 : -1) : 0; }
+  let macro = null;
+  try {
+    const [dx, ty] = await Promise.all([sgYahoo('DX-Y.NYB', '3mo', '1d', 7000), sgYahoo('^TNX', '3mo', '1d', 7000)]);
+    const ch = rr => { const c = rr.map(r => r.c), n = c.length; return n > 11 ? sgN((c[n - 1] / c[n - 11] - 1) * 100) : null; };
+    const raw = ty.rows[ty.rows.length - 1].c, y = raw > 20 ? raw / 10 : raw;
+    macro = { dxy: sgN(dx.rows[dx.rows.length - 1].c), dxyChg10d: ch(dx.rows), us10y: sgN(y), us10yChg10d: ch(ty.rows), asOf: new Date(dx.rows[dx.rows.length - 1].t).toISOString().slice(0, 10) };
+  } catch (e) { macro = null; }
+  const daily = cd.day ? sgDaily(cd.day.rows) : null;
+  let news = [], calOk = false;
+  try {
+    const evs = await calendar();
+    calOk = true;
+    const now = Date.now();
+    news = evs.filter(e => e && e.cur === 'USD' && e.impact === 'High' && e.ts > now - 30 * 60000 && e.ts < now + 90 * 60000)
+      .map(e => ({ title: String(e.title).slice(0, 110), at: new Date(e.ts).toISOString(), inMin: Math.round((e.ts - now) / 60000), forecast: e.forecast || '', previous: e.previous || '' }));
+  } catch (e) { calOk = false; }
+  let spot = null, paxg = null;
+  const [spRes, pgRes] = await Promise.allSettled([liveSpot(), paxgSpot()]);
+  spot = spRes.status === 'fulfilled' ? spRes.value.price : null;
+  paxg = pgRes.status === 'fulfilled' ? pgRes.value : null;
+  let cross = null;
+  if (spot && paxg) {
+    const dp = Math.abs(spot - paxg.price) / spot * 100;
+    cross = { price: paxg.price, src: paxg.src, diffPct: sgN(dp), ok: dp <= 1.5 };
+  }
+  const basis = [], add = (w, why) => { basis.push({ w: sgN(w), why }); };
+  let score = 0;
+  if (ema20 != null && ema50 != null) { const w = ema20 > ema50 ? 1.4 : -1.4; score += w; add(w, `EMA20 ${ema20 > ema50 ? 'di atas' : 'di bawah'} EMA50 (${tf})`); }
+  if (h1dir) { score += h1dir * 1.6; add(h1dir * 1.6, `Bias H1 ${h1dir > 0 ? 'naik' : 'turun'} (EMA20 vs EMA50)`); }
+  if (st.trend === 'BULLISH') { score += 1.2; add(1.2, 'Struktur M15 higher-high & higher-low'); }
+  else if (st.trend === 'BEARISH') { score -= 1.2; add(-1.2, 'Struktur M15 lower-high & lower-low'); }
+  if (st.bos) { const w = st.bos.dir === 'BULLISH' ? 1.3 : -1.3; score += w; add(w, `${st.bos.kind} ${st.bos.dir === 'BULLISH' ? 'di atas' : 'di bawah'} swing ${st.bos.level}`); }
+  if (sw) { const w = sw.kind === 'bull' ? 1.2 : -1.2; score += w; add(w, `Sapuan likuiditas ${sw.kind === 'bull' ? 'bawah' : 'atas'} (${sw.level})`); }
+  if (pos != null) { if (pos <= 35) { score += 0.7; add(0.7, `Harga di discount (${pos}% range)`); } else if (pos >= 65) { score -= 0.7; add(-0.7, `Harga di premium (${pos}% range)`); } }
+  if (rsi != null) { if (rsi >= 72) { score -= 0.6; add(-0.6, `RSI ${sgN(rsi)} jenuh beli`); } else if (rsi <= 28) { score += 0.6; add(0.6, `RSI ${sgN(rsi)} jenuh jual`); } }
+  if (macro) {
+    if (macro.dxyChg10d != null) { const w = macro.dxyChg10d > 0 ? -0.9 : 0.9; score += w; add(w, `DXY 10 hari ${macro.dxyChg10d > 0 ? '+' : ''}${macro.dxyChg10d}% (${macro.dxyChg10d > 0 ? 'tekanan turun' : 'dukungan naik'} emas)`); }
+    if (macro.us10yChg10d != null) { const w = macro.us10yChg10d > 0 ? -0.8 : 0.8; score += w; add(w, `Yield 10Y 10 hari ${macro.us10yChg10d > 0 ? '+' : ''}${macro.us10yChg10d}%`); }
+  }
+  if (daily && daily.trend) { const w = daily.trend === 'naik' ? 0.8 : -0.8; score += w; add(w, `Tren harian ${daily.trend} (SMA20 vs SMA50)`); }
+  if (st5 && st5.trend !== 'RANGE') { const w = st5.trend === 'BULLISH' ? 0.6 : -0.6; score += w; add(w, `Struktur M5 ${st5.trend === 'BULLISH' ? 'bullish' : 'bearish'}`); }
+  if (disp) { const w = disp.kind === 'bull' ? 0.9 : -0.9; score += w; add(w, `Displacement ${disp.kind === 'bull' ? 'naik' : 'turun'} (body ${disp.body})`); }
+  if (ob) { const w = ob.kind === 'bull' ? 0.7 : -0.7; score += w; add(w, `Order block ${ob.kind === 'bull' ? 'bullish' : 'bearish'} ${ob.lo}–${ob.hi}`); }
+  if (smt) { const w = smt.kind === 'bull' ? 0.8 : -0.8; score += w; add(w, `SMT ${smt.kind} — ${smt.why}`); }
+  if (asia && asia.judas) { const w = asia.judas === 'bull' ? 0.7 : -0.7; score += w; add(w, `Judas swing: range Asia sisi ${asia.judas === 'bull' ? 'bawah' : 'atas'} disapu`); }
+  if (sesi.kill) { score += 0.3; add(0.3, `Sesi aktif: ${sesi.kill}`); }
+  if (ocl && atr && Math.abs(last.c - ocl.close) <= atr * 0.5) { score += 0.3; add(0.3, `Harga di level OCL (close harian ${ocl.close})`); }
+  const sigTot = basis.reduce((a, b) => a + Math.abs(b.w || 0), 0) || 1;
+  const agree = Math.round(basis.filter(b => b.w > 0).reduce((a, b) => a + Math.abs(b.w || 0), 0) / sigTot * 100);
+  let direction = score >= 2 ? 'BUY' : score <= -2 ? 'SELL' : 'WAIT';
+  const gates = [];
+  if (direction === 'BUY' && pos != null && pos > 60) { gates.push('harga di premium (' + pos + '% range); Alchemist menunggu discount'); direction = 'WAIT'; }
+  if (direction === 'SELL' && pos != null && pos < 40) { gates.push('harga di discount (' + pos + '% range); Alchemist menunggu premium'); direction = 'WAIT'; }
+  const wantDir = direction === 'BUY' ? 'BULLISH' : direction === 'SELL' ? 'BEARISH' : null;
+  const wantKind = direction === 'BUY' ? 'bull' : direction === 'SELL' ? 'bear' : '';
+  const bosOk = !!st.bos && st.bos.dir === wantDir, bos5Ok = !!(st5 && st5.bos && st5.bos.dir === wantDir);
+  const swOk = !!sw && sw.kind === wantKind, sw5Ok = !!sw5 && sw5.kind === wantKind, sweepOk = swOk || sw5Ok;
+  const dispOk = !!disp && disp.kind === wantKind, obOk = !!ob && ob.kind === wantKind;
+  const smtOk = !!smt && smt.kind === wantKind, judasOk = !!asia && asia.judas === wantKind;
+  const confirms = [bosOk || bos5Ok, sweepOk, dispOk, obOk, smtOk, judasOk].filter(Boolean).length;
+  if (direction !== 'WAIT' && (confirms < 2 || (!bosOk && !bos5Ok && !sweepOk))) { gates.push('butuh minimal 2 konfirmasi Alchemist (BOS/sweep + displacement/OB/SMT); saat ini ' + confirms); direction = 'WAIT'; }
+  if (direction !== 'WAIT' && news.length) { gates.push('rilis USD High impact ≤90 menit; spread berisiko'); direction = 'WAIT'; }
+  if (direction !== 'WAIT' && cross && !cross.ok) { gates.push('spot emas vs PAXG selisih ' + cross.diffPct + '% (data global tidak konsisten)'); direction = 'WAIT'; }
+  const ageNow = Math.round((Date.now() - last.t) / 60000);
+  if (direction !== 'WAIT' && ageNow > 60) { gates.push('candle terakhir ' + ageNow + ' menit lalu (pasar tutup / data usang)'); direction = 'WAIT'; }
+  let conf = Math.round(0.55 * Math.min(100, Math.abs(score) / 13 * 100) + 0.45 * agree);
+  if (direction === 'WAIT') conf = Math.min(conf, 40);
+  if (cd.degraded) conf = Math.min(conf, 55);
+  const rawPrice = sgN(last.c);
+  let calib = 0, price = rawPrice;
+  if (spot && rawPrice && spot > 0 && Math.abs(spot / rawPrice - 1) < 0.02) { calib = sgN(spot - rawPrice); price = sgN(spot); }
+  const sh = v => (v == null ? null : sgN(v + calib));
+  const bos = st.bos ? { dir: st.bos.dir, kind: st.bos.kind, level: sh(st.bos.level) } : null;
+  const sweep = sw ? { kind: sw.kind, level: sh(sw.level), why: sw.why } : null;
+  const obS = ob ? { kind: ob.kind, lo: sh(ob.lo), hi: sh(ob.hi) } : null;
+  const asiaS = asia ? { hi: sh(asia.hi), lo: sh(asia.lo), sweptUp: asia.sweptUp, sweptDn: asia.sweptDn, judas: asia.judas } : null;
+  const oclS = ocl ? { open: sh(ocl.open), close: sh(ocl.close), hi: sh(ocl.hi), lo: sh(ocl.lo) } : null;
+  const dailyS = daily ? { last: sh(daily.last), asOf: daily.asOf, rsi: daily.rsi, trend: daily.trend, hi20: sh(daily.hi20), lo20: sh(daily.lo20) } : null;
+  const want = direction === 'BUY' ? 'bull' : direction === 'SELL' ? 'bear' : null;
+  const pool = want ? (fvg5.some(z => z.kind === want) ? fvg5 : fvg) : (fvg5.length ? fvg5 : fvg);
+  const poiRaw = (want ? pool.filter(z => z.kind === want) : pool)
+    .map(z => ({ kind: z.kind, lo: z.lo, hi: z.hi, mid: (z.lo + z.hi) / 2 }))
+    .filter(z => z.mid != null && isFinite(z.mid))
+    .sort((a, b) => Math.abs(a.mid - rawPrice) - Math.abs(b.mid - rawPrice))[0] || null;
+  const poi = poiRaw ? { kind: poiRaw.kind, lo: sh(poiRaw.lo), hi: sh(poiRaw.hi), mid: sh(poiRaw.mid), dist: sgN(Math.abs(poiRaw.mid - rawPrice)) } : null;
+  const slDist = sgN(SGP.slPips * SGP.pip), tpDist = sgN(slDist * SGP.rr);
+  let plan = null, entryType = null;
+  if (direction !== 'WAIT') {
+    const s = direction === 'BUY' ? 1 : -1;
+    const useLimit = !!poi && poi.dist != null && poi.dist > slDist * 0.5 && poi.dist <= (atr || 0) * 1.2;
+    const entryPx = useLimit ? poi.mid : price;
+    entryType = useLimit ? 'LIMIT POI' : 'MARKET';
+    plan = { dir: direction, entryType, entry: entryPx, sl: sgN(entryPx - s * slDist), tp: sgN(entryPx + s * tpDist), slPips: SGP.slPips, tpPips: SGP.slPips * SGP.rr, rr: SGP.rr, slDist, tpDist, perLotRisk: sgN(100 * slDist), minStopAtr: atr ? sgN(atr * 1.15) : null, tight: !!(atr && slDist < atr * 0.9) };
+  }
+  const midRange = sgN((rangeHi + rangeLo) / 2);
+  const watch = {
+    zoneBuy: [sh(rangeLo), sh(midRange)], zoneSell: [sh(midRange), sh(rangeHi)],
+    buyTrigger: 'harga di discount + sapuan low + BOS/MSS bullish ' + (cd.degraded ? 'D1' : 'M15'),
+    sellTrigger: 'harga di premium + sapuan high + BOS/MSS bearish ' + (cd.degraded ? 'D1' : 'M15')
+  };
+  const ageMin = Math.round((Date.now() - last.t) / 60000);
+  const curl = m1rows && m1rows.length ? m1rows[m1rows.length - 1] : null;
+  const checklist = [
+    { s: 'Bias HTF (H1)', ok: !!h1dir && ((direction === 'BUY' && h1dir > 0) || (direction === 'SELL' && h1dir < 0)), n: h1dir ? (h1dir > 0 ? 'H1 naik' : 'H1 turun') : 'H1 tidak terbaca' },
+    { s: 'Struktur M15', ok: (direction === 'BUY' && st.trend === 'BULLISH') || (direction === 'SELL' && st.trend === 'BEARISH'), n: st.trend },
+    { s: 'Struktur M5 searah', ok: !!st5 && st5.trend === wantDir, n: st5 ? st5.trend : 'M5 tidak terbaca' },
+    { s: 'BOS / MSS', ok: bosOk || bos5Ok, n: bos ? bos.kind + ' ' + bos.dir : bos5Ok ? 'BOS M5 ' + st5.bos.dir : 'belum ada' },
+    { s: 'Sapuan likuiditas', ok: sweepOk, n: sweep ? sweep.why : sw5Ok ? 'sweep M5' : 'tidak terdeteksi' },
+    { s: 'Displacement', ok: dispOk, n: disp ? disp.kind + ' body ' + disp.body : 'tidak ada impuls' },
+    { s: 'Order block', ok: obOk, n: obS ? (obS.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + obS.lo + '–' + obS.hi : 'tidak ada' },
+    { s: 'POI (FVG)', ok: !!poi, n: poi ? (poi.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + poi.lo + '–' + poi.hi : 'tidak ada FVG segar' },
+    { s: 'Premium / discount', ok: pos != null && ((direction === 'BUY' && pos <= 55) || (direction === 'SELL' && pos >= 45)), n: pos == null ? 'range tidak terbaca' : pos + '% range' },
+    { s: 'Sesi / killzone', ok: !!sesi.kill, n: sesi.kill || ('sesi ' + sesi.ses) },
+    { s: 'SMT / divergensi', ok: smtOk, n: smt ? smt.kind : 'tidak terdeteksi' },
+    { s: 'RR minimal 1:2', ok: SGP.rr >= 2, n: '1:' + SGP.rr + ' · SL ' + SGP.slPips + ' pip' },
+    { s: 'Tidak dekat rilis besar', ok: news.length === 0, n: news.length ? news.map(x => x.title).join(', ') : 'aman dalam 90 menit' }
+  ];
+  const notes = [];
+  if (cd.degraded && cd.errs && cd.errs.length) notes.push('Candle intraday gagal; dipakai data harian: ' + cd.errs.slice(0, 2).join(' | '));
+  if (!cd.h1) notes.push('Candle H1 tidak tersedia; bias HTF dilewati.');
+  if (!cd.m5) notes.push('Candle M5 tidak tersedia; konfirmasi entry memakai M15.');
+  if (!macro) notes.push('DXY / yield 10Y tidak terbaca; skor makro dilewati.');
+  if (ageMin > 180) notes.push('Candle terakhir berumur ' + ageMin + ' menit (pasar kemungkinan tutup).');
+  if (plan && plan.tight) notes.push('SL 30 pip lebih rapat dari 1×ATR (' + sgN(atr) + '); risiko tersentuh noise tinggi.');
+  if (spot && price && Math.abs(spot / price - 1) * 100 > 0.6) notes.push('Harga candle vs spot emas berbeda ' + sgN(Math.abs(spot / price - 1) * 100) + '%; periksa sumber.');
+  if (news.length) notes.push('Ada rilis USD High impact dalam 90 menit; spread bisa melebar.');
+  if (gates.length) notes.push('Entry ditahan: ' + gates.join(' | ') + '.');
+  if (calib) notes.push('Level harga dikalibrasi ke spot emas (selisih futures ' + calib + ').');
+  const quality = [
+    { k: 'Candle ' + tf, ok: rows.length >= 30, d: rows.length + ' bar · terakhir ' + new Date(last.t).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' },
+    { k: 'Candle M5 (konfirmasi)', ok: !!cd.m5, d: cd.m5 ? cd.m5.rows.length + ' bar' : 'tidak tersedia' },
+    { k: 'Candle M1 (tick)', ok: !!cd.m1, d: curl && m1rows ? 'close ' + sgN(curl.c) : 'tidak tersedia' },
+    { k: 'Candle H1 (bias HTF)', ok: !!cd.h1, d: cd.h1 ? cd.h1.rows.length + ' bar' : 'tidak tersedia' },
+    { k: 'Candle harian', ok: !!daily, d: daily ? 'per ' + daily.asOf : 'tidak tersedia' },
+    { k: 'Makro DXY & yield 10Y', ok: !!macro, d: macro ? 'per ' + macro.asOf : 'tidak tersedia' },
+    { k: 'Spot emas (verifikasi)', ok: !!spot, d: spot ? String(sgN(spot)) : 'tidak tersedia' },
+    { k: 'Kalender rilis', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
+  ];
+  const dataValid = ageMin <= 60 && !!spot && !!cd.m5 && calOk && (!cross || cross.ok);
+  const validation = [
+    { k: 'Harga spot live', ok: !!spot, d: spot ? 'gold-api ' + spot : 'tidak tersedia' },
+    { k: 'Validasi silang PAXG', ok: !!(cross && cross.ok), d: cross ? cross.src + ' ' + cross.price + ' (selisih ' + cross.diffPct + '%)' : 'tidak terbaca' },
+    { k: 'Kesegaran candle', ok: ageMin <= 60, d: ageMin + ' menit' },
+    { k: 'Struktur intraday lengkap', ok: !!(cd.m15 && cd.m5 && cd.h1), d: (cd.m5 ? 'M5 ' + cd.m5.rows.length + ' bar' : 'M5 tidak ada') + ' · ' + (cd.h1 ? 'H1 ' + cd.h1.rows.length + ' bar' : 'H1 tidak ada') },
+    { k: 'Kalender rilis global', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
+  ];
+  const sources = [
+    { name: 'Yahoo Finance — ' + cd.m15.sym, ok: true },
+    { name: 'gold-api.com (spot emas live)', ok: !!spot },
+    { name: 'Yahoo Finance — DXY intraday & ^TNX', ok: !!(cd.dxy && macro) },
+    { name: 'Forex Factory / FairEconomy (kalender)', ok: calOk }
+  ];
+  return {
+    generatedAt: new Date().toISOString(), symbol: 'XAUUSD', timeframe: tf, pip: SGP.pip, slPips: SGP.slPips, rr: SGP.rr,
+    price, candleAt: new Date(last.t).toISOString(), ageMin, stale: ageMin > 180, degraded: !!cd.degraded,
+    atr: sgN(atr), atrPips: atr ? sgN(atr / SGP.pip) : null, rsi: sgN(rsi), ema20: sgN(ema20), ema50: sgN(ema50), atr5: sgN(atr5),
+    position: pos, structure: st.trend, bos, sweep, ob: obS, asia: asiaS, ocl: oclS, smt, displacement: disp, session: sesi, confirms,
+    poi, fvg: fvg.map(z => ({ kind: z.kind, lo: sh(z.lo), hi: sh(z.hi) })),
+    m5: st5 ? { trend: st5.trend, bos: st5.bos ? { dir: st5.bos.dir, level: sh(st5.bos.level) } : null, sweep: sw5 ? { kind: sw5.kind, level: sh(sw5.level) } : null } : null,
+    range: { hi: sh(rangeHi), lo: sh(rangeLo) }, macro, daily: dailyS, direction, score: sgN(score), confidence: conf,
+    basis, plan, entryType, checklist, news, watch, spot: spot ? sgN(spot) : null, gates, calib, rawPrice,
+    priceSource: calib ? 'spot emas (kalibrasi dari GC=F)' : (cd.m15.sym || 'Yahoo'),
+    quality, validation, dataValid, cross, sources, notes
+  };
+});
+function signalText(p) {
+  if (!p || p.error) return '[SG] SIGNAL ENTRY: tidak tersedia.';
+  const L = [];
+  L.push('[SG] SIGNAL ENTRY XAUUSD — mesin Alchemist deterministik (' + p.timeframe + ' entry, M5 konfirmasi, H1 bias). Level di bawah berasal dari mesin, BUKAN karangan AI.');
+  L.push(`Harga ${p.price}${p.priceSource ? ' (' + p.priceSource + ')' : ''} (candle ${p.candleAt}${p.stale ? '; USANG / pasar kemungkinan tutup' : ''}) | arah ${p.direction} | skor ${p.score} | keyakinan ${p.confidence}% | konfirmasi ${p.confirms}/6`);
+  if (p.gates && p.gates.length) L.push('ENTRY DITAHAN: ' + p.gates.join(' | '));
+  L.push(`Struktur M15 ${p.structure}${p.bos ? ' | ' + p.bos.kind + ' ' + p.bos.dir + ' @' + p.bos.level : ''}${p.sweep ? ' | sapuan ' + p.sweep.kind + ' @' + p.sweep.level : ''} | posisi range ${p.position == null ? 'n/a' : p.position + '%'} | RSI ${p.rsi == null ? 'n/a' : p.rsi} | ATR ${p.atr == null ? 'n/a' : p.atr}`);
+  if (p.m5) L.push(`M5: struktur ${p.m5.trend}${p.m5.bos ? ' | BOS ' + p.m5.bos.dir : ''}${p.m5.sweep ? ' | sweep ' + p.m5.sweep.kind : ''}`);
+  if (p.ob) L.push(`ORDER BLOCK: ${p.ob.kind} ${p.ob.lo}–${p.ob.hi}`);
+  if (p.displacement) L.push(`DISPLACEMENT: ${p.displacement.kind} body ${p.displacement.body}`);
+  if (p.smt) L.push(`SMT: ${p.smt.kind} — ${p.smt.why}`);
+  if (p.session) L.push(`SESI: ${p.session.ses}${p.session.kill ? ' · ' + p.session.kill : ''}`);
+  if (p.asia) L.push(`RANGE ASIA: ${p.asia.lo}–${p.asia.hi}${p.asia.judas ? ' · judas ' + p.asia.judas : ''}`);
+  if (p.ocl) L.push(`OCL harian: open ${p.ocl.open} / close ${p.ocl.close}`);
+  L.push(p.plan ? `RENCANA (${p.plan.entryType}): ${p.plan.dir} entry ${p.plan.entry} | SL ${p.plan.sl} (${p.plan.slPips} pip) | TP ${p.plan.tp} (${p.plan.tpPips} pip, RR 1:${p.plan.rr}) | risiko ${p.plan.perLotRisk} per 1.00 lot` : 'RENCANA: WAIT — konfluensi belum cukup untuk entry.');
+  if (p.macro) L.push(`MAKRO: DXY ${p.macro.dxy} (10 hari ${p.macro.dxyChg10d}%) | yield 10Y ${p.macro.us10y}% (10 hari ${p.macro.us10yChg10d}%)`);
+  if (p.daily) L.push(`HARIAN: ${p.daily.last} per ${p.daily.asOf} | tren ${p.daily.trend || 'n/a'} | RSI ${p.daily.rsi == null ? 'n/a' : p.daily.rsi} | range20 ${p.daily.lo20}–${p.daily.hi20}`);
+  if (p.news && p.news.length) L.push('RISIKO RILIS ≤90 MENIT: ' + p.news.map(x => `${x.title} (${x.inMin} menit; forecast ${x.forecast || 'n/a'})`).join(' | '));
+  if (p.watch) L.push(`ZONA TUNGGU: BUY ${p.watch.zoneBuy[0]}–${p.watch.zoneBuy[1]} (${p.watch.buyTrigger}) | SELL ${p.watch.zoneSell[0]}–${p.watch.zoneSell[1]} (${p.watch.sellTrigger})`);
+  L.push('VALIDASI DATA: ' + (p.validation || []).map(v => (v.ok ? 'OK ' : 'CEK ') + v.k + ' (' + v.d + ')').join(' | '));
+  L.push('CHECKLIST: ' + (p.checklist || []).map(c => (c.ok ? 'OK ' : 'BELUM ') + c.s).join(' | '));
+  L.push('DASAR SKOR: ' + (p.basis || []).map(b => (b.w > 0 ? '+' : '') + b.w + ' ' + b.why).join(' | '));
+  return L.join('\n');
+}
+function sanitizeSignalAI(o) {
+  o = (o && typeof o === 'object') ? o : {};
+  const V = ['CONFIRM', 'CAUTION', 'REJECT'];
+  const out = { verdict: V.includes(upper(o.verdict)) ? upper(o.verdict) : 'CAUTION', summary: cut(o.summary, 900), reasons: arr(o.reasons, 6, 240), warnings: arr(o.warnings, 5, 240), management: arr(o.management, 5, 240), invalidation: cut(o.invalidation, 320), alchemist: [] };
+  (Array.isArray(o.alchemist) ? o.alchemist : []).slice(0, 10).forEach(x => { if (x && typeof x === 'object') out.alchemist.push({ step: cut(x.step, 80), ok: x.ok === true, note: cut(x.note, 220) }); });
+  return out;
+}
+async function aiSignal(pack, t0) {
+  const errs = [];
+  const sys = `Kamu trader emas (XAUUSD) yang menjalankan strategi Alchemist (turunan MSNR/ICT/CRT). Waktu sekarang: ${new Date().toUTCString()}.
+Tugas: menilai kualitas sinyal entry yang SUDAH dihitung mesin, bukan membuat sinyal baru.
+ATURAN KERAS:
+1. Fokus tunggal XAUUSD. Jangan menyebut pair lain.
+2. Entry, SL, TP, jarak pip, RR, dan tipe entry (LIMIT POI / MARKET) di [SG] adalah hasil mesin dan TIDAK BOLEH diubah, ditambah, atau diganti. Jangan mengarang angka, level, probabilitas, atau tanggal.
+3. Pakai hanya data [SG]. Bila data kurang, tulis di warnings.
+4. Metode Alchemist lengkap: top-down (H1 → M15 → M5), storyline, POI (FVG/OB/OCL), sapuan likuiditas + displacement + MSS/BOS, premium/discount, sesi/killzone, SMT, RR minimal 1:2, hindari rilis besar, risiko maksimal 1% per trade.
+5. verdict: CONFIRM hanya bila arah mesin bukan WAIT, minimal 2 konfirmasi Alchemist, dan tidak ada rilis High ≤90 menit; CAUTION bila ada syarat belum terpenuhi; REJECT bila arah WAIT, data usang, atau bertentangan dengan struktur/makro.
+6. Jelaskan risiko nyata: SL 30 pip bisa lebih rapat dari ATR, spread saat berita, pasar tutup, entry limit bisa tidak tersentuh.
+7. Ini edukasi, bukan saran finansial. Bahasa Indonesia.
+
+DATA [SG]:
+${signalText(pack).slice(0, 9000)}
+
+OUTPUT hanya JSON valid:
+{"verdict":"CONFIRM|CAUTION|REJECT","summary":"2-3 kalimat","alchemist":[{"step":"...","ok":true,"note":"..."}],"reasons":["..."],"warnings":["..."],"management":["partial/BE/time stop"],"invalidation":"kondisi yang membatalkan sinyal"}`;
+  const out = await llm(sys, [{ role: 'user', content: 'Nilai sinyal XAUUSD di atas. Keluarkan hanya JSON.' }], 2200, errs, t0 + 42000, { temp: 0.2, json: 'object', field: 'signal' }, { tmo: 26000 });
+  if (!out) return { ai: null, notes: ['AI gagal: ' + errs.join(' | ').slice(0, 240)] };
+  try { return { ai: sanitizeSignalAI(parseAiJson(out.text)), provider: out.provider, model: out.model, notes: [] }; }
+  catch (e) { return { ai: null, provider: out.provider, model: out.model, notes: ['Format balasan AI tidak valid.'] }; }
+}
+async function xauSignalHandler(req, res) {
+  const b = req.body || {}, phase = b.phase, t0 = Date.now();
+  res.setHeader('Cache-Control', 'no-store');
+  if (phase === 'tick') {
+    try {
+      const s = await liveSpot();
+      return res.status(200).json({ phase: 'tick', tick: { price: s.price, at: s.at, source: 'gold-api.com (spot)' } });
+    } catch (e) { return res.status(200).json({ phase: 'tick', tick: null, error: msg(e, 120) }); }
+  }
+  let pack;
+  try { pack = await xauSignalPack(); } catch (e) { return res.status(200).json({ error: 'Data candle XAUUSD tidak tersedia: ' + msg(e, 200) }); }
+  if (phase === 'ai') {
+    const a = await aiSignal(pack, t0);
+    return res.status(200).json({ phase: 'ai', signal: pack, ai: a.ai, aiNotes: a.notes, provider: a.provider, model: a.model });
+  }
+  res.status(200).json({ phase: 'data', signal: pack, ai: null });
+}
 const xauCache = new Map();
 // ✏️ [TEKS BISA DIUBAH] [PESAN] xauHandler: Pesan error News Analisis XAUUSD.
 async function xauHandler(req, res) {
@@ -1673,7 +2126,7 @@ async function xauHandler(req, res) {
   if (c && Date.now() - c.t < 300000) return res.status(200).json({ ...c.p, cached: true });
   if (b.fresh) bustData();
   const errs = [], gg = await gatherAll('all', errs, true, ['XAUUSD'], '1-5 hari');
-  const base = { ...publicBase(gg, errs), xau: xauFocus(gg), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
+  const base = { ...publicBase(gg, errs), xau: xauFocus(gg), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: await xauSignalPack().catch(e => ({ error: 'Sinyal entry gagal: ' + msg(e, 140) })), gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
   if (phase === 'data') return res.status(200).json({ phase: 'data', ...base, g: compactG(gg) });
   const r = await aiXau(compactG(gg), t0), payload = { ...base, ...r, notes: base.notes.concat(r.notes) };
   if (payload.xai) xauCache.set('xau', { t: Date.now(), p: payload });
@@ -2325,12 +2778,13 @@ module.exports = async (req, res) => {
   const au = await authorize(req);
   if (!au.ok) return res.status(au.status).json({ error: au.error });
   const bd0 = req.body || {};
-  if ((bd0.action === 'news' || bd0.action === 'pro' || bd0.action === 'xau' || bd0.cat === 'trading' || (bd0.action === 'tutor' && TRADING_MAPEL.includes(bd0.mapel))) && !(await tradingAllowed(au)))
+  if ((bd0.action === 'news' || bd0.action === 'pro' || bd0.action === 'xau' || bd0.action === 'xauSignal' || bd0.cat === 'trading' || (bd0.action === 'tutor' && TRADING_MAPEL.includes(bd0.mapel))) && !(await tradingAllowed(au)))
     return res.status(403).json({ error: 'Fitur Trading khusus admin. Ajukan izin ke admin lewat tab Trading.', code: 'trading_locked' });
   if (bd0.action === 'ai_status') { if (!au.admin) return res.status(403).json({ error: 'Khusus admin' }); return aiStatusHandler(req, res); }
   if (req.body && req.body.action === 'news') return newsHandler(req, res);
   if (req.body && req.body.action === 'pro') return proHandler(req, res);
   if (req.body && req.body.action === 'xau') return xauHandler(req, res);
+  if (req.body && req.body.action === 'xauSignal') return xauSignalHandler(req, res);
   if (req.body && req.body.action === 'tutor') return tutorHandler(req, res);
   if (req.body && req.body.action === 'kurikulum') return kurikulumHandler(req, res);
   if (req.body && req.body.action === 'world') return worldHandler(req, res);
