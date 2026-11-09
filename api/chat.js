@@ -2024,6 +2024,157 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     { k: 'Struktur intraday lengkap', ok: !!(cd.m15 && cd.m5 && cd.h1), d: (cd.m5 ? 'M5 ' + cd.m5.rows.length + ' bar' : 'M5 tidak ada') + ' · ' + (cd.h1 ? 'H1 ' + cd.h1.rows.length + ' bar' : 'H1 tidak ada') },
     { k: 'Kalender rilis global', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
   ];
+  /* ---------- 5+ setup entry Alchemist: entry, SL, TP dari struktur live ---------- */
+  const pipD = SGP.pip, bufD = Math.max(pipD * 3, (atr || 3) * 0.12);
+  const rLo = sh(rangeLo), rHi = sh(rangeHi);
+  const biasDir = (direction === 'BUY' || direction === 'SELL') ? direction
+    : (st.trend === 'BULLISH' ? 'BUY' : st.trend === 'BEARISH' ? 'SELL' : (h1dir >= 0 ? 'BUY' : 'SELL'));
+  const biasOk = d => d === 'BUY' ? (h1dir >= 0 && st.trend !== 'BEARISH') : (h1dir <= 0 && st.trend !== 'BULLISH');
+  const zoneOk = d => pos == null ? true : (d === 'BUY' ? pos <= 60 : pos >= 40);
+  const SB = [];
+  const mkSetup = o => {
+    const dir = o.dir;
+    if ((dir !== 'BUY' && dir !== 'SELL') || !isFinite(o.entry) || !isFinite(o.sl) || !isFinite(o.tp)) return;
+    const entry = sgN(o.entry);
+    const midRangeD = (rLo != null && rHi != null && rHi > rLo) ? (rLo + rHi) / 2 : null;
+    const zoneAt = midRangeD == null ? true : (dir === 'BUY' ? entry <= midRangeD : entry >= midRangeD);
+    let sl = sgN(o.sl);
+    if (dir === 'BUY' && !(sl < entry)) sl = sgN(entry - Math.max(2.5, (atr || 3) * 0.6));
+    if (dir === 'SELL' && !(sl > entry)) sl = sgN(entry + Math.max(2.5, (atr || 3) * 0.6));
+    let slDist = Math.abs(entry - sl);
+    const minDist = SGP.slPips * pipD, maxDist = 60 * pipD;
+    if (slDist < minDist) slDist = minDist;
+    if (slDist > maxDist) slDist = maxDist;
+    sl = sgN(dir === 'BUY' ? entry - slDist : entry + slDist);
+    const tp = sgN(entry + (dir === 'BUY' ? 1 : -1) * slDist * SGP.rr);
+    const tpDist = Math.abs(tp - entry);
+    const slPips = Math.round(slDist / pipD), tpPips = Math.round(tpDist / pipD), rr = sgN(tpDist / slDist);
+    const ahead = dir === 'BUY' ? price - entry : entry - price;
+    const status = ahead <= 0 ? 'LEWAT' : Math.abs(price - entry) <= Math.max(1.2, (atr || 0) * 0.35) ? 'SIAP' : 'TUNGGU';
+    const blockers = [], notes = [];
+    if (!dataValid) blockers.push('data belum valid');
+    if (ageMin > 60) blockers.push('candle usang ' + ageMin + ' menit');
+    if (news.length) blockers.push('dekat rilis High impact');
+    if (status === 'LEWAT') blockers.push('harga sudah melewati level (jangan kejar)');
+    if (rr < 2) blockers.push('RR 1:' + rr + ' < 1:2');
+    if (o.extra) blockers.push(o.extra);
+    if (!zoneAt) blockers.push('entry di ' + (dir === 'BUY' ? 'premium' : 'discount') + ', bukan zona ' + (dir === 'BUY' ? 'discount' : 'premium'));
+    if (!o.bias) notes.push('bias H1/struktur belum searah');
+    let sc = (o.conf || 0) + (o.bias ? 1 : 0) + (zoneAt ? 1 : 0) + (sesi.kill ? 1 : 0) + (dataValid ? 1 : 0);
+    sc = Math.max(0, Math.min(5, sc));
+    SB.push({
+      id: o.id, method: o.method, dir, type: o.type || 'LIMIT', entry, sl, tp, slPips, tpPips, rr,
+      riskPerLot: sgN(100 * slDist), status, valid: blockers.length === 0,
+      need: blockers.concat(notes).join(' · ') || 'semua syarat terpenuhi', why: o.why || '', score: sc
+    });
+  };
+
+  if (obS) {
+    const dir = obS.kind === 'bull' ? 'BUY' : 'SELL';
+    const entry = dir === 'BUY' ? obS.hi : obS.lo;
+    const sl = dir === 'BUY' ? obS.lo - bufD : obS.hi + bufD;
+    const d = Math.abs(entry - sl);
+    mkSetup({ id: 'ob', method: 'Order Block M15 retest', dir, entry, sl, tp: entry + (dir === 'BUY' ? 1 : -1) * d * 2,
+      why: 'OB ' + (obS.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + obS.lo + '–' + obS.hi + ' sebagai titik retest.',
+      conf: 2, bias: biasOk(dir), zone: zoneOk(dir) });
+  }
+
+  const fvAll = (fvg5.length ? fvg5 : fvg).map(z => ({ kind: z.kind, lo: sh(z.lo), hi: sh(z.hi), mid: sh((z.lo + z.hi) / 2) }))
+    .filter(z => z.mid != null && isFinite(z.mid));
+  const fvBias = fvAll.filter(z => z.kind === (biasDir === 'BUY' ? 'bull' : 'bear'))
+    .sort((a, b) => Math.abs(a.mid - price) - Math.abs(b.mid - price))[0];
+  if (fvBias) {
+    const dir = biasDir;
+    const sl = dir === 'BUY' ? fvBias.lo - bufD : fvBias.hi + bufD;
+    const d = Math.abs(fvBias.mid - sl);
+    mkSetup({ id: 'fvg', method: 'FVG M15 retest', dir, entry: fvBias.mid, sl, tp: fvBias.mid + (dir === 'BUY' ? 1 : -1) * d * 2,
+      why: 'FVG ' + (fvBias.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + fvBias.lo + '–' + fvBias.hi + ' belum terisi.',
+      conf: 2, bias: biasOk(dir), zone: zoneOk(dir) });
+  }
+
+  if (asiaS) {
+    const ar = Math.max(0.5, asiaS.hi - asiaS.lo), stopGap = Math.max(bufD, ar * 0.12);
+    ['BUY', 'SELL'].forEach(dir => {
+      const entry = dir === 'BUY' ? asiaS.lo : asiaS.hi;
+      const sl = dir === 'BUY' ? asiaS.lo - stopGap : asiaS.hi + stopGap;
+      const d = Math.abs(entry - sl);
+      const opp = dir === 'BUY' ? asiaS.hi : asiaS.lo;
+      const tp = dir === 'BUY' ? Math.max(opp, entry + 2 * d) : Math.min(opp, entry - 2 * d);
+      const judasOk = !!asiaS.judas && (asiaS.judas === 'bull' ? 'BUY' : 'SELL') === dir;
+      const extra = asiaS.judas && !judasOk
+        ? 'sisi ' + (asiaS.judas === 'bull' ? 'bawah' : 'atas') + ' sudah disapu (bias reversal ' + (asiaS.judas === 'bull' ? 'naik' : 'turun') + ')'
+        : (!asiaS.judas ? 'belum ada sapuan likuiditas Asia' : null);
+      mkSetup({ id: 'asia' + dir, method: 'Asia range ' + (dir === 'BUY' ? 'buy' : 'sell') + (judasOk ? ' (Judas)' : ''), dir, entry, sl, tp,
+        why: 'Range Asia ' + asiaS.lo + '–' + asiaS.hi + ' · ' + (asiaS.judas ? 'judas ' + asiaS.judas : 'belum disapu') + '.',
+        conf: judasOk ? 3 : 1, bias: biasOk(dir) || judasOk, zone: zoneOk(dir), extra });
+    });
+  }
+
+  if (isFinite(rLo) && isFinite(rHi) && rHi > rLo) {
+    ['BUY', 'SELL'].forEach(dir => {
+      const entry = dir === 'BUY' ? rLo + (rHi - rLo) * 0.30 : rLo + (rHi - rLo) * 0.70;
+      const sl = dir === 'BUY' ? rLo - bufD : rHi + bufD;
+      const d = Math.abs(entry - sl);
+      const tp = dir === 'BUY' ? Math.max(rHi, entry + 2 * d) : Math.min(rLo, entry - 2 * d);
+      mkSetup({ id: 'range' + dir, method: 'Range ' + (dir === 'BUY' ? 'discount 30%' : 'premium 70%'), dir, entry, sl, tp,
+        why: 'Range 80 candle ' + rLo + '–' + rHi + ' · posisi ' + (pos == null ? '—' : pos + '%') + '.',
+        conf: 1, bias: biasOk(dir), zone: zoneOk(dir) });
+    });
+  }
+
+  if (oclS && isFinite(oclS.close)) {
+    const dir = price >= oclS.close ? 'BUY' : 'SELL';
+    const entry = oclS.close, maxRisk = Math.max(2.5, (atr || 3) * 1.1);
+    const swing = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
+    const stop = dir === 'BUY'
+      ? (swing != null && swing < entry - bufD * 2 ? swing : entry - maxRisk)
+      : (swing != null && swing > entry + bufD * 2 ? swing : entry + maxRisk);
+    const sl = dir === 'BUY' ? stop - bufD : stop + bufD;
+    const d = Math.abs(entry - sl);
+    mkSetup({ id: 'ocl', method: 'OCL harian retest', dir, entry, sl, tp: entry + (dir === 'BUY' ? 1 : -1) * d * 2,
+      why: 'Close harian ' + oclS.close + ' (open ' + oclS.open + ') sebagai magnet retest.',
+      conf: 1, bias: biasOk(dir), zone: zoneOk(dir) });
+  }
+
+  if (bos) {
+    const dir = bos.dir === 'BULLISH' ? 'BUY' : 'SELL';
+    const entry = bos.level;
+    const swing = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
+    const stop = swing == null ? (dir === 'BUY' ? entry - bufD * 2 : entry + bufD * 2) : swing;
+    const sl = dir === 'BUY' ? stop - bufD : stop + bufD;
+    const d = Math.abs(entry - sl);
+    mkSetup({ id: 'bos', method: 'BOS/MSS retest', dir, entry, sl, tp: entry + (dir === 'BUY' ? 1 : -1) * d * 2,
+      why: bos.kind + ' ' + bos.dir + ' @' + bos.level + ' sebagai level retest.',
+      conf: 2, bias: true, zone: zoneOk(dir) });
+  }
+
+  if (smt) {
+    const dir = smt.kind === 'bull' ? 'BUY' : 'SELL';
+    const poiSide = poi && ((dir === 'BUY' && poi.kind === 'bull') || (dir === 'SELL' && poi.kind === 'bear')) ? poi.mid : null;
+    const entry = poiSide == null ? price : poiSide;
+    const swing = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
+    const sl = swing == null
+      ? (dir === 'BUY' ? entry - Math.max(2.5, (atr || 3) * 0.9) : entry + Math.max(2.5, (atr || 3) * 0.9))
+      : (dir === 'BUY' ? swing - bufD : swing + bufD);
+    const d = Math.abs(entry - sl);
+    mkSetup({ id: 'smt', method: 'SMT / DXY divergence', dir, entry, sl, tp: entry + (dir === 'BUY' ? 1 : -1) * d * 2,
+      why: smt.why, conf: 2, bias: biasOk(dir), zone: zoneOk(dir), extra: poiSide == null ? 'entry di harga pasar, tunggu konfirmasi M5' : null });
+  }
+
+  if (SB.length < 5) {
+    ['BUY', 'SELL'].forEach(dir => {
+      const lvl = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
+      if (lvl == null) return;
+      const sl = dir === 'BUY' ? lvl - Math.max(1.5, (atr || 3) * 0.5) : lvl + Math.max(1.5, (atr || 3) * 0.5);
+      const d = Math.abs(lvl - sl);
+      mkSetup({ id: 'swing' + dir, method: 'Swing liquidity ' + (dir === 'BUY' ? 'low' : 'high'), dir, entry: lvl, sl,
+        tp: lvl + (dir === 'BUY' ? 1 : -1) * d * 2, why: 'Swing terakhir ' + lvl + ' sebagai likuiditas.',
+        conf: 1, bias: biasOk(dir), zone: zoneOk(dir) });
+    });
+  }
+
+  const rank = { SIAP: 0, TUNGGU: 1, LEWAT: 2 };
+  const setups = SB.sort((a, b) => ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || (b.score - a.score) || (rank[a.status] - rank[b.status]) || (a.slPips - b.slPips));
   const sources = [
     { name: 'Yahoo Finance — ' + cd.m15.sym, ok: true },
     { name: 'gold-api.com (spot emas live)', ok: !!spot },
@@ -2040,7 +2191,7 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     range: { hi: sh(rangeHi), lo: sh(rangeLo) }, macro, daily: dailyS, direction, score: sgN(score), confidence: conf,
     basis, plan, entryType, checklist, news, watch, spot: spot ? sgN(spot) : null, gates, calib, rawPrice,
     priceSource: calib ? 'spot emas (kalibrasi dari GC=F)' : (cd.m15.sym || 'Yahoo'),
-    quality, validation, dataValid, cross, sources, notes
+    quality, validation, dataValid, cross, setups, sources, notes
   };
 });
 function signalText(p) {
@@ -2063,6 +2214,7 @@ function signalText(p) {
   if (p.news && p.news.length) L.push('RISIKO RILIS ≤90 MENIT: ' + p.news.map(x => `${x.title} (${x.inMin} menit; forecast ${x.forecast || 'n/a'})`).join(' | '));
   if (p.watch) L.push(`ZONA TUNGGU: BUY ${p.watch.zoneBuy[0]}–${p.watch.zoneBuy[1]} (${p.watch.buyTrigger}) | SELL ${p.watch.zoneSell[0]}–${p.watch.zoneSell[1]} (${p.watch.sellTrigger})`);
   L.push('VALIDASI DATA: ' + (p.validation || []).map(v => (v.ok ? 'OK ' : 'CEK ') + v.k + ' (' + v.d + ')').join(' | '));
+  L.push('SETUP ALCHEMIST (' + (p.setups || []).length + '): ' + (p.setups || []).map(s => s.method + ' [' + s.dir + ' ' + s.status + (s.valid ? ' VALID' : '') + '] entry ' + s.entry + ' SL ' + s.sl + ' (' + s.slPips + ' pip) TP ' + s.tp + ' (' + s.tpPips + ' pip, 1:' + s.rr + ')').join(' | '));
   L.push('CHECKLIST: ' + (p.checklist || []).map(c => (c.ok ? 'OK ' : 'BELUM ') + c.s).join(' | '));
   L.push('DASAR SKOR: ' + (p.basis || []).map(b => (b.w > 0 ? '+' : '') + b.w + ' ' + b.why).join(' | '));
   return L.join('\n');
