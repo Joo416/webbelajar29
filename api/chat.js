@@ -1569,6 +1569,71 @@ function xauDirFallback(g) {
   if (px) { if (px.chg5d != null) s += Number(px.chg5d); if (px.chg20d != null) s += Number(px.chg20d) * 0.3; }
   return s > 0 ? 'BULLISH' : s < 0 ? 'BEARISH' : 'BULLISH';
 }
+/* Arah deterministik News: harga XAUUSD, DXY, yield riil/nominal, mesin skor,
+   nada berita, dan kejutan aktual-vs-forecast. Dipakai untuk mengoreksi AI
+   yang membalik arah pasar (mis. AI BUY saat emas justru jatuh tajam). */
+function xauMarket(g, pack, tags) {
+  let score = 0;
+  const evidence = [];
+  const add = (w, why) => {
+    const n = Number(w);
+    if (!isFinite(n) || Math.abs(n) < 0.01) return;
+    score += n;
+    evidence.push({ w: Math.round(n * 100) / 100, why: cut(why, 240) });
+  };
+  const e = g && g.eng && g.eng.pairs && g.eng.pairs.XAUUSD;
+  if (e && isFinite(e.score)) add(clip(e.score / 25, -2.5, 2.5), `Mesin skor XAUUSD ${e.score} (${e.bias || 'NETRAL'})`);
+  const px = g && g.px && g.px.pairs && g.px.pairs.XAUUSD;
+  if (px) {
+    if (px.chg1d != null) add(clip(Number(px.chg1d) * 0.45, -1.2, 1.2), `Emas 1 hari ${px.chg1d > 0 ? '+' : ''}${px.chg1d}%`);
+    if (px.chg5d != null) add(clip(Number(px.chg5d) * 0.8, -2.4, 2.4), `Emas 5 hari ${px.chg5d > 0 ? '+' : ''}${px.chg5d}%`);
+    if (px.chg20d != null) add(clip(Number(px.chg20d) * 0.25, -1.5, 1.5), `Emas 20 hari ${px.chg20d > 0 ? '+' : ''}${px.chg20d}%`);
+    if (px.trend === 'naik') add(0.5, 'Tren harian emas naik (SMA20 > SMA50)');
+    else if (px.trend === 'turun') add(-0.5, 'Tren harian emas turun (SMA20 < SMA50)');
+  }
+  const m = (g && g.mr) || {};
+  if (m.ry) {
+    if (m.ry.chg5 != null) add(clip(-Number(m.ry.chg5) * 8, -1.8, 1.8), `Yield riil 10Y 5 hari ${m.ry.chg5 > 0 ? '+' : ''}${m.ry.chg5}pp`);
+    if (m.ry.chg20 != null) add(clip(-Number(m.ry.chg20) * 3, -0.9, 0.9), `Yield riil 10Y 20 hari ${m.ry.chg20 > 0 ? '+' : ''}${m.ry.chg20}pp`);
+  }
+  if (m.dxy) {
+    if (m.dxy.chg5 != null) add(clip(-Number(m.dxy.chg5) * 0.9, -1.8, 1.8), `DXY 5 hari ${m.dxy.chg5 > 0 ? '+' : ''}${m.dxy.chg5}%`);
+    if (m.dxy.chg20 != null) add(clip(-Number(m.dxy.chg20) * 0.3, -0.9, 0.9), `DXY 20 hari ${m.dxy.chg20 > 0 ? '+' : ''}${m.dxy.chg20}%`);
+  }
+  const y = (g && g.yl) || {};
+  if (y.y10c5 != null) add(clip(-Number(y.y10c5) * 8, -1.6, 1.6), `Yield 10Y 5 hari ${y.y10c5 > 0 ? '+' : ''}${y.y10c5}pp`);
+  if (y.y2c5 != null) add(clip(-Number(y.y2c5) * 5, -1.2, 1.2), `Yield 2Y 5 hari ${y.y2c5 > 0 ? '+' : ''}${y.y2c5}pp`);
+  if (g && g.tone && g.tone.score != null && g.tone.n >= 3) add(clip(-Number(g.tone.score) / 50, -1, 1), `Nada berita ${g.tone.score >= 0 ? 'hawkish' : 'dovish'} (${g.tone.n} sumber)`);
+  if (g && g.fdiff && g.fdiff.score != null && g.fdiff.n >= 1) add(clip(-Number(g.fdiff.score) / 2, -1.2, 1.2), `Perubahan teks FOMC ${g.fdiff.score >= 0 ? 'hawkish' : 'dovish'}`);
+  /* Kejutan rilis fokus: aktual > forecast = USD lebih kuat = tekanan turun emas.
+     Untuk unemployment/claims arahnya dibalik. */
+  let focusShock = false;
+  (pack && Array.isArray(pack.focus) ? pack.focus : []).forEach(bk => {
+    if (!bk || (Array.isArray(tags) && tags.length && !tags.includes(bk.tag))) return;
+    const ev = (bk.events || [])[0] || {};
+    if (!ev.actual || !ev.forecast) return;
+    const a = numOf(ev.actual), f = numOf(ev.forecast);
+    if (a == null || f == null) return;
+    focusShock = true;
+    const diff = a - f, unit = bk.tag === 'NFP' ? 75 : 0.15;
+    if (Math.abs(diff) < 1e-9) { add(0, `${bk.tag} sesuai konsensus`); return; }
+    const inv = /unemployment|jobless|claims/i.test(String(ev.title || '')), sign = (diff > 0) !== inv ? -1 : 1;
+    add(clip(sign * Math.abs(diff) / unit * 1.8, -2.2, 2.2), `${bk.tag} aktual ${ev.actual} vs forecast ${ev.forecast}`);
+  });
+  if (!focusShock && Array.isArray(g && g.sp)) {
+    g.sp.filter(x => x && x.cur === 'USD').forEach(x => {
+      const s = x.dir === 'LEBIH KUAT' ? -0.45 : x.dir === 'LEBIH LEMAH' ? 0.45 : 0;
+      if (s) add(s, `Kejutan ${x.title || 'rilis USD'} ${x.dir}`);
+    });
+  }
+  const abs = evidence.reduce((a, x) => a + Math.abs(x.w), 0);
+  const bias = score >= 0.9 ? 'BULLISH' : score <= -0.9 ? 'BEARISH' : 'NETRAL';
+  return {
+    bias, score: Math.round(score * 100) / 100,
+    strong: Math.abs(score) >= 1.6 && (!!e || !!px) && abs >= 2.2,
+    evidence: evidence.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 8)
+  };
+}
 function sanitizeXau(o, opts) {
   o = (o && typeof o === 'object') ? o : {};
   const B = ['BULLISH', 'BEARISH', 'NETRAL'], C = ['RENDAH', 'SEDANG', 'TINGGI'];
@@ -1578,12 +1643,33 @@ function sanitizeXau(o, opts) {
   const rawAct = upper(o.action || b.action || ''), rawBias = B.includes(upper(b.bias)) ? upper(b.bias) : 'NETRAL';
   const biasAct = rawBias === 'BULLISH' ? 'BUY' : rawBias === 'BEARISH' ? 'SELL' : '';
   const fallbackBias = (opts && opts.fallback === 'BEARISH') ? 'BEARISH' : 'BULLISH';
-  const action = rawAct === 'BUY' || rawAct === 'SELL' ? rawAct : (biasAct || (fallbackBias === 'BULLISH' ? 'BUY' : 'SELL'));
-  const forced = rawAct !== 'BUY' && rawAct !== 'SELL';
+  const market = (opts && opts.market) || null;
+  const mBias = market && B.includes(upper(market.bias)) ? upper(market.bias) : 'NETRAL';
+  const mAction = mBias === 'BULLISH' ? 'BUY' : mBias === 'BEARISH' ? 'SELL' : '';
+  let action = rawAct === 'BUY' || rawAct === 'SELL' ? rawAct : (biasAct || '');
+  let actionSource = action ? (rawAct === action ? 'AI' : 'AI-bias') : 'mesin';
+  let actionOverridden = false, actionConflict = false;
+  /* Arah AI tidak boleh membalik bukti pasar yang kuat. Ini mencegah kasus
+     News BUY padahal harga, DXY, yield riil, dan kejutan rilis semuanya turun. */
+  if (mAction) {
+    if (!action) { action = mAction; actionSource = 'mesin'; actionOverridden = true; }
+    else if (action !== mAction) {
+      actionConflict = true;
+      if (market.strong) { action = mAction; actionSource = 'mesin'; actionOverridden = true; }
+      else if (conf === 'TINGGI') conf = 'SEDANG';
+    }
+  }
+  if (!action) { action = fallbackBias === 'BULLISH' ? 'BUY' : 'SELL'; actionSource = 'mesin'; actionOverridden = true; }
+  const forced = actionSource === 'mesin';
   const finalBias = action === 'BUY' ? 'BULLISH' : 'BEARISH';
-  if (forced && conf === 'TINGGI') conf = 'SEDANG';
+  if ((forced || actionConflict) && conf === 'TINGGI') conf = 'SEDANG';
   const out = {
-    action, action_source: forced ? 'mesin' : 'AI', action_forced: forced,
+    action, action_source: actionSource, action_forced: forced, action_overridden: actionOverridden,
+    action_ai: rawAct || null, action_conflict: actionConflict,
+    market: market ? {
+      bias: mBias || finalBias, score: Number(market.score) || 0, strong: !!market.strong,
+      evidence: (Array.isArray(market.evidence) ? market.evidence : []).slice(0, 10).map(x => ({ w: Number(x.w) || 0, why: cut(x.why, 240) }))
+    } : null,
     action_reason: cut(o.action_reason || b.action_reason || '', 700),
     summary: cut(o.summary, 1000),
     bias: {
@@ -1612,7 +1698,7 @@ function sanitizeXau(o, opts) {
       tag, title: cut(e.title, 160), date: cut(e.date, 24), time_utc: cut(e.time_utc, 24),
       forecast: cut(e.forecast, 30), previous: cut(e.previous, 30), consensus_note: cut(e.consensus_note, 240),
       gold_bull_if: cut(e.gold_bull_if, 320), gold_bear_if: cut(e.gold_bear_if, 320),
-      gold_bias: eb, gold_action: eb === 'BULLISH' ? 'BUY' : 'SELL',
+      ai_gold_bias: eb, gold_bias: finalBias, gold_action: action,
       why: cut(e.why, 600), spike: cut(e.spike, 280), validity: cut(e.validity, 340), confidence: C.includes(upper(e.confidence)) ? upper(e.confidence) : 'RENDAH'
     });
   });
@@ -1629,8 +1715,10 @@ function sanitizeXau(o, opts) {
   (Array.isArray(o.scenarios) ? o.scenarios : []).slice(0, 5).forEach(s => {
     if (s && typeof s === 'object') out.scenarios.push({ name: cut(s.name, 100), if: cut(s.if, 320), then: cut(s.then, 520) });
   });
-  out.action_conflict = false;
-  if (forced) out.action_reason = cut((out.action_reason ? out.action_reason + ' ' : '') + 'Arah final dipilih mesin dari data global (BUY/SELL); WAIT tidak dipakai di News.', 700);
+  if (actionOverridden) {
+    const ev = market && Array.isArray(market.evidence) ? market.evidence.slice(0, 3).map(x => x.why).filter(Boolean).join('; ') : '';
+    out.action_reason = cut('Arah final ' + action + ' dipilih mesin dari data pasar terbaru' + (rawAct && rawAct !== action ? '; AI semula ' + rawAct + ' dan dikoreksi' : '') + '. WAIT tidak dipakai di News.' + (ev ? ' Bukti: ' + ev + '.' : ''), 700);
+  } else if (actionConflict) out.action_reason = cut((out.action_reason ? out.action_reason + ' ' : '') + 'AI berbeda arah dengan data pasar; keyakinan diturunkan dan arah pasar dipakai sebagai pembanding.', 700);
   // Lengkapi empat rilis fokus bila AI melewatkan salah satunya; data jadwal tetap dari server.
   (opts && opts.pack && Array.isArray(opts.pack.focus) ? opts.pack.focus : []).forEach(bk => {
     if (!bk || !bk.tag || !allowedTags.includes(bk.tag) || out.events.some(e => e.tag === bk.tag)) return;
@@ -1652,12 +1740,13 @@ async function aiXau(g, focus, t0) {
   const FL = FT.join(', ');
   const text = dataText(g, true), fxPack = xauFocus(g, F);
   const engine = (g.eng && g.eng.pairs && g.eng.pairs.XAUUSD) || null;
-  const fallback = xauDirFallback(g);
+  const fallback = xauDirFallback(g), market = xauMarket(g, fxPack, FT);
   let sigText = '';
   try { sigText = signalText(await xauSignalPack()); } catch (e) { sigText = '[SG] SIGNAL ENTRY: tidak tersedia (' + msg(e, 120) + ').'; }
   const sys = `Kamu analis makroekonomi dan trader emas (XAUUSD) bergaya desk institusional. Waktu sekarang: ${new Date().toUTCString()}. Tugas: menentukan ke mana XAUUSD bergerak menjelang dan saat rilis ${FL}, memakai HANYA data di bawah.
 
 ATURAN KERAS:
+0. ARAH FINAL HARUS MENGIKUTI BUKTI PASAR TERBARU: gerak harga XAUUSD, DXY, yield riil/nominal, dan arah kejutan aktual-vs-forecast. Jangan membalik arah hanya karena bias lama atau narasi berita. Jika data pasar turun tajam, aksi News harus SELL; jika data pasar naik kuat, aksi harus BUY.
 1. Fokus TUNGGAL XAUUSD. Jangan menganalisis atau menyebut pair lain (EURUSD, GBPUSD, USDJPY, dan sejenisnya).
 2. Pakai HANYA data berikut. Dilarang mengarang angka, level harga, tanggal, jam rilis, forecast/konsensus, atau probabilitas persen yang tidak tertulis. Level harga HANYA boleh berasal dari [P] (harga/level turunan harga harian) atau [L]; sebut sumbernya. Itu area referensi berbasis data, BUKAN entry/SL/TP atau saran transaksi.
 3. Konsensus: forecast hanya dari [C]/[SP]/sumber berita bernomor; sebut asalnya dan ingat kalender berasal dari agregator, bukan data resmi. Jika tidak ada, tulis "konsensus tidak ditemukan".
@@ -1690,7 +1779,8 @@ OUTPUT: HANYA JSON valid tanpa markdown, semua teks Bahasa Indonesia, backslash 
   if (!out) payload.notes.push('AI gagal: ' + aerr.join(' | ').slice(0, 300));
   else {
     try {
-      payload.xai = sanitizeXau(parseAiJson(out.text), { xauPx: xauHasPrice(g), pack: fxPack, tags: FT, fallback });
+      payload.xai = sanitizeXau(parseAiJson(out.text), { xauPx: xauHasPrice(g), pack: fxPack, tags: FT, fallback, market });
+      payload.market = market;
       if (!payload.xai.events.length) throw new Error('tidak ada rilis fokus');
       const e = engine;
       if (e) {
@@ -1699,8 +1789,9 @@ OUTPUT: HANYA JSON valid tanpa markdown, semua teks Bahasa Indonesia, backslash 
         if (e.bias !== 'NETRAL' && payload.xai.bias.bias !== 'NETRAL' && e.bias !== payload.xai.bias.bias) {
           payload.xai.bias.conflict = true;
           payload.xai.bias.confidence = 'RENDAH';
-          payload.notes.push(`Arah AI (${payload.xai.bias.bias}) berbeda dengan mesin skor XAUUSD (${e.bias}); keyakinan diturunkan.`);
+          payload.notes.push(`Arah final (${payload.xai.bias.bias}) berbeda dengan mesin skor XAUUSD (${e.bias}); keyakinan diturunkan.`);
         }
+        if (payload.xai.action_overridden) payload.notes.push(`Arah AI ${payload.xai.action_ai || 'netral/WAIT'} dikoreksi ke ${payload.xai.action} oleh bukti pasar XAUUSD.`);
       }
       payload.flags = guardNumbers(payload.xai, text + JSON.stringify(fxPack));
     } catch (e) {
@@ -2084,6 +2175,13 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     { k: 'Kalender rilis global', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
   ];
   /* ---------- 5+ setup entry Alchemist: entry, SL, TP dari struktur live ---------- */
+  const XAU_STYLE_LABEL = { SCALPING: 'Scalping', DAY: 'Day Trading', SWING: 'Swing Trading' };
+  const xauStyleOf = method => {
+    const s = String(method || '').toLowerCase();
+    if (/swing/.test(s)) return 'SWING';
+    if (/m5|m1|scalp|asia|judas|ote/.test(s)) return 'SCALPING';
+    return 'DAY';
+  };
   const pipD = SGP.pip, bufD = Math.max(pipD * 3, (atr || 3) * 0.12);
   const rLo = sh(rangeLo), rHi = sh(rangeHi);
   const biasDir = (direction === 'BUY' || direction === 'SELL') ? direction
@@ -2127,8 +2225,20 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     if (!o.bias) notes.push('bias H1/struktur belum searah');
     let sc = (o.conf || 0) + (o.bias ? 1 : 0) + (zoneAt ? 1 : 0) + (sesi.kill ? 1 : 0) + (dataValid ? 1 : 0);
     sc = Math.max(0, Math.min(5, sc));
+    const style = o.style || xauStyleOf(o.method);
+    const styleWhy = o.styleWhy || (style === 'SCALPING'
+      ? 'Scalping M5/M1: tahan menit–jam, konfirmasi sweep → MSS/CHoCH → FVG 50%/OB; SL 30 pip, TP cepat.'
+      : style === 'SWING'
+        ? 'Swing H1/D1: ikuti storyline harian, target likuiditas 20 hari/range, tahan beberapa hari; SL tetap disiplin.'
+        : 'Day Trading M15/M5: tahan intraday, entry di POI setelah struktur M15 searah; target TP1/TP2 dalam sesi.');
+    const globalWhy = [
+      macro ? 'DXY ' + macro.dxy + ' (' + (macro.dxyChg10d == null ? 'n/a' : macro.dxyChg10d + '%') + ' 10h) · yield 10Y ' + macro.us10y + '% (' + (macro.us10yChg10d == null ? 'n/a' : macro.us10yChg10d + '%') + ' 10h)' : 'DXY/yield tidak terbaca',
+      dailyS ? 'tren harian ' + (dailyS.trend || '—') + ' · RSI ' + (dailyS.rsi == null ? '—' : dailyS.rsi) : 'tren harian tidak tersedia',
+      news.length ? '⚠️ ' + news[0].title + ' (' + news[0].inMin + ' menit)' : 'tidak ada rilis High ≤90 menit'
+    ].join(' · ');
     SB.push({
-      id: o.id, method: o.method, dir, type: o.type || 'LIMIT', entry, sl, tp, tp1, tp2, tpMax, slPips, tpPips, tp2Pips, tpMaxPips, rr,
+      id: o.id, method: o.method, dir, style, styleLabel: XAU_STYLE_LABEL[style], styleWhy, globalWhy,
+      type: o.type || 'LIMIT', entry, sl, tp, tp1, tp2, tpMax, slPips, tpPips, tp2Pips, tpMaxPips, rr,
       riskPerLot: sgN(100 * slDist), status, valid: blockers.length === 0,
       need: blockers.concat(notes).join(' · ') || 'semua syarat terpenuhi', why: o.why || '', score: sc,
       entryWhy: o.entryWhy || o.why || 'Entry diambil di POI setelah struktur dan likuiditas mendukung.',
@@ -2309,15 +2419,17 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     }
   }
 
-  if (SB.length < 5) {
+  {
+    /* Selalu sediakan kandidat swing (H1/D1) agar ketiga gaya trading terwakili,
+       bukan hanya ketika setup intraday kurang dari lima. */
     ['BUY', 'SELL'].forEach(dir => {
       const lvl = dir === 'BUY' ? sh(st.lastLo) : sh(st.lastHi);
       if (lvl == null) return;
       const sl = dir === 'BUY' ? lvl - Math.max(1.5, (atr || 3) * 0.5) : lvl + Math.max(1.5, (atr || 3) * 0.5);
       const d = Math.abs(lvl - sl);
       mkSetup({ id: 'swing' + dir, method: 'Swing liquidity ' + (dir === 'BUY' ? 'low' : 'high'), dir, entry: lvl, sl,
-        tp: lvl + (dir === 'BUY' ? 1 : -1) * d * 2, why: 'Swing terakhir ' + lvl + ' sebagai likuiditas.',
-        conf: 1, bias: biasOk(dir), zone: zoneOk(dir) });
+        tp: lvl + (dir === 'BUY' ? 1 : -1) * d * 2, why: 'Swing terakhir ' + lvl + ' sebagai likuiditas H1/D1.',
+        conf: 1, bias: biasOk(dir), zone: zoneOk(dir), style: 'SWING' });
     });
   }
 
@@ -2335,7 +2447,14 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
     }
   }
   const rank = { SIAP: 0, TUNGGU: 1, LEWAT: 2 };
-  const setups = SB.sort((a, b) => ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || (b.score - a.score) || (rank[a.status] - rank[b.status]) || (a.slPips - b.slPips)).slice(0, 10);
+  /* Tiga gaya trading dipisahkan agar BUY/SELL tetap punya konteks horizon.
+     Setiap gaya diwakili lebih dulu, lalu kandidat terbaik lainnya melengkapi
+     daftar sampai 10. Arah final tetap dipakai sebagai bias utama mesin. */
+  const sorted = SB.sort((a, b) => ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || (b.score - a.score) || (rank[a.status] - rank[b.status]) || (a.slPips - b.slPips));
+  const picks = [];
+  ['SCALPING', 'DAY', 'SWING'].forEach(st => { const x = sorted.find(s => s.style === st); if (x) picks.push(x); });
+  sorted.forEach(s => { if (picks.length < 10 && picks.indexOf(s) < 0) picks.push(s); });
+  const setups = picks.slice(0, 10);
   const sources = [
     { name: 'Yahoo Finance — ' + cd.m15.sym, ok: true },
     { name: 'gold-api.com (spot emas live)', ok: !!spot },
@@ -2345,7 +2464,7 @@ const xauSignalPack = () => memoize('xausig', 30000, async () => {
   return {
     generatedAt: new Date().toISOString(), symbol: 'XAUUSD', timeframe: tf, pip: SGP.pip, slPips: SGP.slPips, rr: SGP.rr, tp1Pips: SGP.tp1Pips, tp2Pips: SGP.tp2Pips,
     price, candleAt: new Date(last.t).toISOString(), ageMin, stale: ageMin > 180, degraded: !!cd.degraded,
-    atr: sgN(atr), atrPips: atr ? sgN(atr / SGP.pip) : null, rsi: sgN(rsi), ema20: sgN(ema20), ema50: sgN(ema50), atr5: sgN(atr5),
+    atr: sgN(atr), atrPips: atr ? sgN(atr / SGP.pip) : null, rsi: sgN(rsi), ema20: sgN(ema20), ema50: sgN(ema50), atr5: sgN(atr5), primaryDirection: direction, biasDirection: biasDir, singleDirection: biasDir,
     position: pos, structure: st.trend, bos, sweep, ob: obS, asia: asiaS, ocl: oclS, smt, displacement: disp, session: sesi, confirms,
     poi, fvg: fvg.map(z => ({ kind: z.kind, lo: sh(z.lo), hi: sh(z.hi) })),
     m5: st5 ? { trend: st5.trend, bos: st5.bos ? { dir: st5.bos.dir, level: sh(st5.bos.level) } : null, sweep: sw5 ? { kind: sw5.kind, level: sh(sw5.level) } : null } : null,
@@ -2375,7 +2494,7 @@ function signalText(p) {
   if (p.news && p.news.length) L.push('RISIKO RILIS ≤90 MENIT: ' + p.news.map(x => `${x.title} (${x.inMin} menit; forecast ${x.forecast || 'n/a'})`).join(' | '));
   if (p.watch) L.push(`ZONA TUNGGU: BUY ${p.watch.zoneBuy[0]}–${p.watch.zoneBuy[1]} (${p.watch.buyTrigger}) | SELL ${p.watch.zoneSell[0]}–${p.watch.zoneSell[1]} (${p.watch.sellTrigger})`);
   L.push('VALIDASI DATA: ' + (p.validation || []).map(v => (v.ok ? 'OK ' : 'CEK ') + v.k + ' (' + v.d + ')').join(' | '));
-  L.push('SETUP ALCHEMIST (' + (p.setups || []).length + '): ' + (p.setups || []).map(s => s.method + ' [' + s.dir + ' ' + s.status + (s.valid ? ' VALID' : '') + '] entry ' + s.entry + ' SL ' + s.sl + ' (' + s.slPips + ' pip) TP1 ' + (s.tp1 != null ? s.tp1 : s.tp) + ' (' + s.tpPips + ' pip) TP2 ' + (s.tp2 != null ? s.tp2 : '-') + ' (' + (s.tp2Pips != null ? s.tp2Pips : '-') + ' pip) TPmax ' + (s.tpMax != null ? s.tpMax : '-') + ' (' + (s.tpMaxPips != null ? s.tpMaxPips : '-') + ' pip | ' + (s.why || '') + (s.valid ? '' : ' | ' + (s.need || '')) + ')').join(' | '));
+  L.push('SETUP ALCHEMIST (' + (p.setups || []).length + '): ' + (p.setups || []).map(s => '[' + (s.styleLabel || s.style || '—') + '] ' + s.method + ' [' + s.dir + ' ' + s.status + (s.valid ? ' VALID' : '') + '] entry ' + s.entry + ' SL ' + s.sl + ' (' + s.slPips + ' pip) TP1 ' + (s.tp1 != null ? s.tp1 : s.tp) + ' (' + s.tpPips + ' pip) TP2 ' + (s.tp2 != null ? s.tp2 : '-') + ' (' + (s.tp2Pips != null ? s.tp2Pips : '-') + ' pip) TPmax ' + (s.tpMax != null ? s.tpMax : '-') + ' (' + (s.tpMaxPips != null ? s.tpMaxPips : '-') + ' pip | ' + (s.why || '') + (s.valid ? '' : ' | ' + (s.need || '')) + ')').join(' | '));
   L.push('CHECKLIST: ' + (p.checklist || []).map(c => (c.ok ? 'OK ' : 'BELUM ') + c.s).join(' | '));
   L.push('DASAR SKOR: ' + (p.basis || []).map(b => (b.w > 0 ? '+' : '') + b.w + ' ' + b.why).join(' | '));
   return L.join('\n');
