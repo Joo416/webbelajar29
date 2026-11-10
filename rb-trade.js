@@ -54,7 +54,7 @@ function pXauNews() {
   }).join('');
   $('pane').innerHTML = '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
     + '<div class="rb-eyebrow">Trading · berita global XAUUSD</div><h2>📰 News Analisis — pilih satu rilis</h2>'
-    + '<div class="rb-note">Pilih <b>satu</b> rilis: NFP, CPI, PPI, atau FOMC. Setiap analisis hanya membahas rilis itu — karena tidak semua rilis jatuh di hari yang sama — tetapi AI tetap menggabungkan <b>semua data global</b> (BLS/FRED, EFFR, yield riil, DXY, CFTC, berita) menjadi satu keputusan <b>BUY / SELL / WAIT</b>, plus perkiraan apakah rilis memicu <b>spike</b>. Sumber jadwal: <b>BLS</b> &amp; <b>federalreserve.gov</b>. Validitas wajib menyebut sumber, periode, kesegaran, dan verifikasi silang.</div>'
+    + '<div class="rb-note">Pilih <b>satu</b> rilis: NFP, CPI, PPI, atau FOMC. Setiap analisis hanya membahas rilis itu — karena tidak semua rilis jatuh di hari yang sama — tetapi AI tetap menggabungkan <b>semua data global</b> (BLS/FRED, EFFR, yield riil, DXY, CFTC, berita) menjadi satu keputusan final <b>BUY / SELL</b> (tanpa WAIT), plus status tegas <b>spike: YA / TIDAK</b>. Sumber jadwal: <b>BLS</b> &amp; <b>federalreserve.gov</b>. Validitas wajib menyebut sumber, periode, kesegaran, dan verifikasi silang.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px">' + tabs + '</div>'
     + '<div class="small mut" style="margin-top:6px"><b>' + FX.icon + ' ' + FX.label + '</b> · ' + esc(FX.name) + ' — ' + esc(FX.desc) + (ev ? ' · jadwal ' + esc(new Date(ev.ts).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) : ' · jadwal belum ada di cache') + '</div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>' + FX.label + '</b><span>XAUUSD</span></div></div></div>'
@@ -71,13 +71,13 @@ function xauFocusCard(j) {
   const f = j.xau || {}, x = j.xai || {}, tags = f.focusTags || [], tag = tags.length === 1 ? tags[0] : '';
   const bucket = (f.focus || []).filter(function (b) { return b.tag === tag; })[0];
   const ev = bucket && bucket.events ? bucket.events[0] : null;
-  const sp = x.spike || {};
+  const sp = x.spike || {}, act = x.action === 'SELL' ? 'SELL' : 'BUY';
   const label = f.focusName || (tags.length ? tags.join(' · ') : 'Gabungan');
-  return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-pill y">' + (tags.length === 1 ? 'rilis tunggal' : tags.length + ' rilis') + '</span></div>'
+  return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-pill" style="color:' + (act === 'BUY' ? 'var(--ok)' : 'var(--no)') + '">' + act + ' XAUUSD</span></div>'
     + (ev ? '<div class="small" style="margin-top:4px"><b>' + esc(ev.title || ev.tag) + '</b> · ' + esc(new Date(ev.ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })) + (ev.verified === 'official' ? ' · ✅ jadwal resmi' : '') + '</div>' : '')
     + (ev ? '<div class="small mut" style="margin-top:3px">Forecast: ' + esc(ev.forecast || 'konsensus tidak ditemukan') + (ev.previous ? ' · Previous: ' + esc(ev.previous) : '') + (ev.actual ? ' · Aktual: ' + esc(ev.actual) : '') + '</div>' : '')
-    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⚡ Spike:</b> ' + (sp.likely ? 'berpotensi spike' : 'tidak dominan') + (sp.why ? ' — ' + esc(sp.why) : '') + '</div>'
-    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir.</div></div>';
+    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⚡ Spike:</b> <b style="color:' + (sp.likely ? 'var(--warn)' : 'var(--mut)') + '">' + (sp.likely ? 'YA' : 'TIDAK') + '</b>' + (sp.why ? ' — ' + esc(sp.why) : '') + '</div>'
+    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI.') + '</div></div>';
 }
 
 /* Pembungkus renderXau: tampilan lama tetap, lalu tambah kartu validitas & prediksi. */
@@ -162,11 +162,23 @@ function xauPlanHtml(sig) {
    ===================================================================== */
 const RB31_TRK = 'rb31_sig_active_v1', RB31_CLOSED = 'rb31_sig_closed_v1';
 const RB31_MAX = 10, RB31_MIN = 5, RB31_COOLDOWN = 20 * 60000;
+const RB31_MEM = { active: null, closed: null };
 
+/* Baca/tulis dengan cadangan memori: kartu Sinyal aktif tidak boleh kosong hanya
+   karena localStorage penuh atau diblokir browser. */
 function rb31Read(key, fb) {
-  try { const a = JSON.parse(localStorage.getItem(key) || 'null'); return Array.isArray(a) ? a : fb; } catch (e) { return fb; }
+  let a = null;
+  try { a = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { }
+  const mem = key === RB31_TRK ? RB31_MEM.active : key === RB31_CLOSED ? RB31_MEM.closed : null;
+  if (Array.isArray(a) && (a.length || !Array.isArray(mem))) return a;
+  return Array.isArray(mem) ? mem : fb;
 }
-function rb31Write(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { } }
+function rb31Write(key, v) {
+  const a = Array.isArray(v) ? v.slice() : [];
+  if (key === RB31_TRK) RB31_MEM.active = a;
+  if (key === RB31_CLOSED) RB31_MEM.closed = a;
+  try { localStorage.setItem(key, JSON.stringify(a)); } catch (e) { }
+}
 function rb31Active() { return rb31Read(RB31_TRK, []).filter(function (s) { return s && s.id && s.entry != null && s.sl != null && s.tp1 != null; }); }
 function rb31Closed() { return rb31Read(RB31_CLOSED, []).filter(function (s) { return s && s.id && s.closedAt; }); }
 function rb31SigKey(s) { return String(s.id || s.method || 'x').replace(/[^a-zA-Z0-9_]+/g, '-') + '|' + s.dir; }
@@ -184,6 +196,7 @@ function rb31SigRecord(s, now) {
     tp2Pips: rb31n(s.tp2Pips) || (tp2 != null ? Math.round(Math.abs(tp2 - e) / pip) : null),
     tpMaxPips: rb31n(s.tpMaxPips) || (tpM != null ? Math.round(Math.abs(tpM - e) / pip) : null),
     rr: rb31n(s.rr), score: rb31n(s.score), valid: !!s.valid, why: s.why || '', need: s.need || '',
+    entryWhy: s.entryWhy || '', slWhy: s.slWhy || '', tpWhy: s.tpWhy || '', confluence: s.confluence || '',
     openedAt: (s.openedAt || now), status: 'OPEN', at: now
   };
 }
@@ -278,17 +291,28 @@ function rb31Card(s, price) {
     + '<div class="small mut" style="margin-top:5px">Jarak dari harga: TP1 ' + to(s.tp1) + ' · TP2 ' + to(s.tp2) + ' · TPmax ' + to(s.tpMax) + ' · SL ' + to(s.sl) + '</div>'
     + '<div class="small" style="margin-top:5px">' + st + '</div>'
     + (s.why ? '<div class="small mut" style="margin-top:4px">' + esc(s.why) + '</div>' : '')
+    + (s.entryWhy ? '<div class="small mut" style="margin-top:3px"><b>Entry:</b> ' + esc(s.entryWhy) + '</div>' : '')
+    + (s.slWhy ? '<div class="small mut" style="margin-top:2px"><b>SL:</b> ' + esc(s.slWhy) + '</div>' : '')
+    + (s.tpWhy ? '<div class="small mut" style="margin-top:2px"><b>TP:</b> ' + esc(s.tpWhy) + '</div>' : '')
+    + (s.confluence ? '<div class="small" style="margin-top:2px;color:var(--b)">' + esc(s.confluence) + '</div>' : '')
     + (s.valid ? '' : '<div class="small" style="margin-top:3px;color:var(--warn)">⚠️ ' + esc(s.need || 'syarat belum lengkap') + '</div>')
     + '</div>';
 }
-function rb31ActiveHtml(price) {
+function rb31ActiveHtml(price, d) {
   const act = rb31Active();
+  const pool = (d && d.setups) || [];
+  const nReady = pool.filter(function (s) { return s && s.status === 'SIAP'; }).length;
+  const nWait = pool.filter(function (s) { return s && s.status === 'TUNGGU'; }).length;
+  const nLate = pool.filter(function (s) { return s && s.status === 'LEWAT'; }).length;
+  const nBad = pool.filter(function (s) { return s && !s.valid && s.status !== 'LEWAT'; }).length;
   const sorted = act.slice().sort(function (a, b) { return (a.status === 'TP1' ? 0 : 1) - (b.status === 'TP1' ? 0 : 1) || (b.openedAt || 0) - (a.openedAt || 0); });
+  const emptyWhy = pool.length
+    ? '<div class="warn">Belum ada sinyal aktif. Kandidat terbaru: <b>' + pool.length + '</b> — ' + nReady + ' SIAP, ' + nWait + ' TUNGGU, ' + nLate + ' LEWAT, ' + nBad + ' belum valid. Sinyal hanya dicatat jika belum melewati entry/TP/SL dan tidak dalam cooldown 20 menit setelah selesai.</div>'
+    : '<div class="warn">Belum ada sinyal aktif dan mesin belum menghasilkan kandidat. Tekan “Ambil data terbaru” untuk membaca candle XAUUSD live.</div>';
   return '<div class="card"><div class="rb-card-head"><h3>🟢 Sinyal aktif (' + act.length + '/' + RB31_MAX + ')</h3>'
     + '<span class="rb-pill">' + (act.length >= RB31_MIN ? '✅ ' + act.length + ' sinyal berjalan' : '⏳ menunggu sinyal baru') + '</span></div>'
     + '<div class="rb-note">Sinyal <b>tidak diganti</b> selama belum terkena SL/TP. Setelah selesai (SL/TP1/TP2/TPmax), mesin mencari sinyal baru pada refresh berikutnya. Tidak ada tombol mematikan refresh: data + AI diperbarui otomatis tiap 5 menit.</div>'
-    + (act.length ? sorted.map(function (s) { return rb31Card(s, price); }).join('')
-      : '<div class="warn">Belum ada sinyal aktif. Mesin memilih 5–10 setup terbaik dari struktur M15/M5 + harga spot live. Tunggu refresh otomatis atau tekan “Ambil data terbaru”.</div>')
+    + (act.length ? sorted.map(function (s) { return rb31Card(s, price); }).join('') : emptyWhy)
     + '</div>';
 }
 function rb31ClosedPaint() {
@@ -379,7 +403,7 @@ function rb31PaintNow() {
   if (!box) return;
   const d = SIG_ST.data;
   if (!d) {
-    box.innerHTML = '<div class="card"><div class="warn">Belum ada data sinyal. Tekan <b>Ambil data terbaru</b> untuk membaca chart XAUUSD live, DXY, yield 10Y, spot emas, dan kalender rilis.</div></div>' + rb31ActiveHtml(0);
+    box.innerHTML = '<div class="card"><div class="warn">Belum ada data sinyal. Tekan <b>Ambil data terbaru</b> untuk membaca chart XAUUSD live, DXY, yield 10Y, spot emas, dan kalender rilis.</div></div>' + rb31ActiveHtml(0, null);
     rb31ClosedPaint();
     return;
   }
@@ -477,7 +501,7 @@ function rb31PaintNow() {
     + ((d.validation || []).length ? '<div class="small mut" style="margin-top:8px">Validasi: ' + d.validation.map(function (v) { return (v.ok ? '✅ ' : '⚠️ ') + esc(v.k) + ' — ' + esc(v.d); }).join(' · ') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(function (s) { return (s.ok ? '✅ ' : '⚠️ ') + esc(s.name); }).join(' · ') + '</div></div>';
 
-  box.innerHTML = planCard + rb31ActiveHtml(price) + cand + ctx + globalCard + cek + aiCard + basis + qual;
+  box.innerHTML = planCard + rb31ActiveHtml(price, d) + cand + ctx + globalCard + cek + aiCard + basis + qual;
   rb31ClosedPaint();
   sigLivePaint();
 }
