@@ -4,7 +4,7 @@
       validitas tiap data (sumber, periode, kesegaran) + prediksi jalur emas.
    2. Signal Entry         : 5–10 sinyal Alchemist, SL ≥30 pip, TP1 ≥100 pip,
       TP2 ≥200 pip, TPmax dari struktur/global; sinyal bertahan sampai SL/TP,
-      otomatis ambil data + nilai ulang AI setiap 5 menit (selalu aktif).
+      otomatis ambil data + nilai ulang AI setiap 10 menit (selalu aktif).
    3. Jurnal               : kalkulator lot akurat untuk akun USD / Cent / IDR
       dengan ukuran lot yang benar-benar akan dipakai.
    4. Alchemist            : istilah + timeframe pemakaian, peta timeframe,
@@ -72,12 +72,17 @@ function xauFocusCard(j) {
   const bucket = (f.focus || []).filter(function (b) { return b.tag === tag; })[0];
   const ev = bucket && bucket.events ? bucket.events[0] : null;
   const sp = x.spike || {}, act = x.action === 'SELL' ? 'SELL' : 'BUY';
+  const mk = x.market || {}, mdir = mk.bias || (act === 'BUY' ? 'BULLISH' : 'BEARISH');
+  const mcol = mdir === 'BULLISH' ? 'var(--ok)' : mdir === 'BEARISH' ? 'var(--no)' : 'var(--warn)';
+  const mev = (Array.isArray(mk.evidence) ? mk.evidence : []).slice(0, 5);
   const label = f.focusName || (tags.length ? tags.join(' · ') : 'Gabungan');
   return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-pill" style="color:' + (act === 'BUY' ? 'var(--ok)' : 'var(--no)') + '">' + act + ' XAUUSD</span></div>'
     + (ev ? '<div class="small" style="margin-top:4px"><b>' + esc(ev.title || ev.tag) + '</b> · ' + esc(new Date(ev.ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })) + (ev.verified === 'official' ? ' · ✅ jadwal resmi' : '') + '</div>' : '')
     + (ev ? '<div class="small mut" style="margin-top:3px">Forecast: ' + esc(ev.forecast || 'konsensus tidak ditemukan') + (ev.previous ? ' · Previous: ' + esc(ev.previous) : '') + (ev.actual ? ' · Aktual: ' + esc(ev.actual) : '') + '</div>' : '')
     + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⚡ Spike:</b> <b style="color:' + (sp.likely ? 'var(--warn)' : 'var(--mut)') + '">' + (sp.likely ? 'YA' : 'TIDAK') + '</b>' + (sp.why ? ' — ' + esc(sp.why) : '') + '</div>'
-    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI.') + '</div></div>';
+    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Arah data pasar:</b> <b style="color:' + mcol + '">' + esc(mdir) + '</b>' + (mk.score != null ? ' · skor ' + esc(String(mk.score)) : '') + (mk.strong ? ' · bukti kuat' : ' · bukti belum dominan') + '</div>'
+    + (mev.length ? '<div style="margin-top:4px">' + mev.map(function (e) { return '<div class="small mut">• ' + esc(e.why) + ' (' + (e.w > 0 ? '+' : '') + esc(String(e.w)) + ')</div>'; }).join('') + '</div>' : '<div class="small mut" style="margin-top:4px">Belum ada data pasar yang cukup untuk mengoreksi arah AI; keyakinan dibatasi.</div>')
+    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_overridden ? 'Arah AI dikoreksi mesin karena bertentangan dengan harga/DXY/yield/kejutan rilis.' : x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI dan sudah dicek terhadap data pasar.') + '</div></div>';
 }
 
 /* Pembungkus renderXau: tampilan lama tetap, lalu tambah kartu validitas & prediksi. */
@@ -158,11 +163,31 @@ function xauPlanHtml(sig) {
 }
 
 /* =====================================================================
-   2. SIGNAL ENTRY — 5–10 sinyal, bertahan sampai SL/TP, auto 5 menit
+   2. SIGNAL ENTRY — 5–10 sinyal satu arah, bertahan sampai SL/TP, auto 10 menit
    ===================================================================== */
 const RB31_TRK = 'rb31_sig_active_v1', RB31_CLOSED = 'rb31_sig_closed_v1';
 const RB31_MAX = 10, RB31_MIN = 5, RB31_COOLDOWN = 20 * 60000;
+const RB31_STYLE_LABEL = { SCALPING: 'Scalping', DAY: 'Day Trading', SWING: 'Swing Trading' };
+const RB31_STYLE_ORDER = ['SCALPING', 'DAY', 'SWING'];
 const RB31_MEM = { active: null, closed: null };
+function rb31Style(s) {
+  const v = String((s && s.style) || 'DAY').toUpperCase();
+  return RB31_STYLE_LABEL[v] ? v : 'DAY';
+}
+function rb31StyleLabel(v) { return RB31_STYLE_LABEL[rb31Style({ style: v })]; }
+function rb31StyleNow() {
+  if (SIG_ST.style === 'ALL' || RB31_STYLE_LABEL[SIG_ST.style]) return SIG_ST.style;
+  try {
+    const v = localStorage.getItem('rb31_style_v1');
+    if (v === 'ALL' || RB31_STYLE_LABEL[v]) SIG_ST.style = v;
+  } catch (e) { }
+  return SIG_ST.style || 'ALL';
+}
+function rb31StyleSet(v) {
+  SIG_ST.style = v === 'ALL' || RB31_STYLE_LABEL[v] ? v : 'ALL';
+  try { localStorage.setItem('rb31_style_v1', SIG_ST.style); } catch (e) { }
+  sigPaint();
+}
 
 /* Baca/tulis dengan cadangan memori: kartu Sinyal aktif tidak boleh kosong hanya
    karena localStorage penuh atau diblokir browser. */
@@ -179,7 +204,18 @@ function rb31Write(key, v) {
   if (key === RB31_CLOSED) RB31_MEM.closed = a;
   try { localStorage.setItem(key, JSON.stringify(a)); } catch (e) { }
 }
-function rb31Active() { return rb31Read(RB31_TRK, []).filter(function (s) { return s && s.id && s.entry != null && s.sl != null && s.tp1 != null; }); }
+function rb31Active() {
+  const a = rb31Read(RB31_TRK, []).filter(function (s) { return s && s.id && s.entry != null && s.sl != null && s.tp1 != null; });
+  /* Satu sinyal aktif per gaya (Scalping / Day Trading / Swing Trading).
+     BUY dan SELL boleh muncul bersamaan hanya jika berasal dari gaya berbeda,
+     sehingga tidak ada dua sinyal yang saling bertabrakan pada horizon yang sama. */
+  const picked = {};
+  a.forEach(function (s) {
+    const st = rb31Style(s), old = picked[st];
+    if (!old || (s.openedAt || 0) > (old.openedAt || 0)) picked[st] = s;
+  });
+  return RB31_STYLE_ORDER.map(function (st) { return picked[st]; }).filter(Boolean);
+}
 function rb31Closed() { return rb31Read(RB31_CLOSED, []).filter(function (s) { return s && s.id && s.closedAt; }); }
 function rb31SigKey(s) { return String(s.id || s.method || 'x').replace(/[^a-zA-Z0-9_]+/g, '-') + '|' + s.dir; }
 function rb31SigRecord(s, now) {
@@ -189,7 +225,8 @@ function rb31SigRecord(s, now) {
   if (e == null || sl == null || tp1 == null) return null;
   const pip = 0.1;
   return {
-    id: rb31SigKey(s), method: s.method || 'Alchemist', dir: s.dir, entry: e, sl: sl,
+    id: rb31SigKey(s), method: s.method || 'Alchemist', dir: s.dir, style: rb31Style(s),
+    styleWhy: s.styleWhy || '', globalWhy: s.globalWhy || '', entry: e, sl: sl,
     tp1: tp1, tp2: tp2 != null ? tp2 : tp1, tpMax: tpM != null ? tpM : (tp2 != null ? tp2 : tp1),
     slPips: rb31n(s.slPips) || Math.round(Math.abs(e - sl) / pip),
     tp1Pips: rb31n(s.tpPips) || Math.round(Math.abs(tp1 - e) / pip),
@@ -207,6 +244,7 @@ function rb31TrackSync(d, price) {
   const px = rb31n(price);
   const now = Date.now();
   let act = rb31Active(), closed = rb31Closed(), changed = false;
+  const canOpen = d.direction === 'BUY' || d.direction === 'SELL';
   if (px && px > 0) {
     act.forEach(function (s) {
       if (s.status === 'SL' || s.status === 'TP2' || s.status === 'MAX') return;
@@ -231,12 +269,18 @@ function rb31TrackSync(d, price) {
     act = act.filter(function (s) { return !doneIds[s.id]; });
     changed = true;
   }
+  if (!canOpen) {
+    if (changed) { rb31Write(RB31_TRK, act.slice(0, RB31_MAX)); rb31Write(RB31_CLOSED, closed); }
+    return changed;
+  }
   const pool = (d.setups || []).slice().sort(function (a, b) {
     return ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || ((rb31n(b.score) || 0) - (rb31n(a.score) || 0));
   });
   pool.forEach(function (s) {
     if (act.length >= RB31_MAX) return;
     if (!s || s.status === 'LEWAT' || !s.dir || s.entry == null) return;
+    /* Satu setup aktif per gaya; setup lain tetap tampil di daftar kandidat. */
+    if (act.some(function (x) { return rb31Style(x) === rb31Style(s); })) return;
     const key = rb31SigKey(s);
     if (act.some(function (x) { return x.id === key; })) return;
     if (closed.some(function (x) { return x.id === key && now - (x.closedAt || 0) < RB31_COOLDOWN; })) return;
@@ -273,14 +317,16 @@ function rb31PlanOf(d) {
   };
 }
 function rb31Card(s, price) {
-  const buy = s.dir === 'BUY';
+  const buy = s.dir === 'BUY', style = rb31StyleLabel(s.style);
   const st = s.status === 'TP1' ? '<span class="rb-pill" style="color:var(--ok);border-color:var(--ok)">🟢 TP1 tercapai — lanjut TP2</span>'
     : '<span class="rb-pill" style="color:var(--warn)">⏳ AKTIF — tunggu SL/TP</span>';
   const to = (v) => price && v != null ? Math.round(Math.abs(v - price) / 0.1) + ' pip' : '—';
   return '<div class="exp" style="margin-bottom:8px;color:var(--tx);border-color:' + (s.status === 'TP1' ? 'var(--ok)' : 'var(--line2)') + '">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
-    + '<b>' + (buy ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b>'
+    + '<b>' + (buy ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b><span class="rb-pill">' + esc(style) + '</span>'
     + '<span class="small mut">dibuka ' + esc(new Date(s.openedAt).toLocaleTimeString('id-ID')) + ' · skor ' + (s.score == null ? '—' : s.score) + '/5</span></div>'
+    + (s.styleWhy ? '<div class="small" style="margin-top:4px;color:var(--b)">' + esc(s.styleWhy) + '</div>' : '')
+    + (s.globalWhy ? '<div class="small mut" style="margin-top:3px"><b>Global:</b> ' + esc(s.globalWhy) + '</div>' : '')
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;margin-top:7px">'
     + sigMini('Entry', sigNum(s.entry))
     + sigMini('SL · ' + s.slPips + ' pip', '<span style="color:var(--no)">' + sigNum(s.sl) + '</span>')
@@ -299,8 +345,9 @@ function rb31Card(s, price) {
     + '</div>';
 }
 function rb31ActiveHtml(price, d) {
-  const act = rb31Active();
-  const pool = (d && d.setups) || [];
+  const sf = rb31StyleNow();
+  const act = rb31Active().filter(function (s) { return sf === 'ALL' || rb31Style(s) === sf; });
+  const pool = ((d && d.setups) || []).filter(function (s) { return s && (sf === 'ALL' || rb31Style(s) === sf); });
   const nReady = pool.filter(function (s) { return s && s.status === 'SIAP'; }).length;
   const nWait = pool.filter(function (s) { return s && s.status === 'TUNGGU'; }).length;
   const nLate = pool.filter(function (s) { return s && s.status === 'LEWAT'; }).length;
@@ -309,9 +356,9 @@ function rb31ActiveHtml(price, d) {
   const emptyWhy = pool.length
     ? '<div class="warn">Belum ada sinyal aktif. Kandidat terbaru: <b>' + pool.length + '</b> — ' + nReady + ' SIAP, ' + nWait + ' TUNGGU, ' + nLate + ' LEWAT, ' + nBad + ' belum valid. Sinyal hanya dicatat jika belum melewati entry/TP/SL dan tidak dalam cooldown 20 menit setelah selesai.</div>'
     : '<div class="warn">Belum ada sinyal aktif dan mesin belum menghasilkan kandidat. Tekan “Ambil data terbaru” untuk membaca candle XAUUSD live.</div>';
-  return '<div class="card"><div class="rb-card-head"><h3>🟢 Sinyal aktif (' + act.length + '/' + RB31_MAX + ')</h3>'
-    + '<span class="rb-pill">' + (act.length >= RB31_MIN ? '✅ ' + act.length + ' sinyal berjalan' : '⏳ menunggu sinyal baru') + '</span></div>'
-    + '<div class="rb-note">Sinyal <b>tidak diganti</b> selama belum terkena SL/TP. Setelah selesai (SL/TP1/TP2/TPmax), mesin mencari sinyal baru pada refresh berikutnya. Tidak ada tombol mematikan refresh: data + AI diperbarui otomatis tiap 5 menit.</div>'
+  return '<div class="card"><div class="rb-card-head"><h3>🟢 Sinyal aktif · ' + esc(sf === 'ALL' ? 'semua gaya' : rb31StyleLabel(sf)) + ' (' + act.length + '/' + RB31_STYLE_ORDER.length + ' gaya)</h3>'
+    + '<span class="rb-pill">' + (act.length ? '✅ ' + act.length + ' sinyal berjalan' : '⏳ menunggu sinyal baru') + '</span></div>'
+    + '<div class="rb-note">Maksimal <b>satu sinyal aktif per gaya</b>: Scalping, Day Trading, dan Swing Trading. BUY dan SELL boleh muncul bersamaan hanya jika berasal dari gaya/horizon berbeda; setup satu gaya tidak boleh berlawanan arah. Sinyal bertahan sampai SL/TP1/TP2/TPmax, lalu diganti pada refresh berikutnya. Data + AI diperbarui otomatis tiap <b>10 menit</b>.</div>'
     + (act.length ? sorted.map(function (s) { return rb31Card(s, price); }).join('') : emptyWhy)
     + '</div>';
 }
@@ -323,7 +370,7 @@ function rb31ClosedPaint() {
     + (done.length ? '<button class="x" type="button" onclick="rb31ClearClosed()">Hapus riwayat</button>' : '') + '</div>'
     + (done.length ? done.map(function (s) {
       const win = s.result === 'WIN';
-      return '<div class="item" style="align-items:flex-start"><span><b>' + (s.dir === 'BUY' ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b><div class="small mut">' + esc(new Date(s.closedAt).toLocaleString('id-ID')) + ' · entry ' + sigNum(s.entry) + ' → ' + esc(s.status) + ' @' + sigNum(s.closePrice) + '</div></div><span style="white-space:nowrap;color:' + (win ? 'var(--ok)' : 'var(--no)') + ';font-weight:800">' + (win ? '✅ ' : '❌ ') + (s.r != null ? (s.r > 0 ? '+' : '') + s.r + 'R' : s.status) + '</span></div>';
+      return '<div class="item" style="align-items:flex-start"><span><b>' + (s.dir === 'BUY' ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b> <span class="rb-pill">' + esc(rb31StyleLabel(s.style)) + '</span><div class="small mut">' + esc(new Date(s.closedAt).toLocaleString('id-ID')) + ' · entry ' + sigNum(s.entry) + ' → ' + esc(s.status) + ' @' + sigNum(s.closePrice) + '</div></div><span style="white-space:nowrap;color:' + (win ? 'var(--ok)' : 'var(--no)') + ';font-weight:800">' + (win ? '✅ ' : '❌ ') + (s.r != null ? (s.r > 0 ? '+' : '') + s.r + 'R' : s.status) + '</span></div>';
     }).join('') : '<div class="mut small">Belum ada sinyal yang selesai. Sinyal dicatat otomatis saat kena SL/TP.</div>')
     + '</div>';
 }
@@ -338,19 +385,22 @@ function pSignalEntry() {
   SIG_ST.auto = true;
   try { localStorage.setItem('rb_sig_auto', '1'); } catch (e) { }
   const d = SIG_ST.data;
-  const fresh = d && d.generatedAt && (Date.now() - Date.parse(d.generatedAt) < 150000);
+  const fresh = d && d.generatedAt && (Date.now() - Date.parse(d.generatedAt) < 10 * 60000);
   const stale = d && d.generatedAt ? '<span class="mut small">Data tersimpan ' + esc(sigTime(d.generatedAt)) + '</span>' : '';
   $('pane').innerHTML =
     '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
     + '<div class="rb-eyebrow">Trading · sinyal eksekusi XAUUSD</div><h2>🎯 Signal Entry Alchemist</h2>'
-    + '<div class="rb-note">Mesin membaca chart <b>live</b> (spot emas + candle M15 struktur, M5 konfirmasi, M1 tick, bias H1/D1, DXY, yield 10Y, dan kalender rilis), lalu memilih <b>5–10 setup</b> paling akurat. Konfirmasi entry memakai model Alchemist yang paling banyak dipakai trader profesional: <b>sapuan likuiditas → MSS/CHoCH → entry di FVG 50%, order block, atau OTE 62–79% M5</b>. Aturan level: <b>SL minimal 30 pip</b>, <b>TP1 minimal 100 pip</b>, <b>TP2 minimal 200 pip</b>, <b>TPmax</b> mengikuti target struktur/global (range, high/low 20 hari, range Asia). Sinyal bertahan sampai SL/TP, lalu diganti sinyal baru. Data + AI diperbarui otomatis <b>setiap 5 menit</b>.</div>'
-    + '<div class="rb-pill-row"><span class="rb-pill y">SL ≥30 pip</span><span class="rb-pill y">TP1 ≥100 pip</span><span class="rb-pill y">TP2 ≥200 pip</span><span class="rb-pill">5–10 sinyal</span><span class="rb-pill">Auto 5 menit</span></div>'
+    + '<div class="rb-note">Mesin membaca chart <b>live</b> (spot emas + candle M15 struktur, M5 konfirmasi, M1 tick, bias H1/D1, DXY, yield 10Y, dan kalender rilis), lalu memilih <b>5–10 setup</b> paling akurat. Setiap setup diberi label <b>Scalping</b>, <b>Day Trading</b>, atau <b>Swing Trading</b> sesuai horizonnya. Konfirmasi entry memakai model Alchemist lengkap: <b>sapuan likuiditas → MSS/CHoCH → displacement → entry di FVG 50%/OB/OTE</b>, dengan premium/discount, sesi, SMT, dan data global XAUUSD. Aturan level: <b>SL minimal 30 pip</b>, <b>TP1 minimal 100 pip</b>, <b>TP2 minimal 200 pip</b>, <b>TPmax</b> mengikuti struktur/global. Data + AI diperbarui otomatis <b>setiap 10 menit</b>.</div>'
+    + '<div class="rb-pill-row"><span class="rb-pill y">Scalping · M5/M1</span><span class="rb-pill y">Day · M15/M5</span><span class="rb-pill y">Swing · H1/D1</span><span class="rb-pill">5–10 setup</span><span class="rb-pill">Auto 10 menit</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
     + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
     + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
     + '<button class="btn alt" type="button" onclick="sigCopy(this)">📋 Salin sinyal</button>'
     + '<button class="btn alt" type="button" onclick="sigNotifAsk()">' + esc(sigNotifLabel()) + '</button></div>'
-    + '<div class="small mut" style="margin-top:8px"> Auto-refresh <b>5 menit</b>: selalu aktif (ambil data terbaru → nilai ulang AI). ' + stale + '</div></div>'
+    + '<div class="small mut" style="margin-top:8px"> Auto-refresh <b>10 menit</b>: selalu aktif (ambil data terbaru → nilai ulang AI). ' + stale + '</div></div>'
+    + '<div class="card" style="padding:10px 14px"><div class="rb-card-head"><h3>🎛️ Gaya trading</h3><span class="rb-pill">Scalping · Day · Swing</span></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + [['ALL', 'Semua'], ['SCALPING', 'Scalping'], ['DAY', 'Day Trading'], ['SWING', 'Swing Trading']].map(function (x) { const on = rb31StyleNow() === x[0]; return '<button class="x" type="button" onclick="rb31StyleSet(\'' + x[0] + '\')" style="' + (on ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:800' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>'
+    + '<div class="small mut" style="margin-top:6px">Scalping memakai konfirmasi M5/M1; Day Trading memakai struktur M15/M5; Swing Trading memakai bias H1/D1 dan target likuiditas lebih jauh. Filter ini hanya mengubah tampilan, bukan mengubah level atau arah mesin.</div></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
     + '<div id="sigBox"></div>'
     + '<div class="card"><div class="rb-card-head"><h3>📈 Chart XAUUSD — TradingView real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
@@ -376,10 +426,10 @@ function sigAutoStart() {
   SIG_ST.timer = setInterval(function () {
     if (!document.getElementById('sigBox')) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; return; }
     if (!SIG_ST.loading && !SIG_ST.loadingAI) sigLoad(false);
-  }, 5 * 60000);
+  }, 10 * 60000);
 }
-function sigAutoStop() { /* refresh otomatis 5 menit tidak bisa dimatikan (permintaan) */ }
-function sigAuto() { if (typeof v21Toast === 'function') v21Toast('Auto-refresh 5 menit selalu aktif'); sigAutoStart(); }
+function sigAutoStop() { /* refresh otomatis 10 menit tidak bisa dimatikan (permintaan) */ }
+function sigAuto() { if (typeof v21Toast === 'function') v21Toast('Auto-refresh 10 menit selalu aktif'); sigAutoStart(); }
 function sigLivePaint() {
   const t = SIG_ST.tick;
   if (t && t.price && SIG_ST.data && rb31TrackSync(SIG_ST.data, t.price) && !rb31Painting) { sigPaint(); return; }
@@ -434,12 +484,15 @@ function rb31PaintNow() {
       + (d.poi ? '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>POI terdekat:</b> FVG ' + (d.poi.kind === 'bull' ? 'bullish' : 'bearish') + ' ' + d.poi.lo + '–' + d.poi.hi + '</div>' : ''))
     + '</div>';
 
-  const pool = (d.setups || []);
+  const styleFilter = rb31StyleNow();
+  const pool = (d.setups || []).filter(function (s) { return s && (styleFilter === 'ALL' || rb31Style(s) === styleFilter); });
   const cand = '<div class="card"><div class="rb-card-head"><h3>🎯 Kandidat sinyal terbaru (' + pool.length + ')</h3><span class="rb-pill">' + (d.dataValid ? '✅ data valid' : '⚠️ data terbatas') + '</span></div>'
     + '<details><summary class="small" style="cursor:pointer;color:var(--b)">Lihat semua kandidat, level, dan alasannya</summary>'
     + (pool.length ? pool.map(function (s) {
-      const buy = s.dir === 'BUY';
-      return '<div class="exp" style="margin-top:8px;color:var(--tx)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + (buy ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b><span class="rb-pill">' + esc(s.status) + ' · skor ' + s.score + '/5</span></div>'
+      const buy = s.dir === 'BUY', style = rb31StyleLabel(s.style);
+      return '<div class="exp" style="margin-top:8px;color:var(--tx)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + (buy ? '🟢 BUY' : '🔴 SELL') + ' · ' + esc(s.method) + '</b><span class="rb-pill">' + esc(style) + ' · ' + esc(s.status) + ' · skor ' + s.score + '/5</span></div>'
+        + (s.styleWhy ? '<div class="small" style="margin-top:3px;color:var(--b)">' + esc(s.styleWhy) + '</div>' : '')
+        + (s.globalWhy ? '<div class="small mut" style="margin-top:2px"><b>Data global:</b> ' + esc(s.globalWhy) + '</div>' : '')
         + '<div class="small mut" style="margin-top:4px">Entry ' + sigNum(s.entry) + ' · SL ' + sigNum(s.sl) + ' (' + s.slPips + ' pip) · TP1 ' + sigNum(s.tp1 != null ? s.tp1 : s.tp) + ' (' + s.tpPips + ' pip) · TP2 ' + sigNum(s.tp2) + ' (' + (s.tp2Pips == null ? '—' : s.tp2Pips) + ' pip) · TPmax ' + sigNum(s.tpMax) + ' (' + (s.tpMaxPips == null ? '—' : s.tpMaxPips) + ' pip)</div>'
         + '<div class="small" style="margin-top:3px">' + esc(s.why || '') + '</div>'
         + '<div class="small mut" style="margin-top:4px"><b>Entry:</b> ' + esc(s.entryWhy || '—') + ' · <b>SL:</b> ' + esc(s.slWhy || '—') + ' · <b>TP:</b> ' + esc(s.tpWhy || '—') + '</div>'
@@ -515,7 +568,7 @@ function sigCopy(btn) {
   txt += 'Struktur M15: ' + d.structure + (d.m5 ? ' · M5 ' + d.m5.trend : '') + (d.sweep ? ' · sweep ' + d.sweep.kind : '') + '\n'
     + 'Sesi: ' + (d.session ? d.session.ses + (d.session.kill ? ' / ' + d.session.kill : '') : '—') + '\n'
     + 'Checklist: ' + (d.checklist || []).filter(function (c) { return c.ok; }).length + '/' + (d.checklist || []).length + ' OK\n';
-  if (act.length) txt += 'SINYAL AKTIF (' + act.length + '):\n' + act.map(function (s) { return '• ' + s.method + ' ' + s.dir + ' E' + s.entry + ' SL' + s.sl + ' TP1 ' + s.tp1 + ' TP2 ' + s.tp2 + ' TPmax ' + s.tpMax + ' [' + s.status + ']'; }).join('\n') + '\n';
+  if (act.length) txt += 'SINYAL AKTIF (' + act.length + '):\n' + act.map(function (s) { return '• [' + rb31StyleLabel(s.style) + '] ' + s.method + ' ' + s.dir + ' E' + s.entry + ' SL' + s.sl + ' TP1 ' + s.tp1 + ' TP2 ' + s.tp2 + ' TPmax ' + s.tpMax + ' [' + s.status + ']'; }).join('\n') + '\n';
   txt += 'Edukasi, bukan saran finansial.';
   const done = function () {
     if (btn) { const o = btn.textContent; btn.textContent = '✅ Tersalin'; setTimeout(function () { btn.textContent = o; }, 1600); }

@@ -139,7 +139,7 @@ function sigLevels() {
 /* ---------- halaman ---------- */
 function pSignalEntry() {
   if (!SIG_ST.data) SIG_ST.data = sigCacheGet();
-  const fresh = SIG_ST.data && SIG_ST.data.generatedAt && (Date.now() - Date.parse(SIG_ST.data.generatedAt) < 150000);
+  const fresh = SIG_ST.data && SIG_ST.data.generatedAt && (Date.now() - Date.parse(SIG_ST.data.generatedAt) < 10 * 60000);
   const stale = SIG_ST.data && SIG_ST.data.generatedAt ? '<span class="mut small">Data tersimpan ' + esc(sigTime(SIG_ST.data.generatedAt)) + '</span>' : '';
   $('pane').innerHTML =
     '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
@@ -149,7 +149,7 @@ function pSignalEntry() {
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
     + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
     + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
-    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()">⏱️ Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati') + '</button>'
+    + '<button class="btn alt" type="button" id="sigAutoBtn" onclick="sigAuto()">⏱️ Auto 10 menit: ' + (SIG_ST.auto ? 'aktif' : 'mati') + '</button>'
     + '<button class="btn alt" type="button" onclick="sigCopy(this)">📋 Salin sinyal</button></div>'
     + '<div class="small mut" style="margin-top:8px">' + stale + '</div></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
@@ -171,7 +171,7 @@ function pSignalEntry() {
   sigTickStart();
   if (SIG_ST.auto) sigAutoStart();
   const ab = $('sigAutoBtn');
-  if (ab) ab.textContent = ' Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati');
+  if (ab) ab.textContent = ' Auto 10 menit: ' + (SIG_ST.auto ? 'aktif' : 'mati');
   if (!fresh && !SIG_ST.loading) setTimeout(function () { sigLoad(true); }, 60);
 }
 function sigTv() {
@@ -219,7 +219,7 @@ function sigSetupCard(d) {
     + '<div class="rb-note" style="margin-bottom:8px">Semua level dihitung dari candle M15/M5/M1 + spot live, diurutkan dari skor tertinggi. SL struktur dibatasi <b>30–60 pip</b> dan TP <b>1:2</b>. <b>SIAP</b> = harga dekat level, <b>TUNGGU</b> = limit belum tersentuh, <b>LEWAT</b> = harga sudah melewati level (jangan kejar).</div>'
     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px">'
     + '<button class="x" type="button" onclick="sigNotifAsk()">' + esc(sigNotifLabel()) + '</button>'
-    + '<span class="small mut">Auto 60 dtk: <b>' + (SIG_ST.auto ? 'aktif' : 'mati') + '</b> · penanda muncul saat setup berubah TUNGGU → SIAP · notifikasi browser saat tab tidak aktif.</span></div>'
+    + '<span class="small mut">Auto 10 menit: <b>' + (SIG_ST.auto ? 'aktif' : 'mati') + '</b> · penanda muncul saat setup berubah TUNGGU → SIAP · notifikasi browser saat tab tidak aktif.</span></div>'
     + arr.map((s, i) => {
       const isFresh = freshOf(s);
       return '<div class="exp" style="margin-bottom:8px;border-color:' + ((i === 0 || isFresh) ? 'var(--accent)' : 'var(--line)') + '">'
@@ -460,7 +460,7 @@ function sigAutoStart() {
   SIG_ST.timer = setInterval(function () {
     if (!document.getElementById('sigBox')) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; return; }
     if (!SIG_ST.loading && !SIG_ST.loadingAI) sigLoad(true);
-  }, 60000);
+  }, 10 * 60000);
 }
 function sigAutoStop() { if (SIG_ST.timer) { clearInterval(SIG_ST.timer); SIG_ST.timer = 0; } }
 function sigAuto() {
@@ -468,8 +468,8 @@ function sigAuto() {
   try { localStorage.setItem('rb_sig_auto', SIG_ST.auto ? '1' : '0'); } catch (e) { }
   if (SIG_ST.auto) sigAutoStart(); else sigAutoStop();
   const btn = $('sigAutoBtn');
-  if (btn) btn.textContent = ' Auto 60 dtk: ' + (SIG_ST.auto ? 'aktif' : 'mati');
-  if (typeof v21Toast === 'function') v21Toast(SIG_ST.auto ? 'Auto-refresh 60 detik aktif' : 'Auto-refresh dimatikan');
+  if (btn) btn.textContent = ' Auto 10 menit: ' + (SIG_ST.auto ? 'aktif' : 'mati');
+  if (typeof v21Toast === 'function') v21Toast(SIG_ST.auto ? 'Auto-refresh 10 menit aktif' : 'Auto-refresh dimatikan');
 }
 function sigCopy(btn) {
   const d = SIG_ST.data, lv = sigLevels();
