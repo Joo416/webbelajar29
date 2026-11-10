@@ -428,14 +428,19 @@ function alQuizPick(i, k) {
 }
 function alTermsHtml() {
   const q = rb26Norm(ALCH.term);
-  const rows = ALCH_TERMS.filter(function (x) {
-    return !q || rb26Norm(x[0] + ' ' + x[1] + ' ' + x[2] + ' ' + x[3]).indexOf(q) >= 0;
+  const picked = new Map();
+  ALCH_TERMS.forEach(function (x, i) {
+    if (q && rb26Norm(x[0] + ' ' + x[1] + ' ' + x[2] + ' ' + x[3]).indexOf(q) < 0) return;
+    picked.set(rb26Norm(x[0]), { x: x, i: i });
   });
+  const rows = Array.from(picked.values());
   return '<input placeholder="Cari istilah (mis. FVG, QML, SBR)..." autocomplete="off" value="' + rb26Safe(ALCH.term) + '" oninput="alTerm(this.value)" style="margin-bottom:10px">'
-    + '<div class="rb-note" style="margin-bottom:6px">' + rows.length + ' istilah</div>'
-    + '<div class="rb-terms">' + (rows.length ? rows.map(function (x) {
+    + '<div class="rb-note" style="margin-bottom:6px">' + rows.length + ' istilah · setiap istilah punya contoh chart TradingView real-time, level entry/SL/TP, dan alasan invalidasi.</div>'
+    + '<div class="rb-terms">' + (rows.length ? rows.map(function (r) {
+      const x = r.x;
       return '<div class="rb-term"><span class="rb-term-abbr">' + rb26Safe(x[1]) + '</span><b>' + rb26Safe(x[0]) + '</b>'
-        + '<p>' + rb26Safe(x[2]) + '</p><div class="rb-term-use"><b>Dipakai:</b> ' + rb26Safe(x[3]) + '</div></div>';
+        + '<p>' + rb26Safe(x[2]) + '</p><div class="rb-term-use"><b>Dipakai:</b> ' + rb26Safe(x[3]) + '</div>'
+        + '<button type="button" class="x" style="margin-top:8px" onclick="alTermChart(' + r.i + ')">📈 Contoh chart real-time</button></div>';
     }).join('') : '<div class="rb-muted-box">Istilah tidak ditemukan.</div>') + '</div>';
 }
 function alStudyCaseSvg() {

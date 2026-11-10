@@ -40,7 +40,6 @@ ALCH_TERMS.push(
   ['PD array', 'Kumpulan zona', 'Order block, FVG, breaker, mitigation, dan likuiditas.', 'Kosakata untuk memilih POI.'],
   ['Inducement', 'Jebakan likuiditas', 'Level kecil yang memancing entry sebelum level utama diuji.', 'Jangan entry sebelum inducement disapu.'],
   ['Displacement', 'Impuls kuat', 'Pergerakan cepat dengan body besar yang meninggalkan FVG.', 'Bukti niat institusional, bukan sekadar koreksi.'],
-  ['Liquidity void', 'Kekosongan likuiditas', 'Area yang dilewati terlalu cepat sehingga tipis transaksi.', 'Harga sering kembali mengisi area ini.'],
   ['Breaker block', 'Blok gagal', 'Order block yang gagal lalu dipakai dari arah berlawanan.', 'Zona entry setelah struktur berubah.'],
   ['Mitigation block', 'Blok mitigasi', 'Zona tempat institusi menutup posisi lama.', 'Sering menjadi tempat retest sebelum lanjut.'],
   ['Equal highs / lows', 'High/low sejajar', 'Dua high atau low hampir sama; menyimpan stop trader.', 'Target sapuan likuiditas yang jelas.'],
@@ -559,6 +558,216 @@ function alQuizHtml() {
     + (done === ALCH_QUIZ.length ? '<div class="rb-callout ' + (right >= pass ? 'ok' : 'warn') + '"><b>Skor akhir: ' + right + '/' + ALCH_QUIZ.length + '.</b> ' + (right >= pass ? 'Lanjut ke backtest 100 trade dan jalankan rencana.' : 'Baca ulang kelompok Pemula dan Analisa sebelum mengulang kuis.') + '</div>' : '')
     + '</div>';
 }
+
+/* ==========================================================================
+   CONTOH CHART REAL-TIME PER ISTILAH
+   Satu modal TradingView (dimuat saat diklik) + level entry/SL/TP dan alasan.
+   ========================================================================== */
+const ALCH_CHART_CASES = {
+  sweep: {
+    tf: 'M5', title: 'Sapuan likuiditas → MSS → FVG 50%',
+    entry: 'Limit di 50% FVG (consequent encroachment) yang lahir dari displacement setelah MSS. Jangan entry di titik sweep.',
+    sl: 'Di luar ekstrem sweep ditambah buffer ATR M5; minimal 30 pip dari entry pada XAUUSD.',
+    tp: 'TP1 100 pip (partial), TP2 200 pip, TPmax ke sisi berlawanan range atau high/low 20 hari.',
+    why: 'Sweep mengambil stop, MSS membuktikan struktur berubah, dan displacement meninggalkan FVG. Entry di retest FVG memberi invalidasi jelas dan RR besar.',
+    invalid: 'Close melewati tepi FVG, MSS gagal, atau harga membuat ekstrem baru searah sweep.'
+  },
+  ob: {
+    tf: 'M15', title: 'Order block retest',
+    entry: 'Limit di 50% order block (candle berlawanan terakhir sebelum impuls) atau setelah reaksi pertama di tepinya.',
+    sl: 'Di luar tepi OB + buffer ATR; jangan menaruh stop di dalam zona.',
+    tp: 'Likuiditas berikutnya, high/low range, lalu TPmax di level HTF.',
+    why: 'OB adalah jejak order institusi yang belum selesai. Retest pertama memberi lokasi entry dekat invalidasi.',
+    invalid: 'OB ditembus close tanpa reaksi, atau struktur entry berubah.'
+  },
+  ote: {
+    tf: 'M5', title: 'OTE 62–79% dari leg impuls',
+    entry: 'Limit pada retracement 62–79% leg impuls terakhir, idealnya bertemu FVG atau OB.',
+    sl: 'Di luar awal leg (swing pelindung) + buffer ATR.',
+    tp: 'Fibonacci 0% leg, lalu ekstensi 1.272–1.618 atau likuiditas luar.',
+    why: 'OTE memberi harga retracement dalam tren tanpa mengejar candle; stop relatif dekat sehingga RR membesar.',
+    invalid: 'Harga menembus awal leg atau retracement melewati 100%.'
+  },
+  breaker: {
+    tf: 'M15', title: 'Breaker block setelah struktur berubah',
+    entry: 'Retest breaker (OB yang gagal) setelah BOS/MSS berlawanan arah.',
+    sl: 'Di luar breaker dan swing yang membatalkan perubahan struktur.',
+    tp: 'Likuiditas sisi berlawanan, lalu level HTF berikutnya.',
+    why: 'Breaker adalah zona tempat posisi lama terjebak; retest-nya sering menjadi entry searah struktur baru.',
+    invalid: 'Harga kembali ke sisi lama breaker dengan close kuat.'
+  },
+  premium: {
+    tf: 'H1', title: 'Premium / discount dealing range',
+    entry: 'Buy hanya di discount (bawah 50% range), sell hanya di premium (atas 50% range), searah storyline.',
+    sl: 'Di luar swing range atau di luar POI + buffer ATR.',
+    tp: '50% range, lalu sisi berlawanan range sebagai target utama.',
+    why: 'Membeli di discount memberi stop lebih dekat dan ruang profit lebih besar dibanding mengejar di premium.',
+    invalid: 'Range ditembus close dan struktur membentuk dealing range baru.'
+  },
+  judas: {
+    tf: 'M15', title: 'Judas swing / sapuan range Asia',
+    entry: 'Setelah London menyapu high/low Asia dan MSS M5, entry di FVG/OB dari impuls balik.',
+    sl: 'Di luar ekstrem sapuan Asia + buffer ATR.',
+    tp: 'Sisi berlawanan range Asia, lalu external liquidity.',
+    why: 'Sapuan awal sesi menjebak breakout trader; entry setelah MSS menghindari sisi salah dari manipulasi.',
+    invalid: 'Harga bertahan di luar range dan membuat struktur baru searah sapuan.'
+  },
+  silver: {
+    tf: 'M5', title: 'Silver bullet 10–11 / 14–15 UTC',
+    entry: 'Entry di FVG M5 pertama setelah sapuan kecil dan displacement pada jendela waktu Silver Bullet.',
+    sl: 'Di luar swing kecil + buffer ATR M5.',
+    tp: 'Likuiditas terdekat; TP1 100 pip, sisanya trailing struktur.',
+    why: 'Jendela waktu ini sering menghasilkan satu impuls bersih; entry di FVG mengikuti alur institusional tanpa menebak.',
+    invalid: 'FVG terisi penuh tanpa reaksi atau jendela waktu berakhir tanpa displacement.'
+  },
+  crt: {
+    tf: 'M15', title: 'CRT: sapuan range candle acuan',
+    entry: 'Tandai high/low candle D1/H4. Setelah satu sisi disapu dan MSS M15, entry di FVG/OB konfirmasi.',
+    sl: 'Di luar ekstrem sapuan range acuan.',
+    tp: 'Sisi berlawanan range acuan; partial di internal liquidity.',
+    why: 'CRT memakai high/low sebagai kolam likuiditas. Entry setelah manipulasi menghindari breakout palsu.',
+    invalid: 'Close di luar range ke arah sapuan dan bertahan di sana.'
+  },
+  bos: {
+    tf: 'M15', title: 'BOS continuation + retest',
+    entry: 'Setelah BOS searah tren, entry pada retest level BOS atau FVG yang ditinggalkan.',
+    sl: 'Di bawah swing terakhir (buy) atau di atas swing terakhir (sell) + buffer.',
+    tp: 'Swing berikutnya searah tren; TPmax di external liquidity.',
+    why: 'BOS menunjukkan tren berlanjut; retest memberi entry dengan invalidasi yang lebih ketat daripada breakout pertama.',
+    invalid: 'Failed break: close kembali melewati level BOS ke sisi semula.'
+  },
+  qm: {
+    tf: 'H1', title: 'Quasimodo (QM) di level left shoulder',
+    entry: 'Entry di level left shoulder (QML) setelah pola shoulder–head–return dan structure break.',
+    sl: 'Di luar head/apex pola.',
+    tp: 'Level HTF berikutnya atau external liquidity.',
+    why: 'QM memberi reversal dengan stop di luar titik invalidasi pola; entry di QML lebih baik daripada mengejar head.',
+    invalid: 'Harga membuat high/low baru melewati apex.'
+  },
+  third: {
+    tf: 'H1', title: 'Third touch + konfluensi HTF',
+    entry: 'Entry setelah candle reaksi di sentuhan ketiga level MSNR yang bertemu POI HTF.',
+    sl: 'Di luar band level + buffer ATR, bukan di dalam band.',
+    tp: 'External liquidity terdekat atau level HTF berikutnya.',
+    why: 'Sentuhan ketiga yang masih fresh dan berkonfluensi memberi reaksi terukur; stop di luar band tidak mudah tersapu.',
+    invalid: 'Close melewati tepi jauh level atau storyline HTF berubah.'
+  },
+  engulfing: {
+    tf: 'M15', title: 'Engulfing zone di SBR/RBS',
+    entry: 'Setelah candle engulfing close, entry di retest 50% candle tersebut atau tepi zona engulfing.',
+    sl: 'Di luar level role-flip dan candle engulfing.',
+    tp: 'Swing berikutnya searah engulfing.',
+    why: 'Engulfing menunjukkan penolakan kuat di level; retest memberi entry dekat invalidasi.',
+    invalid: 'Candle berikutnya menelan balik engulfing (dua kali gagal = buang).'
+  },
+  ocl: {
+    tf: 'H1', title: 'OCL / MSNR level retest',
+    entry: 'Entry saat harga menyentuh band OCL lalu close kembali menjauh searah storyline.',
+    sl: 'Di luar tepi jauh band + buffer ATR.',
+    tp: 'OCL berikutnya atau external liquidity.',
+    why: 'OCL adalah pertemuan close–open yang menjadi memori order; reaksi pertama masih fresh dan layak ditradingkan.',
+    invalid: 'Close melewati tepi jauh band selama dua candle.'
+  },
+  smt: {
+    tf: 'M15', title: 'SMT divergence XAUUSD vs DXY/yield',
+    entry: 'Setelah XAU membuat high/low baru tetapi DXY/yield tidak mengonfirmasi, tunggu MSS M5 lalu entry di FVG/OB.',
+    sl: 'Di luar ekstrem divergensi + buffer ATR.',
+    tp: 'Likuiditas berlawanan atau level HTF; TPmax di range ekstrem.',
+    why: 'Divergensi menunjukkan gerakan tidak didukung pasar lain; entry setelah MSS menghindari menebak reversal mentah.',
+    invalid: 'Korelasi kembali normal dan XAU membuat ekstrem baru yang dikonfirmasi DXY.'
+  },
+  ipda: {
+    tf: 'D1', title: 'IPDA / draw on liquidity / Power of Three',
+    entry: 'Tentukan DOL harian; tunggu accumulation–manipulation–distribution. Entry di FVG/OB setelah manipulation disapu.',
+    sl: 'Di luar ekstrem manipulasi harian.',
+    tp: 'DOL berikutnya (high/low harian atau likuiditas mingguan).',
+    why: 'IPDA memberi kerangka waktu: harga sering menyapu satu sisi range lalu bergerak ke likuiditas seberang.',
+    invalid: 'DOL sudah tercapai atau distribusi gagal dan range harian baru terbentuk.'
+  },
+  risk: {
+    tf: 'M15', title: 'Penerapan risiko pada chart live',
+    entry: 'Chart ini bukan pola entry. Entry tetap di POI model; yang dihitung di sini adalah ukuran lot dari jarak SL.',
+    sl: 'SL logis di luar struktur, bukan angka yang dipaksakan agar lot terlihat besar.',
+    tp: 'TP1 minimal 2R; TP2/TPmax mengikuti likuiditas, bukan harapan.',
+    why: 'Risiko 0,5–1% per trade membuat satu kesalahan tidak menghapus banyak profit. Lot dihitung dari SL, bukan dari target.',
+    invalid: 'Jika risiko aktual melebihi batas harian, setup dibatalkan walau arah terlihat bagus.'
+  },
+  execution: {
+    tf: 'M5', title: 'Biaya eksekusi pada chart live',
+    entry: 'Chart ini menunjukkan konteks harga. Entry tetap di POI; perhatikan spread, slippage, dan jenis order sebelum menekan tombol.',
+    sl: 'Jarak SL dihitung dalam pip; 1 pip XAUUSD umumnya 0,1. Pastikan buffer ATR lebih besar dari spread.',
+    tp: 'TP dihitung dari entry + pip; biaya spread/komisi mengurangi hasil bersih.',
+    why: 'Istilah eksekusi tidak menciptakan sinyal, tetapi menentukan apakah edge tetap positif setelah biaya.',
+    invalid: 'Jika spread melebar saat rilis atau slippage membuat entry jauh dari rencana, batalkan order.'
+  },
+  macro: {
+    tf: 'D1', title: 'Konteks makro pada chart harian',
+    entry: 'Chart ini bukan sinyal entry. Gunakan DXY, yield riil, dan kalender untuk menentukan boleh atau tidak mencari setup.',
+    sl: 'SL tetap dari struktur; makro yang berlawanan memperkecil lot atau membatalkan trade.',
+    tp: 'Target struktur, bukan target yang mengabaikan risiko rilis.',
+    why: 'Emas bergerak melawan yield riil dan USD. Konteks makro yang salah membuat setup teknikal bagus sering gagal.',
+    invalid: 'Rilis High impact ≤30 menit atau perubahan nada The Fed membatalkan rencana intraday.'
+  }
+};
+const ALCH_TERM_CASE = {
+  'MSNR': 'ocl', 'Storyline': 'macro', 'HTF / LTF': 'sweep', 'POI': 'sweep', 'OCL': 'ocl', 'Band level': 'ocl', 'Touch': 'ocl', 'Miss': 'ocl', 'Fresh': 'ob', 'Unfresh': 'ob', 'SBR': 'breaker', 'RBS': 'breaker', 'Roadblock': 'premium', 'Rejection': 'sweep', 'Breakout internal': 'bos', 'Breakout external': 'bos', 'CRT': 'crt', 'Sweep': 'sweep', 'Internal liquidity': 'sweep', 'External liquidity': 'sweep', 'MSS': 'sweep', 'CHoCH': 'sweep', 'BOS': 'bos', 'Engulfing zone': 'engulfing', 'Order block': 'ob', 'FVG': 'sweep', 'QM / QML': 'qm', 'Apex': 'qm', 'Third touch': 'third', 'Break & retest': 'bos', 'Confluence': 'sweep', 'Killzone': 'judas', 'A+ setup': 'sweep', 'Turtle soup': 'sweep', 'Power of Three': 'ipda', 'IPDA': 'ipda', 'Draw on liquidity': 'ipda', 'Dealing range': 'premium', 'Premium / discount': 'premium', 'PD array': 'sweep', 'Break of Structure': 'bos', 'Market Structure Shift': 'sweep', 'Change of Character': 'sweep', 'Displacement': 'sweep', 'Fair Value Gap': 'sweep', 'Consequent encroachment': 'sweep', 'Breaker block': 'breaker', 'Mitigation block': 'breaker', 'Liquidity void': 'sweep', 'Equal highs / lows': 'sweep', 'Optimal Trade Entry': 'ote', 'Silver bullet': 'silver', 'Judas swing': 'judas', 'SMT divergence': 'smt', 'Real yield': 'macro', 'DXY': 'macro', 'COT report': 'macro', 'News blackout': 'risk', 'TP ladder': 'risk', 'Backtest sample': 'risk', 'Session liquidity': 'judas', 'Multi-timeframe alignment': 'sweep',
+  'Bid / Ask': 'execution', 'Pip': 'execution', 'Point': 'execution', 'Lot': 'execution', 'Leverage': 'execution', 'Margin': 'execution', 'Margin call': 'execution', 'Swap': 'execution', 'Market order': 'execution', 'Limit order': 'execution', 'Stop order': 'execution', 'Trailing stop': 'execution', 'Partial close': 'execution', 'Break even (BE)': 'execution', 'Time stop': 'risk', 'Position sizing': 'risk', 'Inducement': 'sweep', 'Asian range': 'judas', 'Profit factor': 'risk', 'Risk of ruin': 'risk', 'Win rate': 'risk', 'Over-trading': 'risk', 'FOMO': 'risk', 'Slippage': 'execution', 'Korelasi': 'macro'
+};
+function alTermCase(t) {
+  const name = String(t[0] || '');
+  let key = ALCH_TERM_CASE[name];
+  if (!key) {
+    if (/risk per trade|position sizing|r multiple|profit factor|win rate|expectancy|drawdown|journal|backtest|over-?trading|fomo|revenge|confirmation|risk of ruin|time stop/i.test(name)) key = 'risk';
+    else if (/pip|point|lot|leverage|margin|swap|order|spread|slippage|partial|break even/i.test(name)) key = 'execution';
+    else if (/dxy|yield|cot|news blackout|korelasi|real yield|ipda|draw on liquidity|power of three/i.test(name)) key = 'macro';
+    else if (/killzone|asia|judas|silver/i.test(name)) key = 'judas';
+    else key = 'sweep';
+  }
+  const c = ALCH_CHART_CASES[key] || ALCH_CHART_CASES.sweep;
+  return { key: key, tf: t[4] || c.tf, def: t[2] || '', use: t[3] || '', c: c };
+}
+function alTvInterval(tf) {
+  const s = String(tf || '').toUpperCase();
+  if (/M5/.test(s)) return '5';
+  if (/M15/.test(s)) return '15';
+  if (/H1/.test(s)) return '60';
+  if (/H4/.test(s)) return '240';
+  if (/D1|W1|MN/.test(s)) return 'D';
+  return '15';
+}
+function alTermChartClose() {
+  const box = document.getElementById('rbAlchChart');
+  if (box) box.hidden = true;
+  document.body.classList.remove('rb-chart-open');
+}
+function alTermChart(i) {
+  const t = ALCH_TERMS[i];
+  if (!t) return;
+  const x = alTermCase(t), c = x.c;
+  let box = document.getElementById('rbAlchChart');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'rbAlchChart';
+    box.className = 'rb-chart-modal';
+    box.hidden = true;
+    box.onclick = function (e) { if (e.target === box) alTermChartClose(); };
+    document.body.appendChild(box);
+  }
+  const iv = alTvInterval(x.tf);
+  const url = 'https://s.tradingview.com/widgetembed/?symbol=OANDA%3AXAUUSD&interval=' + iv + '&theme=dark&style=1&timezone=Etc%2FUTC&locale=id&hidesidetoolbar=1&symboledit=0&saveimage=0&withdateranges=1&studies=%5B%5D';
+  box.innerHTML = '<div class="rb-chart-sheet" onclick="event.stopPropagation()">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><div><div class="small mut">Contoh chart real-time · XAUUSD · ' + esc(c.title) + '</div><h3>' + esc(t[0]) + ' — ' + esc(x.tf) + '</h3></div><button class="x rb-chart-close" type="button" onclick="alTermChartClose()" aria-label="Tutup">✕</button></div>'
+    + '<div class="small mut" style="margin-top:4px"><b>' + esc(t[1]) + '</b> · ' + esc(x.def) + '</div>'
+    + '<div class="rb-chart-frame"><iframe src="' + esc(url) + '" title="TradingView XAUUSD ' + esc(t[0]) + '" loading="lazy" allowtransparency="true" scrolling="no"></iframe></div>'
+    + '<div class="rb-chart-levels"><div><span>Entry — kenapa di situ</span><b>' + esc(c.entry) + '</b></div><div><span>Stop loss — kenapa di situ</span><b>' + esc(c.sl) + '</b></div><div><span>Take profit — kenapa di situ</span><b>' + esc(c.tp) + '</b></div></div>'
+    + '<div class="rb-note" style="margin-top:10px"><b>Alasan setup:</b> ' + esc(c.why) + '</div>'
+    + '<div class="rb-callout warn" style="margin-top:8px"><b>Invalidasi:</b> ' + esc(c.invalid) + '</div>'
+    + '<div class="small mut" style="margin-top:8px">Dipakai untuk: ' + esc(x.use) + '. Chart ini alat verifikasi visual; level sinyal utama tetap dihitung mesin dari candle live. <a href="https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD" target="_blank" rel="noopener" style="color:var(--b)">Buka chart penuh ↗</a></div>'
+    + '</div>';
+  box.hidden = false;
+  document.body.classList.add('rb-chart-open');
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') alTermChartClose(); });
 
 /* ---------- kerangka halaman ---------- */
 function alGroup(g) {
