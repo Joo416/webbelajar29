@@ -237,3 +237,41 @@ textarea{font-size:16px}
 .rb-chart-levels b{display:block;margin-top:3px;font-size:.86rem;line-height:1.45}
 .rb-chart-close{width:34px;height:34px;flex:none;border-radius:10px}
 @media(max-width:640px){.rb-chart-modal{padding:8px}.rb-chart-sheet{padding:10px;border-radius:14px}.rb-chart-frame{height:300px}}
+
+/* ==========================================================================
+   V32 — keterbacaan: teks bantu, label, dan angka tidak lagi pudar
+   Dimuat paling akhir, jadi menimpa variabel tema sebelumnya.
+   ========================================================================== */
+:root{
+  --mut:#c4cddb;          /* teks bantu: kontras naik dari #aeb8c6 */
+  --bad:#aeb8c8;          /* 'bad' dipakai untuk label netral, bukan error */
+  --tx-soft:#dde4ee;      /* teks sekunder yang tetap terbaca */
+}
+html[data-theme=light]{
+  --mut:#3c4553;          /* sebelumnya #46505f */
+  --bad:#59636f;
+  --tx-soft:#1b2331;
+}
+html[data-theme=light] ::placeholder{color:#5a6472;opacity:1}
+
+.small{font-size:.87rem;line-height:1.6}
+.mut,.small.mut{color:var(--mut)}
+.rb-note{color:var(--tx-soft);font-size:.83rem;line-height:1.66}
+.rb-note b,.card .small b,.exp b,.warn b,.hint b{color:var(--tx)}
+.rb-pill{color:var(--tx-soft);font-size:.7rem;font-weight:650}
+.item{color:var(--tx-soft);line-height:1.6}
+.item .mut,.item .small.mut{color:var(--mut)}
+.card h3,.card h3 b{color:var(--tx)}
+label{color:var(--tx-soft);font-size:.72rem;font-weight:650;letter-spacing:.03em}
+select,textarea,input{color:var(--tx)}
+::placeholder{color:var(--mut);opacity:1}
+.x{font-size:.8rem;min-height:34px;color:var(--tx)}
+.rb-card-head .rb-pill{color:var(--tx-soft)}
+.rb-term p,.rb-step{color:var(--tx-soft)}
+.rb-table td{color:var(--tx-soft)}
+.rb-src a{color:var(--accent2)}
+.rb-achg .n{opacity:1}
+/* Aturan lama memetakan teks hampir-putih ke --mut; untuk status penting
+   mereka harus tetap tegas, bukan pudar. */
+html [style*="color:#dcdcdc"],html [style*="color:#d3d3d3"],html [style*="color:#c3c3c3"]{color:var(--tx)!important}
+html [style*="color:#e8e8e8"]{color:var(--warn)!important}

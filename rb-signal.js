@@ -12,7 +12,7 @@ const SIG_ST = {
   data: null, ai: null, aiNotes: [], meta: null, tick: null, loading: false, loadingAI: false,
   auto: (function () { try { return localStorage.getItem('rb_sig_auto') !== '0'; } catch (e) { return true; } })(),
   fresh: {}, timer: 0, tickTimer: 0, pip: 0.1, slMode: 'fixed', bal: '1000', risk: '1', err: '', msg: '',
-  tvInt: (function () { try { var v = localStorage.getItem('rb_sig_tv'); return ['1', '5', '15'].indexOf(v) >= 0 ? v : '5'; } catch (e) { return '5'; } })()
+  tvInt: (function () { try { var v = localStorage.getItem('rb_sig_tv'); return ['1', '5', '15', '60', '240'].indexOf(v) >= 0 ? v : '5'; } catch (e) { return '5'; } })()
 };
 const SIG_CACHE = 'rb_sig_last_v2', SIG_HIST = 'rb_sig_hist_v2';
 const SIG_STATES = 'rb_sig_states_v1', SIG_FRESH_MS = 10 * 60000, SIG_COOLDOWN = 5 * 60000, SIG_PREV_MAX = 6 * 3600000;
@@ -177,19 +177,19 @@ function pSignalEntry() {
 function sigTv() {
   const el = $('sigTV');
   if (!el) return;
-  const intv = ['1', '5', '15'].indexOf(String(SIG_ST.tvInt)) >= 0 ? String(SIG_ST.tvInt) : '5';
+  const intv = ['1', '5', '15', '60', '240'].indexOf(String(SIG_ST.tvInt)) >= 0 ? String(SIG_ST.tvInt) : '5';
   const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   const u = 'https://s.tradingview.com/widgetembed/?symbol=OANDA%3AXAUUSD&interval=' + intv + '&hidesidetoolbar=0&symboledit=1&saveimage=0'
     + '&toolbarbg=' + (theme === 'light' ? 'ffffff' : '0d1117') + '&studies=%5B%5D&theme=' + theme
     + '&style=1&timezone=Asia%2FJakarta&locale=id&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=1&details=1';
   el.innerHTML = '<iframe src="' + u + '" style="width:100%;height:100%;border:0" frameborder="0" allowtransparency="true" loading="lazy" title="Chart XAUUSD TradingView"></iframe>';
   const pill = $('sigTvPill');
-  if (pill) pill.textContent = 'LIVE · ' + (intv === '1' ? 'M1' : intv === '15' ? 'M15' : 'M5');
+  if (pill) pill.textContent = 'LIVE · ' + ({ '1': 'M1', '5': 'M5', '15': 'M15', '60': 'H1', '240': 'H4' }[intv] || 'M5');
   const bs = document.querySelectorAll('[data-sigtv]');
   for (let i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-sigtv') === intv);
 }
 function sigTvInt(n) {
-  SIG_ST.tvInt = String(n) === '1' || String(n) === '15' ? String(n) : '5';
+  SIG_ST.tvInt = ['1', '5', '15', '60', '240'].indexOf(String(n)) >= 0 ? String(n) : '5';
   try { localStorage.setItem('rb_sig_tv', SIG_ST.tvInt); } catch (e) { }
   sigTv();
 }

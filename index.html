@@ -701,7 +701,7 @@ function renderNewsBase(j,stale){
     ${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc(j.notes.join(' | ').slice(0,1600))}</div>`:''}<div class="mut small" style="margin-top:8px">Analisis edukasi berbasis data publik, bukan saran finansial. Data bisa direvisi dan pasar bisa bergerak berbeda dari skenario mana pun.</div>`;
 }
 /* ---------- tab Analisis Pro ---------- */
-const BCOL={BULLISH:'var(--b)',BEARISH:'var(--bad)',NETRAL:'var(--mut)'},BARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
+const BCOL={BULLISH:'var(--ok)',BEARISH:'var(--no)',NETRAL:'var(--mut)'},BARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
 // ✏️ [TEKS BISA DIUBAH] 🧠 Trading → Analisis (kartu data & hasil) — fungsi renderProBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function renderProBase(j,stale){
   const p=j.pro,t=new Date(j.fetchedAt);
@@ -2202,7 +2202,7 @@ async function pPapan(){
 <script>
 /* ===== UPDATE V22: tab 🎯 News Analisis — NFP · PPI · CPI · FOMC → XAUUSD ===== */
 const XTAGS=['NFP','PPI','CPI','FOMC'];
-const XCOL={BULLISH:'var(--b)',BEARISH:'var(--bad)',NETRAL:'var(--mut)'};
+const XCOL={BULLISH:'var(--ok)',BEARISH:'var(--no)',NETRAL:'var(--mut)'};
 const XARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
 const XNAME={NFP:'Non-Farm Payrolls',PPI:'Producer Price Index',CPI:'Consumer Price Index',FOMC:'FOMC / suku bunga The Fed'};
 let XR={g:null,cur:null};
