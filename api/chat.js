@@ -1657,6 +1657,82 @@ function xauMarket(g, pack, tags) {
     evidence: evidence.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 8)
   };
 }
+/* ===== Spike rilis (deterministik, bukan tebakan AI) =====
+   Menjawab "apakah rilis ini punya spike?": ukuran dasar per jenis rilis,
+   diskalakan dengan ATR M15 live dan besar kejutan aktual-vs-forecast; bila
+   rilis sudah terbit, reaksi nyata diukur dari candle M5/M15 yang sama dengan
+   chart mesin. */
+const XAU_SPIKE_BASE = { NFP: 260, CPI: 230, PPI: 175, FOMC: 360 }; // pip (1 pip XAUUSD = 0,1)
+function xauSpikeOf(sig, pack, tag) {
+  const empty = { tag: tag || '', likely: false, released: false, sizePips: null, windowMin: null, firstDir: '', imminentH: null, why: 'Rilis fokus belum terbaca.', reaction: null, source: 'mesin (ATR + reaksi candle)' };
+  if (!pack || typeof pack !== 'object') return empty;
+  let ev = null;
+  if (tag && pack.next && pack.next[tag]) ev = pack.next[tag];
+  else if (pack.nearest) ev = pack.nearest;
+  if (!ev || !ev.tag) {
+    const flat = [];
+    (pack.focus || []).forEach(b => (b.events || []).forEach(e => flat.push(e)));
+    flat.sort((a, b) => a.ts - b.ts);
+    ev = flat[0] || null;
+    if (!ev || !ev.tag) ev = pack.nearest || null;
+    else ev = { ...ev, tag: ev.tag };
+  }
+  if (!ev || !ev.ts) return empty;
+  const T = ev.tag || tag, base = XAU_SPIKE_BASE[T] || 220;
+  const atrPips = sig && Number(sig.atrPips) > 0 ? Number(sig.atrPips) : 30;
+  const scale = Math.min(1.8, Math.max(0.6, atrPips / 30));
+  const now = Date.now(), released = ev.ts <= now, hours = (ev.ts - now) / 3600000;
+  let surpriseK = 1, firstDir = 'DUA ARAH', why = '';
+  const f = numOf(ev.forecast);
+  const a = ev.actualOfficial != null ? Number(ev.actualOfficial) : numOf(ev.actual);
+  if (released && f != null && a != null && isFinite(a) && isFinite(f)) {
+    const diff = a - f, unit = T === 'NFP' ? 75 : 0.15;
+    const inv = /unemployment|jobless|claims/i.test(String(ev.title || ''));
+    const hot = (diff > 0) !== inv; // kejutan hawkish: USD kuat → emas tertekan
+    surpriseK = 1 + Math.min(1.2, Math.abs(diff) / unit * 0.8);
+    firstDir = Math.abs(diff) < unit * 0.25 ? 'DUA ARAH' : (hot ? 'SELL' : 'BUY');
+    why = T + ' terbit: aktual ' + (ev.actualOfficial != null ? ev.actualOfficial : ev.actual) + ' vs forecast ' + ev.forecast + ' — kejutan ' + (diff > 0 ? '+' : '') + sgN(diff) + ' (' + (Math.abs(diff) < unit * 0.25 ? 'sesuai konsensus, arah awal dua arah' : hot ? 'lebih panas/kuat → tekanan turun emas' : 'lebih dingin/lemah → dukungan naik emas') + ').';
+  } else if (released) {
+    why = T + ' sudah terbit, tetapi aktual/forecast belum lengkap; spike diperkirakan dari kelas rilis + ATR live.';
+  } else {
+    why = T + ' belum terbit (' + (hours > 0 ? 'dalam ' + (hours < 1 ? Math.round(hours * 60) + ' menit' : sgN(hours) + ' jam') : 'baru saja') + '). Rilis High impact ini historis memicu lonjakan dua arah; arah pertama mengikuti kejutan angka vs konsensus.';
+  }
+  /* Batas atas realistis: lonjakan emas pada rilis High impact jarang melewati
+     ~1,9× ukuran dasar kelas rilisnya; kejutan besar menaikkan, tapi tidak tanpa batas. */
+  const capP = Math.round(base * scale * 1.9);
+  let minP = Math.round(base * scale * 0.8 * (released ? surpriseK : 1));
+  let maxP = Math.round(base * scale * 1.35 * (released ? surpriseK : 1));
+  maxP = Math.min(maxP, capP);
+  minP = Math.min(minP, Math.round(maxP * 0.8));
+  let reaction = null;
+  try {
+    const ch = sig && sig.chart;
+    if (released && ch) {
+      const rowsAll = (ch.m5 && ch.m5.length ? ch.m5 : ch.rows) || [];
+      const pre = rowsAll.filter(r => r.t <= ev.ts);
+      const post = rowsAll.filter(r => r.t >= ev.ts && r.t <= ev.ts + 45 * 60000);
+      if (pre.length && post.length >= 2) {
+        const anchor = pre[pre.length - 1].c;
+        const hi = Math.max(...post.map(r => r.h)), lo = Math.min(...post.map(r => r.l));
+        const last = post[post.length - 1].c;
+        const rangePips = Math.round((hi - lo) / 0.1), netPips = Math.round((last - anchor) / 0.1);
+        reaction = {
+          window: '45 menit setelah rilis', bar: ch.m5 && ch.m5.length ? 'M5' : 'M15',
+          rangePips, upPips: Math.round((hi - anchor) / 0.1), downPips: Math.round((anchor - lo) / 0.1), netPips,
+          firstDir: Math.abs(netPips) < 15 ? 'DUA ARAH' : netPips > 0 ? 'BUY' : 'SELL'
+        };
+      }
+    }
+  } catch (e) { reaction = null; }
+  return {
+    tag: T, title: ev.title || T, ts: ev.ts, released, imminentH: sgN(hours),
+    likely: released ? (reaction ? reaction.rangePips >= 80 : maxP >= 150) : Math.abs(hours) <= 168,
+    sizePips: { min: minP, max: maxP }, windowMin: T === 'FOMC' ? 35 : 20,
+    firstDir: reaction && reaction.firstDir !== 'DUA ARAH' ? reaction.firstDir : firstDir,
+    why, reaction, atrPips: sgN(atrPips), scale: sgN(scale),
+    source: 'mesin: kelas rilis + ATR M15 live' + (reaction ? ' + reaksi candle ' + reaction.bar : '')
+  };
+}
 function sanitizeXau(o, opts) {
   o = (o && typeof o === 'object') ? o : {};
   const B = ['BULLISH', 'BEARISH', 'NETRAL'], C = ['RENDAH', 'SEDANG', 'TINGGI'];
@@ -1703,12 +1779,23 @@ function sanitizeXau(o, opts) {
       watch: arr(b.watch, 5, 150)
     },
     events: [], clusters: [], scenarios: [], risks: arr(o.risks, 5, 240), data_quality: arr(o.data_quality, 8, 260), gold_path: cut(o.gold_path, 900), validity: arr(o.validity, 8, 340),
-    spike: { likely: false, why: '' }
+    spike: { likely: false, why: '', size_pips: null, window_min: null, first_dir: '', reaction: null }
   };
   const sp = (o.spike && typeof o.spike === 'object') ? o.spike : {};
   const spRaw = sp.likely == null ? '' : sp.likely;
-  out.spike.likely = sp.likely === true || sp.likely === 1 || /^(ya|yes|true|1|likely|berpotensi|high)$/i.test(String(spRaw || '').trim());
-  out.spike.why = cut(sp.why || sp.note || (typeof o.spike === 'string' ? o.spike : ''), 360);
+  const spPlan = (opts && opts.spikePlan) || null;
+  const nums = v => (Array.isArray(v) ? v : [v]).map(Number).filter(x => isFinite(x));
+  const spSize = nums(sp.size_pips);
+  const plSize = spPlan && spPlan.sizePips ? [spPlan.sizePips.min, spPlan.sizePips.max].map(Number).filter(x => isFinite(x)) : [];
+  const spDir = upper(sp.first_dir);
+  out.spike = {
+    likely: sp.likely === true || sp.likely === 1 || /^(ya|yes|true|1|likely|berpotensi|high)$/i.test(String(spRaw || '').trim()) || !!(spPlan && spPlan.likely),
+    why: cut(sp.why || sp.note || (typeof o.spike === 'string' ? o.spike : '') || (spPlan ? spPlan.why : ''), 420),
+    size_pips: spSize.length ? { min: Math.min(...spSize), max: Math.max(...spSize) } : (plSize.length ? { min: plSize[0], max: plSize[1] } : null),
+    window_min: isFinite(Number(sp.window_min)) ? Number(sp.window_min) : (spPlan && spPlan.windowMin != null ? spPlan.windowMin : null),
+    first_dir: (spDir === 'BUY' || spDir === 'SELL' || spDir === 'DUA ARAH') ? spDir : (spPlan ? spPlan.firstDir : ''),
+    reaction: (spPlan && spPlan.reaction) || null
+  };
   const allowedTags = (opts && Array.isArray(opts.tags) && opts.tags.length) ? opts.tags : XAU_TAGS;
   (Array.isArray(o.events) ? o.events : []).slice(0, 12).forEach(e => {
     if (!e || typeof e !== 'object') return;
@@ -1764,8 +1851,9 @@ async function aiXau(g, focus, t0) {
   const text = dataText(g, true), fxPack = xauFocus(g, F);
   const engine = (g.eng && g.eng.pairs && g.eng.pairs.XAUUSD) || null;
   const fallback = xauDirFallback(g), market = xauMarket(g, fxPack, FT);
-  let sigText = '';
-  try { sigText = signalText(await xauSignalPack()); } catch (e) { sigText = '[SG] SIGNAL ENTRY: tidak tersedia (' + msg(e, 120) + ').'; }
+  let sigText = '', sigPack = null;
+  try { sigPack = await xauSignalPack(); sigText = signalText(sigPack); } catch (e) { sigText = '[SG] SIGNAL ENTRY: tidak tersedia (' + msg(e, 120) + ').'; }
+  const spike0 = xauSpikeOf(sigPack, fxPack, F === 'all' ? null : F.toUpperCase());
   const sys = `Kamu analis makroekonomi dan trader emas (XAUUSD) bergaya desk institusional. Waktu sekarang: ${new Date().toUTCString()}. Tugas: menentukan ke mana XAUUSD bergerak menjelang dan saat rilis ${FL}, memakai HANYA data di bawah.
 
 ATURAN KERAS:
@@ -1786,24 +1874,28 @@ ATURAN KERAS:
 13. Rencana entry [SG] berasal dari mesin deterministik (SL minimal 30 pip, TP1 minimal 100 pip, TP2 minimal 200 pip, TPmax dari target struktur/global). Jangan mengubah entry/SL/TP. Bila arah AI berbeda dengan mesin, sebut alasannya di action_reason dan turunkan keyakinan.
 14. Setiap rilis fokus WAJIB punya "validity": jelaskan mengapa angka/jadwal itu VALID — sebut sumber resmi (BLS / federalreserve.gov / FRED), periode data, kesegaran tanggal, dan hasil verifikasi silang bila ada. Dilarang menulis "valid" tanpa bukti sumber.
 15. WAJIB memberi "gold_path": prediksi jalur XAUUSD yang operasional (skenario utama, arah per rilis, level referensi dari [P]/[L], dan pemicu yang membatalkannya) menjelang dan saat rilis.
-16. WAJIB mengisi "spike": {"likely":true/false,"why":"..."} untuk rilis fokus terpilih: apakah rilis cenderung memicu lonjakan volatilitas XAUUSD, seberapa besar, dan arah pertama yang paling mungkin. Bedakan spike dari arah akhir.
+16. WAJIB mengisi "spike": {"likely":true/false,"why":"...","size_pips":{"min":0,"max":0},"window_min":0,"first_dir":"BUY|SELL|DUA ARAH"} untuk rilis fokus terpilih: apakah rilis memicu lonjakan volatilitas XAUUSD, perkiraan besar lonjakan dalam pip, jendela waktunya, dan arah PERTAMA yang paling mungkin. [SPK] adalah baseline deterministik (kelas rilis + ATR live + reaksi candle bila sudah terbit) — pakai angkanya, sesuaikan hanya bila ada bukti lain di data. Bedakan spike dari arah akhir.
+17. WAJIB menjelaskan RANTAI SEBAB-AKIBAT arah di action_reason dan thesis: (a) data global yang paling menentukan, (b) dampaknya ke USD/yield riil, (c) dampaknya ke permintaan emas, (d) kesimpulan arah BUY/SELL dan level yang membatalkannya. Tanpa rantai ini jawaban dianggap tidak valid. Jangan mengarang angka baru.
 
 PAKET RILIS FOKUS [XF] (hasil pengelompokan server; jangan menambah rilis di luar ini):
 ${JSON.stringify(fxPack).slice(0, 14000)}
 
 ${sigText}
 
+PAKET SPIKE DETERMINISTIK [SPK] (kelas rilis + ATR live + reaksi candle nyata; jadikan baseline):
+${JSON.stringify(spike0).slice(0, 2600)}
+
 ${text}
 
 OUTPUT: HANYA JSON valid tanpa markdown, semua teks Bahasa Indonesia, backslash digandakan:
-{"action":"BUY|SELL","action_source":"AI","action_reason":"alasan singkat berbasis data global dan berita lain di waktu yang sama","spike":{"likely":true,"why":"apakah rilis ini memicu spike dan arah pertamanya"},"summary":"ringkasan 2-4 kalimat: ke mana XAUUSD dan mengapa","xau_bias":{"bias":"BULLISH|BEARISH|NETRAL","confidence":"RENDAH|SEDANG|TINGGI","thesis":"...","drivers":["... [RY]"],"invalidation":"kondisi data/event yang membatalkan bias","key_levels":[{"label":"...","value":"dari [P]/[L]","source":"[P]"}],"watch":["event/angka yang dipantau"]},"events":[{"tag":"${FT.join('|')}","title":"...","date":"YYYY-MM-DD","time_utc":"...","forecast":"... atau konsensus tidak ditemukan","previous":"...","consensus_note":"...","gold_bull_if":"jika angka memicu XAU naik","gold_bear_if":"jika angka memicu XAU turun","gold_bias":"BULLISH|BEARISH|NETRAL","why":"...","spike":"spike yang biasa terjadi pada rilis ini dan arah pertamanya","validity":"mengapa data ini valid: sumber resmi/berita + periode + kesegaran + verifikasi silang","confidence":"RENDAH|SEDANG|TINGGI"}],"clusters":[{"when":"...","tags":["CPI","PPI"],"why":"efek gabungan","gold_note":"implikasi XAUUSD"}],"scenarios":[{"name":"...","if":"...","then":"..."}],"gold_path":"prediksi jalur XAUUSD menjelang & saat rilis ...","validity":["NFP: valid karena BLS ... (periode, tanggal, verifikasi silang)"],"risks":["..."],"data_quality":["data yang tidak tersedia/terbatas"]}`;
+{"action":"BUY|SELL","action_source":"AI","action_reason":"alasan singkat berbasis data global dan berita lain di waktu yang sama","spike":{"likely":true,"why":"apakah rilis ini memicu spike, besar, jendela, dan arah pertamanya","size_pips":{"min":180,"max":320},"window_min":20,"first_dir":"BUY|SELL|DUA ARAH"},"summary":"ringkasan 2-4 kalimat: ke mana XAUUSD dan mengapa","xau_bias":{"bias":"BULLISH|BEARISH|NETRAL","confidence":"RENDAH|SEDANG|TINGGI","thesis":"...","drivers":["... [RY]"],"invalidation":"kondisi data/event yang membatalkan bias","key_levels":[{"label":"...","value":"dari [P]/[L]","source":"[P]"}],"watch":["event/angka yang dipantau"]},"events":[{"tag":"${FT.join('|')}","title":"...","date":"YYYY-MM-DD","time_utc":"...","forecast":"... atau konsensus tidak ditemukan","previous":"...","consensus_note":"...","gold_bull_if":"jika angka memicu XAU naik","gold_bear_if":"jika angka memicu XAU turun","gold_bias":"BULLISH|BEARISH|NETRAL","why":"...","spike":"spike yang biasa terjadi pada rilis ini dan arah pertamanya","validity":"mengapa data ini valid: sumber resmi/berita + periode + kesegaran + verifikasi silang","confidence":"RENDAH|SEDANG|TINGGI"}],"clusters":[{"when":"...","tags":["CPI","PPI"],"why":"efek gabungan","gold_note":"implikasi XAUUSD"}],"scenarios":[{"name":"...","if":"...","then":"..."}],"gold_path":"prediksi jalur XAUUSD menjelang & saat rilis ...","validity":["NFP: valid karena BLS ... (periode, tanggal, verifikasi silang)"],"risks":["..."],"data_quality":["data yang tidak tersedia/terbatas"]}`;
   const aerr = [], dl = t0 + 56000, msgs = [{ role: 'user', content: 'Susun analisis news XAUUSD sekarang. Keluarkan hanya JSON.' }];
   const out = await llm(sys, msgs, 7000, aerr, dl, { temp: 0.3, json: 'object', field: 'xau' }, { tmo: 34000 });
   const payload = { xai: null, raw: '', flags: [], eng: null, provider: out ? out.provider : null, model: out ? out.model : null, notes: [] };
   if (!out) payload.notes.push('AI gagal: ' + aerr.join(' | ').slice(0, 300));
   else {
     try {
-      payload.xai = sanitizeXau(parseAiJson(out.text), { xauPx: xauHasPrice(g), pack: fxPack, tags: FT, fallback, market });
+      payload.xai = sanitizeXau(parseAiJson(out.text), { xauPx: xauHasPrice(g), pack: fxPack, tags: FT, fallback, market, spikePlan: spike0 });
       payload.market = market;
       if (!payload.xai.events.length) throw new Error('tidak ada rilis fokus');
       const e = engine;
@@ -1990,6 +2082,34 @@ function sgAsia(rows) {
   const sweptUp = after.some(r => r.h > hi), sweptDn = after.some(r => r.l < lo);
   return { hi: sgN(hi), lo: sgN(lo), sweptUp, sweptDn, judas: sweptUp !== sweptDn ? (sweptDn ? 'bull' : 'bear') : null };
 }
+/* Agregasi H1 → H4: bias & dealing range H4 (top-down Alchemist: D1 → H4 → H1 → M15). */
+function sgH4(h1rows) {
+  if (!h1rows || h1rows.length < 40) return null;
+  const out = [];
+  for (let i = 0; i + 4 <= h1rows.length; i += 4) {
+    const seg = h1rows.slice(i, i + 4);
+    out.push({ t: seg[0].t, o: seg[0].o, h: Math.max(...seg.map(r => r.h)), l: Math.min(...seg.map(r => r.l)), c: seg[3].c });
+  }
+  return out.length >= 20 ? out : null;
+}
+/* Liquidity pools: level yang disentuh ≥2 kali (equal high/low) — magnet stop retail. */
+function sgPools(rows, atr) {
+  const out = { highs: [], lows: [] };
+  if (!rows || rows.length < 30 || !(atr > 0)) return out;
+  const tol = atr * 0.2, win = rows.slice(-90);
+  const grp = vals => {
+    const s = vals.slice().sort((a, b) => a - b), g = [];
+    for (const v of s) {
+      const last = g[g.length - 1];
+      if (last && Math.abs(v - last.v) <= tol) { last.v = (last.v * last.n + v) / (last.n + 1); last.n++; }
+      else g.push({ v, n: 1 });
+    }
+    return g.filter(x => x.n >= 2).map(x => sgN(x.v));
+  };
+  out.highs = grp(win.map(r => r.h));
+  out.lows = grp(win.map(r => r.l));
+  return out;
+}
 function sgSMT(gold, dxy) {
   if (!gold || !dxy || gold.length < 30 || dxy.length < 30) return null;
   const g = gold.slice(-30), d = dxy.slice(-30);
@@ -2051,9 +2171,23 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   const pos = rangeHi > rangeLo ? Math.round((last.c - rangeLo) / (rangeHi - rangeLo) * 100) : null;
   let h1dir = 0;
   if (cd.h1 && cd.h1.rows.length > 60) { const hc = cd.h1.rows.map(r => r.c), a = sgEma(hc.slice(-100), 20), b = sgEma(hc.slice(-180), 50); h1dir = a != null && b != null ? (a > b ? 1 : -1) : 0; }
-  let macro = null;
+  const h4rows = cd.h1 ? sgH4(cd.h1.rows) : null;
+  const h4 = (() => {
+    if (!h4rows || h4rows.length < 25) return null;
+    const c4 = h4rows.map(r => r.c), e20 = sgEma(c4.slice(-80), 20), e50 = sgEma(c4.slice(-120), 50);
+    const st4 = sgStructure(h4rows), w4 = h4rows.slice(-30);
+    const hi4 = Math.max(...w4.map(r => r.h)), lo4 = Math.min(...w4.map(r => r.l));
+    return {
+      dir: e20 != null && e50 != null ? (e20 > e50 ? 1 : -1) : 0, trend: st4.trend,
+      ema20: sgN(e20), ema50: sgN(e50), range: { hi: sgN(hi4), lo: sgN(lo4) },
+      pos: hi4 > lo4 ? Math.round((last.c - lo4) / (hi4 - lo4) * 100) : null,
+      bos: st4.bos ? { dir: st4.bos.dir, level: sgN(st4.bos.level) } : null
+    };
+  })();
+  let macro = null, yRows = null;
   try {
     const [dx, ty] = await Promise.all([sgYahoo('DX-Y.NYB', '3mo', '1d', 7000), sgYahoo('^TNX', '3mo', '1d', 7000)]);
+    yRows = ty.rows;
     const ch = rr => { const c = rr.map(r => r.c), n = c.length; return n > 11 ? sgN((c[n - 1] / c[n - 11] - 1) * 100) : null; };
     const raw = ty.rows[ty.rows.length - 1].c, y = raw > 20 ? raw / 10 : raw;
     macro = { dxy: sgN(dx.rows[dx.rows.length - 1].c), dxyChg10d: ch(dx.rows), us10y: sgN(y), us10yChg10d: ch(ty.rows), asOf: new Date(dx.rows[dx.rows.length - 1].t).toISOString().slice(0, 10) };
@@ -2067,6 +2201,20 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     news = evs.filter(e => e && e.cur === 'USD' && e.impact === 'High' && e.ts > now - 30 * 60000 && e.ts < now + 90 * 60000)
       .map(e => ({ title: String(e.title).slice(0, 110), at: new Date(e.ts).toISOString(), inMin: Math.round((e.ts - now) / 60000), forecast: e.forecast || '', previous: e.previous || '' }));
   } catch (e) { calOk = false; }
+  /* Intermarket: emas vs yield 10Y (hubungan normal berlawanan). Divergensi = turunkan keyakinan. */
+  let intermarket = null;
+  try {
+    if (cd.day && cd.day.rows.length > 12 && yRows && yRows.length > 12) {
+      const gc = cd.day.rows.map(r => r.c), yc = yRows.map(r => r.c), n = Math.min(gc.length, yc.length);
+      const goldChg = (gc[n - 1] / gc[n - 11] - 1) * 100, yChg = yc[n - 1] - yc[n - 11];
+      const agree = (goldChg > 0 && yChg < 0) || (goldChg < 0 && yChg > 0);
+      intermarket = {
+        gold10d: sgN(goldChg), yield10d: sgN(yChg), dxy10d: macro ? macro.dxyChg10d : null,
+        aligned: agree ? (goldChg > 0 ? 'BULLISH' : 'BEARISH') : 'MIXED',
+        note: agree ? 'Emas dan yield 10Y berlawanan arah (hubungan normal) — mendukung arah emas.' : 'Emas dan yield 10Y searah (divergensi) — keyakinan diturunkan.'
+      };
+    }
+  } catch (e) { intermarket = null; }
   let spot = null, paxg = null, spotSrc = 'gold-api.com (spot XAU)';
   const [spRes, pgRes] = await Promise.allSettled([liveSpot(), paxgSpot()]);
   spot = spRes.status === 'fulfilled' ? spRes.value.price : null;
@@ -2114,10 +2262,14 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     dirVotes.push({ v: n > 0 ? 1 : -1, w, why });
   };
   if (ema20 != null && ema50 != null) dirVote(ema20 - ema50, 1.6, 'EMA20/EMA50 M15');
-  dirVote(h1dir, 2.2, 'bias H1');
+  dirVote(h1dir, 1.9, 'bias H1');
+  if (h4 && h4.dir) dirVote(h4.dir, 2.2, 'bias H4');
+  if (h4 && h4.trend !== 'RANGE') dirVote(h4.trend === 'BULLISH' ? 1 : -1, 1.6, 'struktur H4');
+  if (h4 && h4.bos) dirVote(h4.bos.dir === 'BULLISH' ? 1 : -1, 1.2, 'BOS H4');
+  if (h4 && h4.pos != null) dirVote(h4.pos < 50 ? 1 : -1, 0.3, 'posisi range H4');
   if (st.trend !== 'RANGE') dirVote(st.trend === 'BULLISH' ? 1 : -1, 2, 'struktur M15');
   if (st5 && st5.trend !== 'RANGE') dirVote(st5.trend === 'BULLISH' ? 1 : -1, 1, 'struktur M5');
-  if (daily && daily.trend) dirVote(daily.trend === 'naik' ? 1 : -1, 1.5, 'tren D1');
+  if (daily && daily.trend) dirVote(daily.trend === 'naik' ? 1 : -1, 2.2, 'tren D1');
   if (st.bos) dirVote(st.bos.dir === 'BULLISH' ? 1 : -1, 1.2, 'BOS terakhir');
   if (pos != null) dirVote(pos < 50 ? 1 : -1, 0.35, 'posisi range');
   const dirSum = dirVotes.reduce((a, v) => a + v.v * v.w, 0);
@@ -2143,7 +2295,10 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   const smtOk = !!smt && smt.kind === wantKind, judasOk = !!asia && asia.judas === wantKind;
   const confirms = [bosOk || bos5Ok, sweepOk, dispOk, obOk, smtOk, judasOk].filter(Boolean).length;
   if (direction !== 'WAIT' && (confirms < 2 || (!bosOk && !bos5Ok && !sweepOk))) { gates.push('butuh minimal 2 konfirmasi Alchemist (BOS/sweep + displacement/OB/SMT); saat ini ' + confirms); direction = 'WAIT'; }
-  if (direction !== 'WAIT' && news.length) { gates.push('rilis USD High impact ≤90 menit; spread berisiko'); direction = 'WAIT'; }
+  /* Rilis High impact hanya memblokir entry di jendela ±20 menit (spread ekstrem).
+     Di luar jendela itu tetap diperingatkan, bukan dilarang — sesuai praktik desk. */
+  const newsHard = news.filter(n => Math.abs(Number(n.inMin) || 0) <= 20);
+  if (direction !== 'WAIT' && newsHard.length) { gates.push('rilis High impact dalam ±20 menit (' + newsHard[0].title + '); spread berisiko'); direction = 'WAIT'; }
   if (direction !== 'WAIT' && cross && !cross.ok) { gates.push('spot emas vs PAXG selisih ' + cross.diffPct + '% (data global tidak konsisten)'); direction = 'WAIT'; }
   const ageNow = Math.round((Date.now() - last.t) / 60000);
   if (direction !== 'WAIT' && ageNow > 60) { gates.push('candle terakhir ' + ageNow + ' menit lalu (pasar tutup / data usang)'); direction = 'WAIT'; }
@@ -2154,6 +2309,13 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   let calib = 0, price = rawPrice;
   if (spot && rawPrice && spot > 0 && Math.abs(spot / rawPrice - 1) < 0.02) { calib = sgN(spot - rawPrice); price = sgN(spot); }
   const sh = v => (v == null ? null : sgN(v + calib));
+  const poolsRaw = sgPools(rows, atr);
+  const prevDay = cd.day && cd.day.rows.length > 1 ? cd.day.rows[cd.day.rows.length - 2] : null;
+  const pdh = sh(prevDay ? prevDay.h : null), pdl = sh(prevDay ? prevDay.l : null), pdo = sh(prevDay ? prevDay.o : null);
+  const pools = {
+    highs: (poolsRaw.highs || []).map(sh).filter(v => v != null).sort((a, b) => b - a).slice(0, 4),
+    lows: (poolsRaw.lows || []).map(sh).filter(v => v != null).sort((a, b) => a - b).slice(0, 4)
+  };
   const bos = st.bos ? { dir: st.bos.dir, kind: st.bos.kind, level: sh(st.bos.level) } : null;
   const sweep = sw ? { kind: sw.kind, level: sh(sw.level), why: sw.why } : null;
   const obS = ob ? { kind: ob.kind, lo: sh(ob.lo), hi: sh(ob.hi) } : null;
@@ -2176,6 +2338,9 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     if (isFinite(rangeLo) && isFinite(rangeHi)) cands.push(dir === 'BUY' ? sh(rangeHi) : sh(rangeLo));
     if (dailyS) cands.push(dir === 'BUY' ? dailyS.hi20 : dailyS.lo20);
     if (asiaS) cands.push(dir === 'BUY' ? asiaS.hi : asiaS.lo);
+    if (pdh != null) cands.push(dir === 'BUY' ? pdh : pdl);
+    (dir === 'BUY' ? pools.highs : pools.lows).slice(0, 3).forEach(v => cands.push(v));
+    if (h4 && h4.range) cands.push(dir === 'BUY' ? h4.range.hi : h4.range.lo);
     const valid = cands.filter(v => v != null && isFinite(v) && (dir === 'BUY' ? v > from : v < from));
     let d = valid.length ? Math.max(...valid.map(v => Math.abs(v - from))) : 0;
     d = Math.max(d, SGP.tp2Pips * SGP.pip * 1.5);
@@ -2211,7 +2376,11 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   const ageMin = Math.round((Date.now() - last.t) / 60000);
   const curl = m1rows && m1rows.length ? m1rows[m1rows.length - 1] : null;
   const checklist = [
+    { s: 'Bias HTF (D1)', ok: !!(daily && daily.trend) && ((direction === 'BUY' && daily.trend === 'naik') || (direction === 'SELL' && daily.trend === 'turun')), n: daily ? (daily.trend || '—') : 'D1 tidak terbaca' },
+    { s: 'Bias H4 searah', ok: !!h4 && ((direction === 'BUY' && h4.dir > 0) || (direction === 'SELL' && h4.dir < 0)), n: h4 ? (h4.dir > 0 ? 'H4 naik' : 'H4 turun') + ' · ' + h4.trend : 'H4 tidak terbaca' },
     { s: 'Bias HTF (H1)', ok: !!h1dir && ((direction === 'BUY' && h1dir > 0) || (direction === 'SELL' && h1dir < 0)), n: h1dir ? (h1dir > 0 ? 'H1 naik' : 'H1 turun') : 'H1 tidak terbaca' },
+    { s: 'Intermarket emas vs yield', ok: !!intermarket && intermarket.aligned !== 'MIXED' && intermarket.aligned === (direction === 'BUY' ? 'BULLISH' : 'BEARISH'), n: intermarket ? intermarket.note : 'tidak terbaca' },
+    { s: 'Likuiditas PDH/PDL & pools', ok: pdh != null && pdl != null, n: (pdh != null ? 'PDH ' + pdh + ' / PDL ' + pdl : 'PDH/PDL tidak terbaca') + ' · ' + (pools.highs.length + pools.lows.length) + ' pool' },
     { s: 'Struktur M15', ok: (direction === 'BUY' && st.trend === 'BULLISH') || (direction === 'SELL' && st.trend === 'BEARISH'), n: st.trend },
     { s: 'Struktur M5 searah', ok: !!st5 && st5.trend === wantDir, n: st5 ? st5.trend : 'M5 tidak terbaca' },
     { s: 'BOS / MSS', ok: bosOk || bos5Ok, n: bos ? bos.kind + ' ' + bos.dir : bos5Ok ? 'BOS M5 ' + st5.bos.dir : 'belum ada' },
@@ -2326,6 +2495,18 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
       entryWhy: o.entryWhy || o.why || 'Entry diambil di POI setelah struktur dan likuiditas mendukung.',
       slWhy: o.slWhy || ('SL di luar ' + (dir === 'BUY' ? 'low' : 'high') + ' pelindung + buffer ATR, lalu dibatasi wajib 30–40 pip (tidak boleh lebih) agar stop tetap di luar noise.'),
       tpWhy: o.tpWhy || ('TP1 ' + tp1 + ' (minimal 100 pip / 2,5R), TP2 ' + tp2 + ' (minimal 200 pip), TP3/TPmax ' + tpMax + ' mengikuti likuiditas struktur terjauh.'),
+      storyline: o.storyline || (dir === 'BUY'
+        ? 'D1/H4 naik → harga di discount → sapuan low retail → MSS/CHoCH bullish → entry di POI, target likuiditas di atas.'
+        : 'D1/H4 turun → harga di premium → sapuan high retail → MSS/CHoCH bearish → entry di POI, target likuiditas di bawah.'),
+      model: o.model || (style === 'SCALPING' ? 'Alchemist M5: sweep → MSS → displacement → FVG 50%/OB/OTE'
+        : style === 'SWING' ? 'Alchemist H1/H4: storyline + likuiditas eksternal + OTE'
+          : 'Alchemist M15/M5: POI retest setelah konfirmasi struktur'),
+      trigger: o.trigger || (dir === 'BUY'
+        ? 'Entry saat retest POI dengan close M5 bullish dan low tertahan di atas SL.'
+        : 'Entry saat retest POI dengan close M5 bearish dan high tertahan di bawah SL.'),
+      invalidation: o.invalidation || ('Setup batal bila candle M15 close ' + (dir === 'BUY' ? 'di bawah' : 'di atas') + ' ' + sl + ' atau bias H4 berbalik.'),
+      management: o.management || 'TP1: amankan 50% + SL ke break-even; TP2: 25%; sisa ke TP3. Batalkan sisa posisi bila candle M15 close melewati SL.',
+      pro: sgN(sc + (h4 && ((dir === 'BUY' && h4.dir > 0) || (dir === 'SELL' && h4.dir < 0)) ? 2 : 0) + (intermarket && intermarket.aligned === (dir === 'BUY' ? 'BULLISH' : 'BEARISH') ? 1 : 0) + (sesi.kill ? 1 : 0) + (o.bias ? 1 : 0)),
       confluence: [o.bias ? 'bias HTF searah' : 'bias HTF belum searah', zoneAt ? (dir === 'BUY' ? 'entry di discount' : 'entry di premium') : 'entry bukan zona ideal', sesi.kill ? 'sesi killzone' : 'di luar killzone', dataValid ? 'data valid' : 'data terbatas'].join(' · ')
     });
   };
@@ -2557,7 +2738,7 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
      dibuang di server, jadi daftar tidak pernah memuat BUY dan SELL bersamaan. */
   const sameDir = SB.filter(s => s.dir === biasDir);
   const oppositeDropped = SB.length - sameDir.length;
-  const sorted = sameDir.sort((a, b) => ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || (b.score - a.score) || (rank[a.status] - rank[b.status]) || (a.slPips - b.slPips));
+  const sorted = sameDir.sort((a, b) => ((b.valid ? 1 : 0) - (a.valid ? 1 : 0)) || ((b.pro == null ? b.score : b.pro) - (a.pro == null ? a.score : a.pro)) || (b.score - a.score) || (rank[a.status] - rank[b.status]) || (a.slPips - b.slPips));
   const picks = [];
   ['SCALPING', 'DAY', 'SWING'].forEach(st => { const x = sorted.find(s => s.style === st); if (x) picks.push(x); });
   sorted.forEach(s => { if (picks.length < 10 && picks.indexOf(s) < 0) picks.push(s); });
@@ -2579,7 +2760,16 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     range: { hi: sh(rangeHi), lo: sh(rangeLo) }, macro, daily: dailyS, direction, score: sgN(score), confidence: conf,
     basis, plan, entryType, checklist, news, watch, spot: spot ? sgN(spot) : null, gates, calib, rawPrice,
     priceSource: calib ? spotSrc + ' (level dikalibrasi ke candle ' + cd.m15.sym + ')' : (cd.m15.sym || 'Yahoo') + (spot ? ' + spot ' + spotSrc : ''),
+    chart: {
+      tf: cd.degraded ? 'D1' : 'M15', pip: SGP.pip,
+      rows: rows.slice(-120).map(r => ({ t: r.t, o: sgN(r.o), h: sgN(r.h), l: sgN(r.l), c: sgN(r.c) })),
+      m5: m5rows ? m5rows.slice(-80).map(r => ({ t: r.t, o: sgN(r.o), h: sgN(r.h), l: sgN(r.l), c: sgN(r.c) })) : null,
+      zones: (fvg5.length ? fvg5 : fvg).map(z => ({ kind: z.kind, lo: sh(z.lo), hi: sh(z.hi) })),
+      ob: obS, sweep, bos, poi, range: { hi: sh(rangeHi), lo: sh(rangeLo) },
+      title: 'Candle ' + (cd.degraded ? 'D1' : 'M15') + ' live + M5 konfirmasi — sumber yang sama dengan level mesin'
+    },
     quality, validation, dataValid, cross, setups, signals: setups, sources, notes,
+    h4, intermarket, pools, pdh, pdl, pdo, dispStrength: disp && atr ? sgN(disp.body / atr) : null,
     minSignals: SGP.minSignals, maxSignals: SGP.maxSignals, refreshSec: SGP.refreshSec,
     levelRule: { slMinPips: SGP.slPips, slMaxPips: SGP.slMaxPips, tp1MinPips: SGP.tp1Pips, tp2MinPips: SGP.tp2Pips, tp3: 'target struktur & likuiditas global terjauh (maks 600 pip)', rrTp1: '≥1:2,5' }
   };
@@ -2592,6 +2782,10 @@ function signalText(p) {
   if (p.gates && p.gates.length) L.push('ENTRY DITAHAN: ' + p.gates.join(' | '));
   L.push(`Struktur M15 ${p.structure}${p.bos ? ' | ' + p.bos.kind + ' ' + p.bos.dir + ' @' + p.bos.level : ''}${p.sweep ? ' | sapuan ' + p.sweep.kind + ' @' + p.sweep.level : ''} | posisi range ${p.position == null ? 'n/a' : p.position + '%'} | RSI ${p.rsi == null ? 'n/a' : p.rsi} | ATR ${p.atr == null ? 'n/a' : p.atr}`);
   if (p.m5) L.push(`M5: struktur ${p.m5.trend}${p.m5.bos ? ' | BOS ' + p.m5.bos.dir : ''}${p.m5.sweep ? ' | sweep ' + p.m5.sweep.kind : ''}`);
+  if (p.h4) L.push(`H4: ${p.h4.dir > 0 ? 'naik' : 'turun'} · ${p.h4.trend} · range ${p.h4.range.hi}–${p.h4.range.lo} · posisi ${p.h4.pos == null ? 'n/a' : p.h4.pos + '%'}${p.h4.bos ? ' | BOS H4 ' + p.h4.bos.dir : ''}`);
+  if (p.pdh != null) L.push(`PDH ${p.pdh} / PDL ${p.pdl} / open harian ${p.pdo}`);
+  if (p.pools) L.push(`Liquidity pools: high ${p.pools.highs.join(', ') || '—'} | low ${p.pools.lows.join(', ') || '—'}`);
+  if (p.intermarket) L.push(`Intermarket: emas 10D ${p.intermarket.gold10d}% vs yield 10Y ${p.intermarket.yield10d}pp (DXY ${p.intermarket.dxy10d}%) → ${p.intermarket.aligned}`);
   if (p.ob) L.push(`ORDER BLOCK: ${p.ob.kind} ${p.ob.lo}–${p.ob.hi}`);
   if (p.displacement) L.push(`DISPLACEMENT: ${p.displacement.kind} body ${p.displacement.body}`);
   if (p.smt) L.push(`SMT: ${p.smt.kind} — ${p.smt.why}`);
@@ -2652,9 +2846,121 @@ function lockSignalDirection(p) {
     directionLock: { ...(p.directionLock || {}), dir, enforced: true, rule: 'Satu arah per siklus — BUY dan SELL tidak pernah tampil bersamaan' }
   };
 }
+/* ===== Kanal notifikasi (server cron + push) =====
+   Topik ntfy diturunkan dari rahasia yang SUDAH ada di Vercel (CRON_SECRET,
+   BLS_API_KEY, atau SERPER_API_KEY_1) sehingga tidak perlu akun baru; bisa
+   ditimpa dengan RB_PUSH_TOPIC bila ingin topik tetap yang mudah diingat. */
+function pushTopic() {
+  const raw = process.env.RB_PUSH_TOPIC;
+  if (raw) {
+    const clean = String(raw).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    if (clean) return clean;
+  }
+  const seed = process.env.CRON_SECRET || process.env.BLS_API_KEY || process.env.SERPER_API_KEY_1 || 'ruang-belajar-xau';
+  return 'rb-xau-' + require('crypto').createHash('sha256').update(String(seed)).digest('hex').slice(0, 20);
+}
+/* Kunci untuk penjadwal eksternal (cron-job.org dsb.) bila CRON_SECRET belum diisi. */
+function cronKey() {
+  const seed = process.env.CRON_SECRET || process.env.BLS_API_KEY || 'ruang-belajar-cron';
+  return require('crypto').createHash('sha256').update('cron|' + String(seed)).digest('hex').slice(0, 24);
+}
+/* ===== Kanal Telegram (opsional, di samping ntfy) =====
+   Env: TELEGRAM_BOT_TOKEN (atau TG_BOT_TOKEN) + TELEGRAM_CHAT_ID (boleh
+   beberapa id dipisah koma). Token TIDAK pernah dikirim ke browser. */
+function tgConf() {
+  const token = String(process.env.TELEGRAM_BOT_TOKEN || process.env.TG_BOT_TOKEN || '').trim();
+  const ids = String(process.env.TELEGRAM_CHAT_ID || process.env.TG_CHAT_ID || '').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return { token, ids, ok: !!(token && ids.length) };
+}
+async function notifyTelegram(text, opts) {
+  const c = tgConf();
+  if (!c.ok) return { ok: false, skipped: true, reason: 'TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diisi', sent: 0, total: 0 };
+  const base = { text: String(text || '').slice(0, 4000), disable_web_page_preview: true };
+  if (opts && opts.html) base.parse_mode = 'HTML';
+  let sent = 0;
+  const errs = [];
+  for (const id of c.ids) {
+    try {
+      const r = await fetch('https://api.telegram.org/bot' + c.token + '/sendMessage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: id, ...base }), signal: AbortSignal.timeout(9000)
+      });
+      if (r.ok) sent++;
+      else errs.push('chat ' + String(id).slice(0, 4) + '… HTTP ' + r.status);
+    } catch (e) {
+      errs.push('chat ' + String(id).slice(0, 4) + '… ' + String((e && e.message) || e).slice(0, 80));
+    }
+  }
+  return { ok: sent > 0, sent, total: c.ids.length, skipped: false, error: errs.join(' | ').slice(0, 200) };
+}
+/* Balas ke satu chat tertentu (dipakai webhook perintah /sinyal & /status). */
+async function tgSendTo(chatId, text) {
+  const c = tgConf();
+  if (!c.token) return { ok: false, reason: 'TELEGRAM_BOT_TOKEN belum diisi' };
+  const id = String(chatId || '').trim();
+  if (!id) return { ok: false, reason: 'chat id kosong' };
+  try {
+    const r = await fetch('https://api.telegram.org/bot' + c.token + '/sendMessage', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: id, text: String(text || '').slice(0, 4000), disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(9000)
+    });
+    let desc = '';
+    try { const j = await r.json(); desc = (j && j.description) || ''; } catch (e) { }
+    return { ok: r.ok, status: r.status, description: desc };
+  } catch (e) {
+    return { ok: false, status: 0, reason: String((e && e.message) || e).slice(0, 120) };
+  }
+}
+/* Webhook Telegram: pakai TELEGRAM_WEBHOOK_SECRET bila ada, jika tidak pakai
+   kunci turunan yang sama dengan penjadwal agar endpoint tetap tertutup. */
+function tgHookSecret() { return process.env.TELEGRAM_WEBHOOK_SECRET || cronKey(); }
 async function xauSignalHandler(req, res) {
   const b = req.body || {}, phase = b.phase, t0 = Date.now();
   res.setHeader('Cache-Control', 'no-store');
+  if (phase === 'push') {
+    const topic = pushTopic(), tg = tgConf();
+    return res.status(200).json({
+      phase: 'push', topic, channel: 'https://ntfy.sh/' + topic, refreshSec: SGP.refreshSec,
+      site: String(process.env.RB_SITE_URL || 'https://belajarforme29.vercel.app').replace(/\/+$/, ''),
+      cronPath: '/api/cron', cronKey: cronKey(), cronSchedule: '*/15 * * * *',
+      telegram: { enabled: tg.ok, chats: tg.ids.length, env: 'TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID', webhook: String(process.env.RB_SITE_URL || 'https://belajarforme29.vercel.app').replace(/\/+$/, '') + '/api/telegram' },
+      note: 'Server menjalankan mesin Alchemist tiap 15 menit lewat /api/cron; notifikasi dikirim ke ntfy dan Telegram (bila env diisi) walau web ditutup.'
+    });
+  }
+  if (phase === 'pushTest') {
+    const tg = await notifyTelegram('✅ Tes notifikasi Ruang Belajar — XAUUSD\n' + new Date().toUTCString() + '\nKanal Telegram aktif. Sinyal berikutnya dikirim otomatis tiap 15 menit.');
+    return res.status(200).json({ phase: 'pushTest', telegram: tg });
+  }
+  if (phase === 'tgHook') {
+    const c = tgConf();
+    if (!c.ok) return res.status(200).json({ phase: 'tgHook', ok: false, error: 'Isi TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID dulu.' });
+    const base = String(process.env.RB_SITE_URL || 'https://belajarforme29.vercel.app').replace(/\/+$/, '');
+    const url = base + '/api/telegram';
+    try {
+      const r = await fetch('https://api.telegram.org/bot' + c.token + '/setWebhook', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, allowed_updates: ['message'], drop_pending_updates: true, secret_token: tgHookSecret() }),
+        signal: AbortSignal.timeout(9000)
+      });
+      const j = await r.json().catch(() => null);
+      return res.status(200).json({ phase: 'tgHook', ok: !!(j && j.ok), description: (j && j.description) || '', url });
+    } catch (e) {
+      return res.status(200).json({ phase: 'tgHook', ok: false, error: String((e && e.message) || e).slice(0, 160), url });
+    }
+  }
+  if (phase === 'tgInfo') {
+    const c = tgConf();
+    if (!c.token) return res.status(200).json({ phase: 'tgInfo', ok: false, error: 'TOKEN belum diisi' });
+    try {
+      const r = await fetch('https://api.telegram.org/bot' + c.token + '/getWebhookInfo', { signal: AbortSignal.timeout(9000) });
+      const j = await r.json().catch(() => null);
+      const i = (j && j.result) || {};
+      return res.status(200).json({ phase: 'tgInfo', ok: !!(j && j.ok), url: i.url || '', pending: i.pending_update_count || 0, lastError: i.last_error_message || '', lastErrorAt: i.last_error_date || null });
+    } catch (e) {
+      return res.status(200).json({ phase: 'tgInfo', ok: false, error: String((e && e.message) || e).slice(0, 160) });
+    }
+  }
   if (phase === 'tick') {
     try {
       const s = await liveSpot();
@@ -2683,7 +2989,9 @@ async function xauHandler(req, res) {
   if (c && Date.now() - c.t < 60000) return res.status(200).json({ ...c.p, cached: true });
   if (b.fresh) bustData();
   const errs = [], gg = await gatherAll(focus, errs, true, ['XAUUSD'], '1-5 hari');
-  const base = { ...publicBase(gg, errs), focus, xau: xauFocus(gg, focus), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: lockSignalDirection(await xauSignalPack().catch(e => ({ error: 'Sinyal entry gagal: ' + msg(e, 140) }))), gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
+  const fx0 = xauFocus(gg, focus);
+  const sig0 = lockSignalDirection(await xauSignalPack().catch(e => ({ error: 'Sinyal entry gagal: ' + msg(e, 140) })));
+  const base = { ...publicBase(gg, errs), focus, xau: fx0, spikePlan: xauSpikeOf(sig0, fx0, focus === 'all' ? null : focus.toUpperCase()), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: sig0, gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
   if (phase === 'data') return res.status(200).json({ phase: 'data', ...base, g: compactG(gg) });
   const r = await aiXau(compactG(gg), focus, t0), payload = { ...base, ...r, notes: base.notes.concat(r.notes) };
   if (payload.xai) xauCache.set(ck, { t: Date.now(), p: payload });
@@ -3382,3 +3690,10 @@ module.exports = async (req, res) => {
 
 module.exports.fuseEvidence = fuseEvidence;
 module.exports.normNum = normNum;
+module.exports.xauSignalPack = xauSignalPack;
+module.exports.pushTopic = pushTopic;
+module.exports.cronKey = cronKey;
+module.exports.tgConf = tgConf;
+module.exports.notifyTelegram = notifyTelegram;
+module.exports.tgSendTo = tgSendTo;
+module.exports.tgHookSecret = tgHookSecret;
