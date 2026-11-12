@@ -107,13 +107,27 @@ function xauFocusCard(j) {
   const mcol = mdir === 'BULLISH' ? 'var(--ok)' : mdir === 'BEARISH' ? 'var(--no)' : 'var(--warn)';
   const mev = (Array.isArray(mk.evidence) ? mk.evidence : []).slice(0, 5);
   const label = f.focusName || (tags.length ? tags.join(' · ') : 'Gabungan');
+  const spPlan = j.spikePlan || null;
+  const spMin = sp.size_pips && sp.size_pips.min != null ? sp.size_pips.min : (spPlan && spPlan.sizePips ? spPlan.sizePips.min : null);
+  const spMax = sp.size_pips && sp.size_pips.max != null ? sp.size_pips.max : (spPlan && spPlan.sizePips ? spPlan.sizePips.max : null);
+  const spWin = sp.window_min != null ? sp.window_min : (spPlan ? spPlan.windowMin : null);
+  const spFirst = sp.first_dir || (spPlan ? spPlan.firstDir : '');
+  const spWhy = sp.why || (spPlan ? spPlan.why : '');
+  const rx = (sp.reaction || (spPlan && spPlan.reaction)) || null;
+  const spYes = sp.likely === true || !!(spPlan && spPlan.likely);
   return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-pill" style="color:' + (act === 'BUY' ? 'var(--ok)' : 'var(--no)') + '">' + act + ' XAUUSD</span></div>'
     + (ev ? '<div class="small" style="margin-top:4px"><b>' + esc(ev.title || ev.tag) + '</b> · ' + esc(new Date(ev.ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })) + (ev.verified === 'official' ? ' · ✅ jadwal resmi' : '') + '</div>' : '')
     + (ev ? '<div class="small mut" style="margin-top:3px">Forecast: ' + esc(ev.forecast || 'konsensus tidak ditemukan') + (ev.previous ? ' · Previous: ' + esc(ev.previous) : '') + (ev.actual ? ' · Aktual: ' + esc(ev.actual) : '') + '</div>' : '')
     + (ev && ev.actualOfficial != null ? '<div class="small" style="margin-top:3px;color:var(--ok)">✅ Angka resmi ' + esc(ev.actualOfficialLabel || '') + ': <b>' + esc(String(ev.actualOfficial)) + '</b> · ' + esc(ev.actualSource || 'BLS/FRED') + '</div>' : '<div class="small mut" style="margin-top:3px">Angka resmi BLS/FRED belum tersedia untuk rilis ini; analisis memakai jadwal + konsensus.</div>')
-    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⚡ Spike:</b> <b style="color:' + (sp.likely ? 'var(--warn)' : 'var(--mut)') + '">' + (sp.likely ? 'YA' : 'TIDAK') + '</b>' + (sp.why ? ' — ' + esc(sp.why) : '') + '</div>'
-    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Arah data pasar:</b> <b style="color:' + mcol + '">' + esc(mdir) + '</b>' + (mk.score != null ? ' · skor ' + esc(String(mk.score)) : '') + (mk.strong ? ' · bukti kuat' : ' · bukti belum dominan') + '</div>'
-    + (mev.length ? '<div style="margin-top:4px">' + mev.map(function (e) { return '<div class="small mut">• ' + esc(e.why) + ' (' + (e.w > 0 ? '+' : '') + esc(String(e.w)) + ')</div>'; }).join('') + '</div>' : '<div class="small mut" style="margin-top:4px">Belum ada data pasar yang cukup untuk mengoreksi arah AI; keyakinan dibatasi.</div>')
+    + '<div class="exp" style="margin-top:8px;color:var(--tx);border-color:' + (spYes ? 'var(--warn)' : 'var(--line2)') + '"><b>⚡ Spike pada rilis ini:</b> <b style="color:' + (spYes ? 'var(--warn)' : 'var(--mut)') + '">' + (spYes ? 'YA' : 'TIDAK') + '</b>'
+    + (spMin != null ? ' · perkiraan <b>' + esc(String(spMin)) + '–' + esc(String(spMax)) + ' pip</b>' : '')
+    + (spWin != null ? ' · jendela ±' + esc(String(spWin)) + ' menit' : '')
+    + (spFirst ? ' · arah pertama <b>' + esc(spFirst) + '</b>' : '')
+    + (spWhy ? '<div class="small mut" style="margin-top:4px">' + esc(spWhy) + '</div>' : '')
+    + (rx ? '<div class="small" style="margin-top:5px;color:var(--ok)">📈 Reaksi nyata (' + esc(rx.window) + ', ' + esc(rx.bar) + '): rentang <b>' + esc(String(rx.rangePips)) + ' pip</b> · naik ' + esc(String(rx.upPips)) + ' / turun ' + esc(String(rx.downPips)) + ' · net ' + (rx.netPips > 0 ? '+' : '') + esc(String(rx.netPips)) + ' pip → ' + esc(rx.firstDir) + '</div>' : '')
+    + '</div>'
+    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>🧭 Kenapa arah ' + act + ':</b> <b style="color:' + mcol + '">' + esc(mdir) + '</b>' + (mk.score != null ? ' · skor ' + esc(String(mk.score)) : '') + (mk.strong ? ' · bukti kuat' : ' · bukti belum dominan') + '</div>'
+    + (mev.length || x.action_reason ? '<div style="margin-top:4px">' + mev.map(function (e, i) { return '<div class="small mut">' + (i + 1) + '. ' + esc(e.why) + ' (' + (e.w > 0 ? '+' : '') + esc(String(e.w)) + ')</div>'; }).join('') + (x.action_reason ? '<div class="small" style="margin-top:5px;line-height:1.55">' + esc(x.action_reason) + '</div>' : '') + '</div>' : '<div class="small mut" style="margin-top:4px">Belum ada data pasar yang cukup untuk mengoreksi arah AI; keyakinan dibatasi.</div>')
     + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_overridden ? 'Arah AI dikoreksi mesin karena bertentangan dengan harga/DXY/yield/kejutan rilis.' : x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI dan sudah dicek terhadap data pasar.') + '</div></div>';
 }
 
@@ -429,6 +443,207 @@ function rb31ClearClosed() {
 
 /* Daftar 3–10 sinyal siap pakai dari mesin: satu arah, SL wajib 30–40 pip,
    TP1 ≥100 pip, TP2 ≥200 pip, TP3/TPmax dari struktur. Diperbarui tiap 15 menit. */
+/* ---------- Notifikasi: browser + kanal push server (tetap jalan saat web ditutup) ---------- */
+function rb31NotifMode() {
+  try { return localStorage.getItem('rb31_notif_mode_v1') === 'summary' ? 'summary' : 'each'; } catch (e) { return 'each'; }
+}
+function rb31NotifSet(m) {
+  try { localStorage.setItem('rb31_notif_mode_v1', m === 'summary' ? 'summary' : 'each'); } catch (e) { }
+  rb31PushPaint();
+}
+function rb31CopyTxt(txt, btn) {
+  const done = function () {
+    if (btn) { const o = btn.textContent; btn.textContent = '✅ Tersalin'; setTimeout(function () { btn.textContent = o; }, 1500); }
+    else if (typeof v21Toast === 'function') v21Toast('Tersalin');
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+    else done();
+  } catch (e) { done(); }
+}
+function rb31PushLoad() {
+  if (SIG_ST.push && SIG_ST.push.topic && Date.now() - (SIG_ST.push.at || 0) < 30 * 60000) return;
+  if (SIG_ST.push && SIG_ST.push.loading) return;
+  SIG_ST.push = { loading: true, at: Date.now() };
+  Promise.resolve(tcall({ action: 'xauSignal', phase: 'push' })).then(function (r) {
+    if (r && r.topic) SIG_ST.push = { topic: r.topic, channel: r.channel || ('https://ntfy.sh/' + r.topic), cronKey: r.cronKey || '', schedule: r.cronSchedule || '*/15 * * * *', telegram: r.telegram || null, site: r.site || '', refreshSec: r.refreshSec || 900, at: Date.now() };
+    else SIG_ST.push = { error: 'Topik push tidak tersedia dari server.', at: Date.now() };
+    rb31PushPaint();
+  }).catch(function () {
+    SIG_ST.push = { error: 'Gagal memuat topik push. Periksa koneksi lalu coba lagi.', at: Date.now() };
+    rb31PushPaint();
+  });
+}
+function rb31PushTest(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Mengirim…'; }
+  const reset = function () { if (btn) { btn.disabled = false; btn.textContent = '📨 Kirim tes Telegram'; } };
+  Promise.resolve(tcall({ action: 'xauSignal', phase: 'pushTest' })).then(function (r) {
+    const t = (r && r.telegram) || {};
+    const msg = t.ok ? '✅ Tes Telegram terkirim ke ' + t.sent + ' chat' : '⚠️ ' + (t.error || t.reason || 'gagal mengirim');
+    if (typeof v21Toast === 'function') v21Toast(msg);
+    reset();
+  }).catch(function () {
+    if (typeof v21Toast === 'function') v21Toast('Tes gagal: jaringan');
+    reset();
+  });
+}
+function rb31TgHook(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menghubungkan…'; }
+  const reset = function () { if (btn) { btn.disabled = false; btn.textContent = '🔗 Hubungkan bot'; } };
+  Promise.resolve(tcall({ action: 'xauSignal', phase: 'tgHook' })).then(function (r) {
+    const msg = r && r.ok ? '✅ Bot terhubung — coba kirim /sinyal' : '⚠️ ' + ((r && (r.description || r.error)) || 'gagal menghubungkan');
+    if (typeof v21Toast === 'function') v21Toast(msg);
+    SIG_ST.push = null; rb31PushLoad(); reset();
+  }).catch(function () {
+    if (typeof v21Toast === 'function') v21Toast('Gagal menghubungkan: jaringan');
+    reset();
+  });
+}
+function rb31TgInfo(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Memeriksa…'; }
+  const reset = function () { if (btn) { btn.disabled = false; btn.textContent = 'ℹ️ Cek webhook'; } };
+  Promise.resolve(tcall({ action: 'xauSignal', phase: 'tgInfo' })).then(function (r) {
+    const msg = r && r.ok
+      ? 'Webhook: ' + (r.url ? 'aktif' : 'belum diset') + ' · antrean ' + (r.pending || 0) + ' pesan' + (r.lastError ? ' · error: ' + String(r.lastError).slice(0, 60) : '')
+      : '⚠️ ' + ((r && r.error) || 'gagal memeriksa webhook');
+    if (typeof v21Toast === 'function') v21Toast(msg);
+    reset();
+  }).catch(function () {
+    if (typeof v21Toast === 'function') v21Toast('Gagal memeriksa: jaringan');
+    reset();
+  });
+}
+function rb31PushCard() {
+  const p = SIG_ST.push || {}, perm = sigNotifPerm(), mode = rb31NotifMode(), on = perm === 'granted';
+  const tg = p.telegram || {};
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : '';
+  const cron = p.topic ? (origin + '/api/cron?key=' + (p.cronKey || '')) : '';
+  return '<div class="card"><div class="rb-card-head"><h3>🔔 Notifikasi setiap sinyal</h3>'
+    + '<span class="rb-pill" style="color:' + (on ? 'var(--ok)' : 'var(--warn)') + ';border-color:' + (on ? 'var(--ok)' : 'var(--warn)') + '">' + (on ? '✅ browser aktif' : '⏳ browser belum aktif') + '</span></div>'
+    + '<div class="rb-note">Mesin Alchemist + data global tetap <b>dianalisis server tiap 15 menit</b> lewat <code>/api/cron</code> — tidak bergantung pada tab yang terbuka. Notifikasi ke HP/desktop dikirim ke kanal <b>ntfy</b> (gratis, tanpa akun): buka tautan topik di aplikasi ntfy atau browser, lalu izinkan notifikasinya. Notifikasi browser di bawah menangkap setiap sinyal selama halaman ini terbuka.</div>'
+    + '<div class="rb-pill-row" style="margin:8px 0"><button class="x" type="button" onclick="sigNotifAsk()">' + esc(sigNotifLabel()) + '</button>'
+    + '<button class="x" type="button" onclick="rb31NotifSet(\'each\')" style="' + (mode === 'each' ? 'border-color:var(--accent);color:var(--accent);font-weight:800' : '') + '">Per sinyal</button>'
+    + '<button class="x" type="button" onclick="rb31NotifSet(\'summary\')" style="' + (mode === 'summary' ? 'border-color:var(--accent);color:var(--accent);font-weight:800' : '') + '">Ringkasan siklus</button></div>'
+    + (p.topic
+      ? '<div class="exp" style="color:var(--tx)"><div class="small mut">Topik push server (rahasia, jangan dibagikan)</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px"><b style="word-break:break-all">' + esc(p.topic) + '</b>'
+        + '<button class="x" type="button" onclick="rb31CopyTxt(\'' + esc(p.topic) + '\',this)">📋 Salin topik</button>'
+        + '<a class="x" href="' + esc(p.channel) + '" target="_blank" rel="noopener" style="text-decoration:none">Subscribe ntfy ↗</a></div>'
+        + '<div class="small mut" style="margin-top:6px">Site server: <b>' + esc(p.site || (typeof location !== 'undefined' ? location.origin : '—')) + '</b> · jadwal <b>' + esc(p.schedule) + '</b> · URL penjadwal (simpan rahasia):<br><span style="word-break:break-all">' + esc(cron) + '</span> '
+        + '<button class="x" type="button" style="margin-top:4px" onclick="rb31CopyTxt(\'' + esc(cron) + '\',this)">📋 Salin URL cron</button></div>'
+        + '<div class="small mut" style="margin-top:6px">Di Vercel Hobby, cron 15 menit butuh paket Pro. Alternatif gratis: tempel URL di atas ke cron-job.org atau uptime service, interval 15 menit.</div>'
+        + '<div class="small" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2)"><b>Kanal Telegram:</b> ' + (tg.enabled
+          ? '<span style="color:var(--ok)">✅ aktif · ' + esc(String(tg.chats || 0)) + ' chat</span>'
+          : '<span style="color:var(--warn)">⏳ belum diisi</span> — set env <b>TELEGRAM_BOT_TOKEN</b> + <b>TELEGRAM_CHAT_ID</b> di Vercel (chat id boleh dipisah koma), lalu deploy ulang.') + '</div>'
+        + (tg.enabled ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="x" type="button" onclick="rb31PushTest(this)">📨 Kirim tes Telegram</button><button class="x" type="button" onclick="rb31TgHook(this)">🔗 Hubungkan bot</button><button class="x" type="button" onclick="rb31TgInfo(this)">ℹ️ Cek webhook</button></div>' : '')
+        + (tg.enabled && tg.webhook ? '<div class="small mut" style="margin-top:4px">Webhook: <span style="word-break:break-all">' + esc(tg.webhook) + '</span><br>Perintah bot: <b>/sinyal</b> · <b>/status</b> · <b>/help</b></div>' : '')
+        + '</div>'
+      : (p.loading ? '<div class="small mut">Memuat topik push…</div>' : '<div class="warn" style="margin:0">' + esc(p.error || 'Topik push belum dimuat.') + ' <button class="x" type="button" onclick="rb31PushLoad()">Coba lagi</button></div>'))
+    + '</div>';
+}
+function rb31PushPaint() {
+  const el = $('sigPush');
+  if (el) el.innerHTML = rb31PushCard();
+}
+/* Notifikasi lokal: satu per sinyal (atau satu ringkasan per siklus), di-dedupe
+   per siklus analisis supaya tidak berbunyi berulang pada data yang sama. */
+function rb31Notify(d) {
+  if (!d || d.error || sigNotifPerm() !== 'granted') return 0;
+  const key = 'rb31_notified_v2';
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { seen = {}; }
+  const now = Date.now(), cyc = String(d.generatedAt || ''), arr = Array.isArray(d.setups) ? d.setups : [];
+  const mode = rb31NotifMode();
+  let n = 0;
+  if (mode === 'summary') {
+    const k = 'sum|' + cyc;
+    if (arr.length && !seen[k]) {
+      seen[k] = now;
+      try {
+        const nt = new Notification('🎯 ' + arr.length + ' sinyal XAUUSD · ' + (d.singleDirection || d.direction || '—'), {
+          body: arr.map(function (s) { return (s.dir === 'BUY' ? '🟢' : '🔴') + ' ' + (s.method || 'Alchemist') + ' · E' + sigNum(s.entry) + ' SL' + sigNum(s.sl) + ' TP1 ' + sigNum(s.tp1 != null ? s.tp1 : s.tp); }).join('\n').slice(0, 900),
+          tag: k
+        });
+        nt.onclick = function () { try { window.focus(); } catch (e) { } try { nt.close(); } catch (e) { } };
+        n++;
+      } catch (e) { }
+    }
+  } else {
+    arr.forEach(function (s) {
+      const k = cyc + '|' + (s.id || s.method) + '|' + s.dir + '|' + s.entry;
+      if (seen[k]) return;
+      seen[k] = now;
+      try {
+        const nt = new Notification((s.dir === 'BUY' ? '🟢 BUY' : '🔴 SELL') + ' XAUUSD · ' + (s.method || 'Alchemist'), {
+          body: 'Entry ' + sigNum(s.entry) + ' (' + (s.type || 'LIMIT') + ')\nSL ' + sigNum(s.sl) + ' (' + s.slPips + ' pip)\nTP1 ' + sigNum(s.tp1 != null ? s.tp1 : s.tp) + ' (' + s.tpPips + ' pip)\nTP2 ' + sigNum(s.tp2) + '\nTP3 ' + sigNum(s.tp3 != null ? s.tp3 : s.tpMax) + '\nStatus: ' + (s.status || '—'),
+          tag: k
+        });
+        nt.onclick = function () { try { window.focus(); } catch (e) { } try { nt.close(); } catch (e) { } };
+        n++;
+      } catch (e) { }
+    });
+  }
+  Object.keys(seen).forEach(function (k) { if (now - seen[k] > 3 * 86400000) delete seen[k]; });
+  try { localStorage.setItem(key, JSON.stringify(seen)); } catch (e) { }
+  return n;
+}
+
+/* Chart analisis real-time: candle yang benar-benar dipakai mesin (M15 + M5)
+   digambar bersama level entry/SL/TP1/TP2/TP3 dan zona FVG. Widget TradingView
+   di bawah tetap dipakai untuk verifikasi visual; isi iframe tidak bisa dibaca
+   lintas-domain, jadi level dihitung dari feed harga yang sama dengan chart itu. */
+function rb31ChartHtml(d) {
+  const ch = d && d.chart;
+  if (!ch || !Array.isArray(ch.rows) || ch.rows.length < 12) return '';
+  const rows = ch.rows.slice(-96);
+  const W = 760, H = 300, padL = 6, padR = 88, padT = 10, padB = 22;
+  const plan0 = d.plan || (Array.isArray(d.setups) && d.setups[0]) || null;
+  const lv = [];
+  if (plan0) {
+    [['Entry', plan0.entry, 'var(--accent)'], ['SL', plan0.sl, 'var(--no)'],
+      ['TP1', plan0.tp1 != null ? plan0.tp1 : plan0.tp, 'var(--ok)'],
+      ['TP2', plan0.tp2, '#4ade80'], ['TP3', plan0.tp3 != null ? plan0.tp3 : plan0.tpMax, '#22c55e']]
+      .forEach(function (x) { const v = Number(x[1]); if (x[1] != null && isFinite(v)) lv.push({ k: x[0], v: v, c: x[2] }); });
+  }
+  const lo0 = Math.min.apply(null, rows.map(function (r) { return r.l; }));
+  const hi0 = Math.max.apply(null, rows.map(function (r) { return r.h; }));
+  const span0 = Math.max(hi0 - lo0, 1);
+  const near = lv.filter(function (x) { return x.v >= lo0 - span0 * 0.8 && x.v <= hi0 + span0 * 0.8; });
+  const lo = Math.min.apply(null, [lo0].concat(near.map(function (x) { return x.v; })));
+  const hi = Math.max.apply(null, [hi0].concat(near.map(function (x) { return x.v; })));
+  const pad = Math.max((hi - lo) * 0.08, 0.5), y0 = lo - pad, y1 = hi + pad;
+  const xAt = function (i) { return padL + (i + 0.5) * ((W - padL - padR) / rows.length); };
+  const bw = Math.max(2, ((W - padL - padR) / rows.length) * 0.62);
+  const yAt = function (v) { return padT + (y1 - v) / (y1 - y0) * (H - padT - padB); };
+  const fx = function (v) { return v == null || !isFinite(Number(v)) ? '' : Number(v).toFixed(2); };
+  let svg = '';
+  (ch.zones || []).slice(-8).forEach(function (z) {
+    if (z.lo == null || z.hi == null) return;
+    const top = yAt(Math.min(z.hi, y1)), bot = yAt(Math.max(z.lo, y0));
+    if (bot - top < 1) return;
+    svg += '<rect x="' + padL + '" y="' + (top - 2).toFixed(1) + '" width="' + (W - padL - padR) + '" height="' + (bot - top + 4).toFixed(1) + '" fill="' + (z.kind === 'bull' ? '#16a34a' : '#dc2626') + '" opacity="0.10"/>';
+  });
+  rows.forEach(function (r, i) {
+    const up = r.c >= r.o, col = up ? '#22c55e' : '#ef4444', x = xAt(i);
+    svg += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + yAt(r.h).toFixed(1) + '" y2="' + yAt(r.l).toFixed(1) + '" stroke="' + col + '" stroke-width="1"/>'
+      + '<rect x="' + (x - bw / 2).toFixed(1) + '" y="' + yAt(Math.max(r.o, r.c)).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, yAt(Math.min(r.o, r.c)) - yAt(Math.max(r.o, r.c))).toFixed(1) + '" fill="' + col + '"/>';
+  });
+  lv.forEach(function (x) {
+    const yy = Math.max(padT, Math.min(H - padB, yAt(x.v)));
+    const off = x.v > y1 ? ' ▲' : x.v < y0 ? ' ▼' : '';
+    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="' + x.c + '" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.9"/>'
+      + '<text x="' + (W - padR + 4) + '" y="' + (yy + 3.5).toFixed(1) + '" fill="' + x.c + '" font-size="11" font-weight="700">' + x.k + ' ' + fx(x.v) + off + '</text>';
+  });
+  const last = rows[rows.length - 1].c, yl = yAt(last);
+  svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yl.toFixed(1) + '" y2="' + yl.toFixed(1) + '" stroke="#e5e7eb" stroke-width="1" opacity="0.5"/>'
+    + '<text x="' + (W - padR + 4) + '" y="' + (yl + 3.5).toFixed(1) + '" fill="#e5e7eb" font-size="11" font-weight="800">' + fx(last) + '</text>'
+    + '<text x="' + padL + '" y="' + (H - 6) + '" fill="#94a3b8" font-size="10">' + esc(ch.tf || 'M15') + ' · ' + rows.length + ' candle live · 1 pip = 0,1 · zona = FVG</text>';
+  const dir = d.direction === 'BUY' ? 'var(--ok)' : d.direction === 'SELL' ? 'var(--no)' : 'var(--warn)';
+  return '<div class="card"><div class="rb-card-head"><h3>📊 Chart analisis real-time (candle mesin)</h3><span class="rb-pill" style="color:' + dir + ';border-color:' + dir + '">' + esc(d.direction || 'WAIT') + ' · ' + esc(ch.tf || 'M15') + '</span></div>'
+    + '<div class="rb-note" style="margin-bottom:8px">Candle <b>live</b> yang dipakai mesin untuk struktur, FVG/OB, sapuan, dan level entry — sumbernya sama dengan harga di TradingView (spot emas + M15/M5). Garis: entry, SL, TP1, TP2, TP3. TradingView di bawah untuk verifikasi visual.</div>'
+    + '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:12px;background:var(--bg2,#0d1117)" role="img" aria-label="Chart XAUUSD live dengan level mesin">' + svg + '</svg>'
+    + '<div class="small mut" style="margin-top:6px">Terakhir: ' + esc(sigTime(d.candleAt)) + ' · harga ' + sigNum(d.price) + ' · ' + esc(d.structure || '—') + (d.m5 ? ' · M5 ' + esc(d.m5.trend) : '') + '</div></div>';
+}
 function rb31ListHtml(price, d) {
   const sf = rb31StyleNow();
   const all = ((d && d.setups) || []).filter(function (s) { return s && (s.dir === 'BUY' || s.dir === 'SELL'); });
@@ -450,7 +665,7 @@ function rb31ListHtml(price, d) {
     return '<div class="exp" style="margin-bottom:8px;color:var(--tx);border-color:' + (i === 0 ? 'var(--accent)' : 'var(--line2)') + '">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
       + '<b>' + (buy ? '🟢 BUY' : '🔴 SELL') + ' #' + (i + 1) + ' · ' + esc(s.method) + '</b>'
-      + '<span><span class="rb-pill">' + esc(rb31StyleLabel(s.style)) + '</span> <span class="rb-pill" style="color:' + stc + ';border-color:' + stc + '">' + esc(st) + '</span></span></div>'
+      + '<span><span class="rb-pill">' + esc(rb31StyleLabel(s.style)) + '</span> <span class="rb-pill">pro ' + esc(String(s.pro != null ? s.pro : s.score)) + '/9</span> <span class="rb-pill" style="color:' + stc + ';border-color:' + stc + '">' + esc(st) + '</span></span></div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;margin-top:7px">'
       + sigMini('Entry · ' + esc(s.type || 'LIMIT'), sigNum(s.entry))
       + sigMini('SL · ' + s.slPips + ' pip', '<span style="color:var(--no)">' + sigNum(s.sl) + '</span>')
@@ -462,6 +677,12 @@ function rb31ListHtml(price, d) {
       + '<div class="small mut" style="margin-top:5px">Jarak dari harga — entry ' + dist(s.entry) + ' · SL ' + dist(s.sl) + ' · TP1 ' + dist(tp1) + ' · TP2 ' + dist(s.tp2) + ' · TP3 ' + dist(tp3) + '</div>'
       + (s.why ? '<div class="small" style="margin-top:4px">' + esc(s.why) + '</div>' : '')
       + (s.globalWhy ? '<div class="small mut" style="margin-top:3px"><b>Data global:</b> ' + esc(s.globalWhy) + '</div>' : '')
+      + '<details style="margin-top:5px"><summary class="small" style="cursor:pointer;color:var(--b)">🧠 Detail Alchemist (storyline · model · trigger · invalidasi)</summary>'
+      + '<div class="small mut" style="margin-top:4px"><b>Storyline:</b> ' + esc(s.storyline || '—') + '</div>'
+      + '<div class="small mut" style="margin-top:2px"><b>Model:</b> ' + esc(s.model || '—') + '</div>'
+      + '<div class="small mut" style="margin-top:2px"><b>Trigger entry:</b> ' + esc(s.trigger || '—') + '</div>'
+      + '<div class="small mut" style="margin-top:2px"><b>Invalidasi:</b> ' + esc(s.invalidation || '—') + '</div>'
+      + '<div class="small mut" style="margin-top:2px"><b>Manajemen:</b> ' + esc(s.management || '—') + '</div></details>'
       + '<div class="small" style="margin-top:3px;color:' + (s.valid ? 'var(--ok)' : 'var(--warn)') + '">' + (s.valid ? '✅ siap dipakai' : '⚠️ ' + esc(s.need || 'tunggu konfirmasi')) + '</div>'
       + '</div>';
   }).join('') + '</div>';
@@ -487,10 +708,11 @@ function pSignalEntry() {
     + '<div class="card" style="padding:10px 14px"><div class="rb-card-head"><h3>🎛️ Gaya trading</h3><span class="rb-pill">Scalping · Day · Swing</span></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + [['ALL', 'Semua'], ['SCALPING', 'Scalping'], ['DAY', 'Day Trading'], ['SWING', 'Swing Trading']].map(function (x) { const on = rb31StyleNow() === x[0]; return '<button class="x" type="button" onclick="rb31StyleSet(\'' + x[0] + '\')" style="' + (on ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:800' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>'
     + '<div class="small mut" style="margin-top:6px">Scalping memakai konfirmasi M5/M1; Day Trading memakai struktur M15/M5; Swing Trading memakai bias H1/D1 dan target likuiditas lebih jauh. Filter ini hanya mengubah tampilan, bukan mengubah level atau arah mesin.</div></div>'
+    + '<div id="sigPush"></div>'
     + '<div id="sigMsg" class="card" style="padding:10px 14px;display:none"></div>'
     + '<div id="sigBox"></div>'
     + '<div class="card"><div class="rb-card-head"><h3>📈 Chart XAUUSD — TradingView real-time</h3><span class="rb-pill" id="sigTvPill">LIVE · M5</span></div>'
-    + '<div class="rb-note" style="margin-bottom:8px">Chart resmi TradingView (tanpa login). Pakai untuk <b>memverifikasi</b> level mesin: sapuan, MSS, FVG/OB. Sinyal dihitung dari data harga live + candle server, jadi tetap sinkron walau chart diganti timeframe.</div>'
+    + '<div class="rb-note" style="margin-bottom:8px">Chart resmi TradingView (tanpa login). Pakai untuk <b>memverifikasi</b> level mesin: sapuan, MSS, FVG/OB. Level dan zona dihitung dari feed harga yang sama dengan chart ini (iframe TradingView tidak bisa dibaca lintas-domain), lalu digambar di <b>Chart analisis real-time</b> di atas.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
     + '<button class="x" type="button" data-sigtv="1" onclick="sigTvInt(1)">1m</button>'
     + '<button class="x" type="button" data-sigtv="5" onclick="sigTvInt(5)">5m</button>'
@@ -505,6 +727,8 @@ function pSignalEntry() {
   sigAutoStart();
   sigPaint();
   sigTickStart();
+  rb31PushLoad();
+  rb31PushPaint();
   if (!fresh && !SIG_ST.loading) setTimeout(function () { sigLoad(false); }, 80);
 }
 function sigAutoStart() {
@@ -563,6 +787,7 @@ function rb31PaintNow() {
   }
   const price = rb31n(d.price) || rb31n(SIG_ST.tick && SIG_ST.tick.price) || 0;
   rb31TrackSync(d, price);
+  rb31Notify(d);
   const lv = rb31PlanOf(d);
   const dir = d.direction || 'WAIT';
   const col = dir === 'BUY' ? 'var(--ok)' : dir === 'SELL' ? 'var(--no)' : 'var(--warn)';
@@ -605,6 +830,10 @@ function rb31PaintNow() {
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px">'
     + sigKv('Harga', sigNum(d.price), d.candleAt ? sigTime(d.candleAt) : '')
     + sigKv('Struktur M15', esc(d.structure || '—'), d.bos ? d.bos.kind + ' ' + d.bos.dir : 'belum BOS')
+    + sigKv('Bias H4', d.h4 ? (d.h4.dir > 0 ? 'naik' : 'turun') : '—', d.h4 ? 'EMA20 ' + sigNum(d.h4.ema20) + ' vs EMA50 ' + sigNum(d.h4.ema50) + ' · ' + esc(d.h4.trend) + ' · posisi ' + (d.h4.pos == null ? '—' : d.h4.pos + '%') : 'H4 tidak terbaca')
+    + sigKv('PDH / PDL', d.pdh == null ? '—' : sigNum(d.pdh) + ' / ' + sigNum(d.pdl), d.pdo == null ? 'open harian tidak terbaca' : 'open harian ' + sigNum(d.pdo))
+    + sigKv('Liquidity pools', d.pools ? String((d.pools.highs || []).length + (d.pools.lows || []).length) : '0', d.pools ? 'high ' + ((d.pools.highs || []).slice(0, 2).join(', ') || '—') + ' · low ' + ((d.pools.lows || []).slice(0, 2).join(', ') || '—') : 'tidak terdeteksi')
+    + sigKv('Intermarket', d.intermarket ? esc(d.intermarket.aligned) : '—', d.intermarket ? 'emas 10D ' + sigNum(d.intermarket.gold10d) + '% · yield ' + sigNum(d.intermarket.yield10d) + 'pp · DXY ' + sigNum(d.intermarket.dxy10d) + '%' : 'tidak terbaca')
     + sigKv('Konfirmasi M5', d.m5 ? esc(d.m5.trend) : '—', d.m5 && d.m5.sweep ? 'sweep ' + d.m5.sweep.kind : 'MSS + FVG/OB')
     + sigKv('ATR14', sigNum(d.atr), d.atrPips == null ? '' : d.atrPips + ' pip')
     + sigKv('RSI14', d.rsi == null ? '—' : d.rsi)
@@ -655,7 +884,7 @@ function rb31PaintNow() {
     + ((d.validation || []).length ? '<div class="small mut" style="margin-top:8px">Validasi: ' + d.validation.map(function (v) { return (v.ok ? '✅ ' : '⚠️ ') + esc(v.k) + ' — ' + esc(v.d); }).join(' · ') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(function (s) { return (s.ok ? '✅ ' : '⚠️ ') + esc(s.name); }).join(' · ') + '</div></div>';
 
-  box.innerHTML = planCard + rb31ListHtml(price, d) + rb31ActiveHtml(price, d) + cand + ctx + globalCard + cek + aiCard + basis + qual;
+  box.innerHTML = planCard + rb31ChartHtml(d) + rb31ListHtml(price, d) + rb31ActiveHtml(price, d) + cand + ctx + globalCard + cek + aiCard + basis + qual;
   rb31ClosedPaint();
   sigLivePaint();
 }
