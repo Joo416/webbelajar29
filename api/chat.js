@@ -1161,18 +1161,23 @@ async function gatherAll(focus, errs, pro, pairs, horizon) {
     (pro || focus === 'fomc' || focus === 'all') ? safe('Perubahan teks pernyataan FOMC', fomcDiff()) : null,
     pro ? safe('Fundamental global (FRED/OECD)', fundamentals()) : null, (pro || focus === 'all') ? safe('Feed bank sentral global', cbFeeds()) : null
   ]);
-  if (fund && fund.errs.length) errs.push('Fundamental global: ' + fund.errs.length + ' seri tidak tersedia → ' + fund.errs.map(x => String(x).split(':')[0]).slice(0, 8).join(', '));
-  if (cbf && cbf.errs.length) errs.push('Feed bank sentral (sebagian gagal): ' + cbf.errs.join(' | '));
-  if (px && px.errs && px.errs.length && Object.keys(px.pairs).length < ALL_PAIRS.length) errs.push('Harga (sebagian gagal): ' + px.errs.slice(0, 4).join(' | '));
-  if (mr && mr.errs && mr.errs.length) errs.push('FRED makro (sebagian gagal): ' + mr.errs.slice(0, 4).join(' | '));
+  const errList = v => (v && Array.isArray(v.errs) ? v.errs : []);
+  if (errList(fund).length) errs.push('Fundamental global: ' + errList(fund).length + ' seri tidak tersedia → ' + errList(fund).map(x => String(x).split(':')[0]).slice(0, 8).join(', '));
+  if (errList(cbf).length) errs.push('Feed bank sentral (sebagian gagal): ' + errList(cbf).join(' | '));
+  if (px && Array.isArray(px.errs) && px.errs.length && px.pairs && Object.keys(px.pairs).length < ALL_PAIRS.length) errs.push('Harga (sebagian gagal): ' + px.errs.slice(0, 4).join(' | '));
+  if (errList(mr).length) errs.push('FRED makro (sebagian gagal): ' + errList(mr).slice(0, 4).join(' | '));
   const sch = { NFP: nfpS || [], CPI: cpiS || [], PPI: ppiS || [], FOMC: fomcS || [] }, today = etDate(Date.now());
   const now = Date.now(), win = e => e.ts >= now - 72 * 3600000 && e.ts <= now + 14 * 86400000;
   const events = (cal || []).filter(win).map(e => {
     const tag = tagOf(e.title, e.cur), o = { ...e, tag };
-    if (tag && e.cur === 'USD' && sch[tag].length && !/minutes|press conference|speaks|testifies/i.test(e.title)) {
+    /* Jadwal resmi hanya tersedia untuk NFP/CPI/PPI/FOMC; tag lain (PCE, RETAIL,
+       GDP, CLAIMS, ADP, ISM) memakai kalender agregator. Jangan sampai tag baru
+       membuat seluruh News gagal karena kunci jadwal tidak ada. */
+    const schT = Array.isArray(sch[tag]) ? sch[tag] : null;
+    if (tag && e.cur === 'USD' && schT && schT.length && !/minutes|press conference|speaks|testifies/i.test(e.title)) {
       const d = etDate(e.ts);
-      if (sch[tag].some(r => r.date === d)) o.verified = 'official';
-      else { o.verified = 'conflict'; const near = sch[tag].map(r => r.date).filter(x => Math.abs(Date.parse(x) - Date.parse(d)) < 12 * 86400000).sort(); if (near.length) o.officialDate = near[0]; }
+      if (schT.some(r => r.date === d)) o.verified = 'official';
+      else { o.verified = 'conflict'; const near = schT.map(r => r.date).filter(x => Math.abs(Date.parse(x) - Date.parse(d)) < 12 * 86400000).sort(); if (near.length) o.officialDate = near[0]; }
     }
     return o;
   });
@@ -1312,9 +1317,9 @@ function quality(g, pro) {
   return q;
 }
 function publicBase(g, errs) {
-  return { fetchedAt: new Date().toISOString(), data: g.bls || null, calendar: g.events, next: g.next, quality: null, px: g.px || null, cot: g.cot || null, mr: g.mr || null, sp: g.sp || [], eng: g.eng || null, tone: g.tone || null, cbt: g.cbt || null, cbHead: g.cbHead || {}, fv: g.fv || null, fdiff: g.fdiff || null, sc: g.sc || [], val: g.val || [], rc: g.rc || [], sources: g.sources.map(s => ({ title: s.title, uri: s.uri, domain: s.domain, official: s.official, date: s.date, tier: s.tier, ageH: s.ageH, corr: s.corr })), notes: errs.filter(Boolean) };
+      return { fetchedAt: new Date().toISOString(), data: g.bls || null, calendar: g.events, next: g.next, quality: null, px: g.px || null, cot: g.cot || null, mr: g.mr || null, sp: g.sp || [], eng: g.eng || null, tone: g.tone || null, cbt: g.cbt || null, cbHead: g.cbHead || {}, fv: g.fv || null, fdiff: g.fdiff || null, sc: g.sc || [], val: g.val || [], rc: g.rc || [], yt: g.yt || null, us: g.us || null, sources: g.sources.map(s => ({ title: s.title, uri: s.uri, domain: s.domain, official: s.official, date: s.date, tier: s.tier, ageH: s.ageH, corr: s.corr })), notes: errs.filter(Boolean) };
 }
-function compactG(g) { return { events: g.events, next: g.next, bls: g.bls, sources: g.sources, yl: g.yl, ef: g.ef, fxs: g.fxs, px: g.px, cot: g.cot, mr: g.mr, sp: g.sp, eng: g.eng, tone: g.tone, fdiff: g.fdiff, fund: g.fund, cbt: g.cbt, sc: g.sc, val: g.val, rc: g.rc, calOk: g.calOk }; }
+function compactG(g) { return { events: g.events, next: g.next, bls: g.bls, sources: g.sources, yl: g.yl, ef: g.ef, fxs: g.fxs, px: g.px, cot: g.cot, mr: g.mr, sp: g.sp, eng: g.eng, tone: g.tone, fdiff: g.fdiff, fund: g.fund, cbt: g.cbt, sc: g.sc, val: g.val, rc: g.rc, yt: g.yt || null, us: g.us || null, calOk: g.calOk }; }
 const ISOD = /^\d{4}-\d\d-\d\d$/;
 function cleanG(x) {
   if (!x || typeof x !== 'object' || JSON.stringify(x).length > 160000) throw new Error('Data gabungan tidak valid atau terlalu besar');
@@ -1322,13 +1327,21 @@ function cleanG(x) {
   const events = (Array.isArray(x.events) ? x.events : []).slice(0, 60).map(e => ({ title: S(e.title, 120), cur: S(e.cur, 3), ts: N(e.ts), impact: e.impact === 'High' ? 'High' : 'Medium', forecast: S(e.forecast, 30), previous: S(e.previous, 30), actual: S(e.actual, 30), tag: XAU_TAGS.includes(e.tag) ? e.tag : '', verified: ['official', 'conflict'].includes(e.verified) ? e.verified : undefined, officialDate: ISOD.test(e.officialDate || '') ? e.officialDate : undefined, resmi: !!e.resmi })).filter(e => e.ts != null);
   const sources = (Array.isArray(x.sources) ? x.sources : []).slice(0, 18).filter(s => s && /^https?:\/\//.test(String(s.uri || ''))).map(s => ({ title: S(s.title, 200), uri: S(s.uri, 500), text: S(s.text, 320), date: S(s.date, 60), domain: S(s.domain, 80), official: !!s.official, tier: [1, 2, 3].includes(s.tier) ? s.tier : 3, ageH: N(s.ageH), corr: N(s.corr) }));
   const next = {};
-  ['NFP', 'PPI', 'CPI', 'FOMC'].forEach(k => { const v = x.next && x.next[k]; if (v && ISOD.test(v.date || '')) next[k] = { date: v.date, time: S(v.time, 12), ref: S(v.ref, 30), source: S(v.source, 30) }; });
+  ['NFP', 'PPI', 'CPI', 'FOMC', 'PCE', 'RETAIL', 'GDP', 'CLAIMS', 'ADP', 'ISM'].forEach(k => { const v = x.next && x.next[k]; if (v && ISOD.test(v.date || '')) next[k] = { date: v.date, time: S(v.time, 12), ref: S(v.ref, 30), source: S(v.source, 30) }; });
   const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? JSON.parse(JSON.stringify(v)) : null);
   const sp = (Array.isArray(x.sp) ? x.sp : []).slice(0, 12).map(e => ({ title: S(e.title, 120), cur: S(e.cur, 3), ts: N(e.ts) || 0, impact: S(e.impact, 8), actual: S(e.actual, 30), forecast: S(e.forecast, 30), previous: S(e.previous, 30), diff: N(e.diff), dir: S(e.dir, 14) }));
   return { events, next, sources, bls: obj(x.bls), yl: obj(x.yl), ef: obj(x.ef), fxs: obj(x.fxs), px: obj(x.px), cot: obj(x.cot), mr: obj(x.mr), sp, eng: obj(x.eng), tone: obj(x.tone), fdiff: obj(x.fdiff), fund: obj(x.fund), cbt: obj(x.cbt),
     sc: (Array.isArray(x.sc) ? x.sc : []).slice(0, 4).map(e => ({ event: S(e.event, 120), ts: N(e.ts) || 0, tag: S(e.tag, 6), forecast: S(e.forecast, 20), scenarios: (Array.isArray(e.scenarios) ? e.scenarios : []).slice(0, 3).map(c => ({ name: S(c.name, 40), desc: S(c.desc, 160), usd: { score: N(c.usd && c.usd.score), bias: S(c.usd && c.usd.bias, 8) }, pairs: Object.fromEntries(Object.entries(c.pairs || {}).slice(0, 8).map(([p, v]) => [S(p, 8), { score: N(v && v.score), bias: S(v && v.bias, 8) }])) })) })),
     val: (Array.isArray(x.val) ? x.val : []).slice(0, 20).map(v => ({ src: S(v.src, 60), msg: S(v.msg, 220), act: S(v.act, 80) })),
-    rc: (Array.isArray(x.rc) ? x.rc : []).slice(0, 10).map(r => ({ title: S(r.title, 80), label: S(r.label, 40), calendar: S(r.calendar, 20), official: N(r.official), diff: N(r.diff), status: S(r.status, 8) })), calOk: !!x.calOk };
+    rc: (Array.isArray(x.rc) ? x.rc : []).slice(0, 10).map(r => ({ title: S(r.title, 80), label: S(r.label, 40), calendar: S(r.calendar, 20), official: N(r.official), diff: N(r.diff), status: S(r.status, 8) })), calOk: !!x.calOk,
+    yt: x.yt && typeof x.yt === 'object' ? {
+      ok: !!x.yt.ok, trusted: N(x.yt.trusted),
+      items: (Array.isArray(x.yt.items) ? x.yt.items : []).slice(0, 14).filter(v => v && /^https?:\/\//.test(String(v.url || ''))).map(v => ({ title: S(v.title, 170), channel: S(v.channel, 60), trusted: S(v.trusted, 40), ageH: N(v.ageH), url: S(v.url, 220) }))
+    } : null,
+    us: x.us && typeof x.us === 'object' ? {
+      ok: !!x.us.ok,
+      items: (Array.isArray(x.us.items) ? x.us.items : []).slice(0, 12).filter(v => v && /^https?:\/\//.test(String(v.url || ''))).map(v => ({ title: S(v.title, 170), source: S(v.source, 40), ageH: N(v.ageH), url: S(v.url, 220) }))
+    } : null };
 }
 const newsCache = new Map();
 // ✏️ [TEKS BISA DIUBAH] [PROMPT AI] aiNews: Perintah AI untuk ringkasan News Trading dan format jawabannya.
@@ -1613,7 +1626,7 @@ function xauDirFallback(g) {
 /* Arah deterministik News: harga XAUUSD, DXY, yield riil/nominal, mesin skor,
    nada berita, dan kejutan aktual-vs-forecast. Dipakai untuk mengoreksi AI
    yang membalik arah pasar (mis. AI BUY saat emas justru jatuh tajam). */
-function xauMarket(g, pack, tags) {
+function xauMarket(g, pack, tags, sig) {
   let score = 0;
   const evidence = [];
   const add = (w, why) => {
@@ -1670,11 +1683,18 @@ function xauMarket(g, pack, tags) {
       if (s) add(s, `Kejutan ${x.title || 'rilis USD'} ${x.dir}`);
     });
   }
+  /* Reaksi nyata sesudah rilis: gerak candle live yang sudah terjadi. Bobot
+     terbesar karena ini fakta pasar, bukan proksi makro lambat. */
+  const react = xauReaction(sig, pack, tags);
+  if (react && react.dir !== 'DUA ARAH') {
+    add(clip(react.netPips / 45, -3, 3), 'Reaksi emas setelah ' + react.tag + ' terbit: ' + (react.netPips > 0 ? '+' : '') + react.netPips + ' pip (' + react.bar + ', ' + react.agoMin + ' menit lalu) → ' + react.dir);
+  }
   const abs = evidence.reduce((a, x) => a + Math.abs(x.w), 0);
   const bias = score >= 0.9 ? 'BULLISH' : score <= -0.9 ? 'BEARISH' : 'NETRAL';
   return {
     bias, score: Math.round(score * 100) / 100,
     strong: Math.abs(score) >= 1.6 && (!!e || !!px) && abs >= 2.2,
+    reaction: react,
     evidence: evidence.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 8)
   };
 }
@@ -1754,6 +1774,131 @@ function xauSpikeOf(sig, pack, tag) {
     source: 'mesin: kelas rilis + ATR M15 live' + (reaction ? ' + reaksi candle ' + reaction.bar : '')
   };
 }
+/* ===== YOUTUBE + MEDIA AS TERPERCAYA (data pendukung arah XAUUSD) =====
+   YouTube dibaca dari hasil pencarian publik (bukan API berbayar): judul, kanal,
+   dan umur unggahan. Angka harga TIDAK diambil dari video — hanya arah/narasi
+   yang dipakai sebagai konteks, dan kanal resmi (Bloomberg/Reuters/CNBC/Kitco
+   dst.) ditandai terpercaya. */
+const YT_TRUST = [
+  ['Bloomberg', /bloomberg/i], ['Reuters', /reuters/i], ['CNBC', /cnbc/i],
+  ['Fox Business', /fox business/i], ['Yahoo Finance', /yahoo finance/i],
+  ['WSJ', /wall street journal|^wsj$/i], ['Financial Times', /financial times|^ft\b/i],
+  ['Kitco News', /kitco/i], ['MarketWatch', /marketwatch/i], ['Investing.com', /investing\.com/i],
+  ['BNN Bloomberg', /bnn bloomberg/i], ['Schwab Network', /schwab/i], ['Forbes', /forbes/i],
+  ['Goldman Sachs', /goldman/i], ['JPMorgan', /jpmorgan|jp morgan/i], ['The Economist', /economist/i],
+  ['Federal Reserve', /federal reserve/i], ['AP', /associated press/i]
+];
+const ytTrustOf = ch => { const s = String(ch || ''); const hit = YT_TRUST.find(x => x[1].test(s)); return hit ? hit[0] : ''; };
+const jdec = s => String(s == null ? '' : s).replace(/\\u([0-9a-f]{4})/gi, (m, h) => { try { return String.fromCharCode(parseInt(h, 16)); } catch (e) { return m; } }).replace(/\\\//g, '/').replace(/\\"/g, '"');
+function ytAgeH(s) {
+  const m = /(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?|[smhdwy])\b/i.exec(String(s || ''));
+  if (!m) return null;
+  const u = m[2].toLowerCase(), k = /^(s|sec)/.test(u) ? 1 / 3600
+    : /^(m|min)/.test(u) ? 1 / 60
+      : /^(h|hr)/.test(u) ? 1
+        : /^(d|day)/.test(u) ? 24
+          : /^(w|week)/.test(u) ? 168
+            : /^(mo|month)/.test(u) ? 720 : 8760;
+  return Math.round(Number(m[1]) * k);
+}
+const YT_QUERIES = [
+  'XAUUSD gold forecast today', 'gold price analysis Federal Reserve',
+  'Reuters gold price today', 'Bloomberg gold price today',
+  'Kitco gold price news', 'Yahoo Finance gold price today',
+  'CNBC gold market today', 'XAUUSD technical analysis today'
+];
+async function ytOne(q) {
+  const u = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q) + '&sp=EgIIAw%253D%253D';
+  const r = await fetch(u, { headers: { 'User-Agent': BUA, 'Accept-Language': 'en-US,en;q=0.9' }, redirect: 'follow', signal: AbortSignal.timeout(12000) });
+  if (!r.ok) throw new Error('YouTube membalas ' + r.status);
+  const t = await r.text();
+  const out = [];
+  t.split('"videoRenderer":{').slice(1, 30).forEach(p => {
+    const id = (p.match(/"videoId":"([A-Za-z0-9_-]{11})"/) || [])[1];
+    if (!id) return;
+    const title = jdec((p.match(/"title":\{"runs":\[\{"text":"([^"]{4,220})"/) || [])[1] || '');
+    const channel = jdec((p.match(/"ownerText":\{"runs":\[\{"text":"([^"]{2,90})"/) || [])[1] || '');
+    const ageTxt = jdec((p.match(/"publishedTimeText":\{"simpleText":"([^"]{2,40})"/) || [])[1] || '');
+    if (!title) return;
+    const trusted = ytTrustOf(channel);
+    const relevant = /gold|xau|bullion|emas|precious metal|silver|logam mulia/i.test(title);
+    if (!relevant) return;
+    if (/#shorts/i.test(title)) return;
+    const ageH = ytAgeH(ageTxt);
+    out.push({ id, title: cut(title, 170), channel: cut(channel, 60), trusted, ageH, ageTxt: cut(ageTxt, 24), url: 'https://www.youtube.com/watch?v=' + id, at: ageH == null ? null : new Date(Date.now() - ageH * 3600000).toISOString() });
+  });
+  return out;
+}
+const ytGold = () => memoize('ytgold', 900000, async () => {
+  const res = await Promise.allSettled(YT_QUERIES.map(ytOne));
+  const map = new Map(), errs = [];
+  res.forEach(r => { if (r.status === 'fulfilled') r.value.forEach(x => { if (!map.has(x.id)) map.set(x.id, x); }); else errs.push(msg(r.reason, 80)); });
+  const items = [...map.values()].sort((a, b) => (b.trusted ? 1 : 0) - (a.trusted ? 1 : 0) || ((a.ageH == null ? 9999 : a.ageH) - (b.ageH == null ? 9999 : b.ageH)));
+  const picked = items.slice(0, 14);
+  return {
+    ok: picked.length > 0, at: new Date().toISOString(), total: items.length,
+    trusted: picked.filter(x => x.trusted).length, items: picked,
+    note: 'YouTube dibaca dari judul + kanal + umur unggahan. Kanal resmi (Bloomberg, Reuters, CNBC, Kitco, dll.) ditandai terpercaya; video komunitas dipakai hanya sebagai konteks. Tidak ada angka harga yang diambil dari video.'
+  };
+});
+const US_RSS_Q = [
+  'gold OR XAUUSD (site:reuters.com OR site:apnews.com OR site:cnbc.com OR site:marketwatch.com OR site:bloomberg.com OR site:wsj.com)',
+  '(gold price OR "Federal Reserve" OR inflation OR "jobless claims" OR "consumer price index") (site:reuters.com OR site:apnews.com OR site:cnbc.com OR site:marketwatch.com OR site:bloomberg.com OR site:wsj.com OR site:ft.com OR site:barrons.com OR site:foxbusiness.com)'
+];
+const usGoldNews = () => memoize('usgoldnews', 600000, async () => {
+  const res = await Promise.allSettled(US_RSS_Q.map(q => rss('https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=en-US&gl=US&ceid=US:en', 14)));
+  const errs = [], map = new Map();
+  res.forEach(r => {
+    if (r.status !== 'fulfilled') { errs.push(msg(r.reason, 90)); return; }
+    r.value.forEach(x => {
+      const title = String(x.title || '').trim();
+      if (!title) return;
+      const sm = /\s-\s([^-]{2,40})$/.exec(title), source = sm ? sm[1].trim() : '';
+      const clean = sm ? title.slice(0, sm.index).trim() : title;
+      const at = x.date ? new Date(x.date) : null;
+      const ageH = at && isFinite(at.getTime()) ? Math.round((Date.now() - at.getTime()) / 3600000) : null;
+      const key = clean.toLowerCase().slice(0, 90);
+      if (map.has(key)) return;
+      map.set(key, { title: cut(clean, 170), source: cut(source, 40), url: x.uri || '', at: at && isFinite(at.getTime()) ? at.toISOString() : null, ageH });
+    });
+  });
+  const items = [...map.values()].sort((a, b) => ((a.ageH == null ? 9999 : a.ageH) - (b.ageH == null ? 9999 : b.ageH))).slice(0, 12);
+  const sources = [...new Set(items.map(x => x.source).filter(Boolean))];
+  return { ok: items.length > 0, at: new Date().toISOString(), items, sources, errors: errs.slice(0, 3), note: 'Media AS terpercaya (Reuters, AP, Bloomberg, CNBC, WSJ, FT, MarketWatch, Barron\'s, Fox Business) via Google News RSS — hanya judul + tautan, tanpa mengarang isi.' };
+});
+/* Reaksi NYATA emas setelah rilis: dari candle live mesin, bukan opini. Dipakai
+   sebagai bukti terkuat arah News supaya hasil tidak berlawanan dengan chart. */
+function xauReaction(sig, pack, tags) {
+  if (!sig || !sig.chart) return null;
+  const want = Array.isArray(tags) && tags.length ? tags : null;
+  const cand = [];
+  (pack && Array.isArray(pack.focus) ? pack.focus : []).forEach(b => {
+    if (!b || (want && !want.includes(b.tag))) return;
+    (b.events || []).forEach(e => { if (e && e.ts) cand.push({ ...e, tag: e.tag || b.tag }); });
+  });
+  if (pack && pack.nearest && pack.nearest.tag && (!want || want.includes(pack.nearest.tag))) cand.push(pack.nearest);
+  const now = Date.now();
+  const ev = cand.filter(e => e.ts <= now && now - e.ts <= 36 * 3600000).sort((a, b) => b.ts - a.ts)[0];
+  if (!ev) return null;
+  const m5 = Array.isArray(sig.chart.m5) ? sig.chart.m5 : [], m15 = Array.isArray(sig.chart.rows) ? sig.chart.rows : [];
+  const useM5 = m5.length > 12 && m5[0].t <= ev.ts;
+  const rows = useM5 ? m5 : m15;
+  const pre = rows.filter(r => r.t <= ev.ts), post = rows.filter(r => r.t > ev.ts);
+  if (!pre.length || post.length < 2) return null;
+  const anchor = pre[pre.length - 1].c, lastBar = post[post.length - 1];
+  const netPips = Math.round((lastBar.c - anchor) / 0.1);
+  const firstBars = post.slice(0, ev.tag === 'FOMC' ? 6 : 3);
+  const firstPips = Math.round((firstBars[firstBars.length - 1].c - anchor) / 0.1);
+  const hi = Math.max(...post.map(r => r.h)), lo = Math.min(...post.map(r => r.l));
+  return {
+    tag: ev.tag, title: cut(ev.title || ev.tag, 120), releasedAt: new Date(ev.ts).toISOString(), agoMin: Math.round((now - ev.ts) / 60000),
+    anchor: sgN(anchor), last: sgN(lastBar.c), netPips, firstPips,
+    rangePips: Math.round((hi - lo) / 0.1), upPips: Math.round((hi - anchor) / 0.1), downPips: Math.round((anchor - lo) / 0.1),
+    dir: Math.abs(netPips) < 12 ? 'DUA ARAH' : netPips > 0 ? 'BUY' : 'SELL',
+    firstDir: Math.abs(firstPips) < 12 ? 'DUA ARAH' : firstPips > 0 ? 'BUY' : 'SELL',
+    bar: useM5 ? 'M5' : 'M15', window: 'dari rilis sampai sekarang', source: 'candle live mesin'
+  };
+}
 function sanitizeXau(o, opts) {
   o = (o && typeof o === 'object') ? o : {};
   const B = ['BULLISH', 'BEARISH', 'NETRAL'], C = ['RENDAH', 'SEDANG', 'TINGGI'];
@@ -1764,6 +1909,7 @@ function sanitizeXau(o, opts) {
   const biasAct = rawBias === 'BULLISH' ? 'BUY' : rawBias === 'BEARISH' ? 'SELL' : '';
   const fallbackBias = (opts && opts.fallback === 'BEARISH') ? 'BEARISH' : 'BULLISH';
   const market = (opts && opts.market) || null;
+  const react = market && market.reaction ? market.reaction : null;
   const mBias = market && B.includes(upper(market.bias)) ? upper(market.bias) : 'NETRAL';
   const mAction = mBias === 'BULLISH' ? 'BUY' : mBias === 'BEARISH' ? 'SELL' : '';
   let action = rawAct === 'BUY' || rawAct === 'SELL' ? rawAct : (biasAct || '');
@@ -1780,12 +1926,26 @@ function sanitizeXau(o, opts) {
     }
   }
   if (!action) { action = fallbackBias === 'BULLISH' ? 'BUY' : 'SELL'; actionSource = 'mesin'; actionOverridden = true; }
-  const forced = actionSource === 'mesin';
+  /* REAKSI RILIS = BUKTI TERKUAT. Bila rilis sudah terbit dan emas sudah bergerak
+     jelas sesudahnya, arah final wajib mengikuti gerak nyata itu — bukan skor
+     lambat (yield/DXY 5-20 hari) yang bisa berlawanan dengan chart hari ini. */
+  if (react && react.dir && react.dir !== 'DUA ARAH' && Math.abs(react.netPips) >= 20 && action !== react.dir) {
+    actionConflict = true;
+    action = react.dir;
+    actionSource = 'reaksi rilis';
+    actionOverridden = true;
+  }
+  const forced = actionSource === 'mesin' || actionSource === 'reaksi rilis';
   const finalBias = action === 'BUY' ? 'BULLISH' : 'BEARISH';
   if ((forced || actionConflict) && conf === 'TINGGI') conf = 'SEDANG';
   const out = {
     action, action_source: actionSource, action_forced: forced, action_overridden: actionOverridden,
     action_ai: rawAct || null, action_conflict: actionConflict,
+    reaction: react ? {
+      tag: react.tag, dir: react.dir, firstDir: react.firstDir, netPips: react.netPips, firstPips: react.firstPips,
+      rangePips: react.rangePips, upPips: react.upPips, downPips: react.downPips, anchor: react.anchor, last: react.last,
+      releasedAt: react.releasedAt, agoMin: react.agoMin, bar: react.bar, window: react.window, source: react.source
+    } : null,
     market: market ? {
       bias: mBias || finalBias, score: Number(market.score) || 0, strong: !!market.strong,
       evidence: (Array.isArray(market.evidence) ? market.evidence : []).slice(0, 10).map(x => ({ w: Number(x.w) || 0, why: cut(x.why, 240) }))
@@ -1846,7 +2006,9 @@ function sanitizeXau(o, opts) {
   (Array.isArray(o.scenarios) ? o.scenarios : []).slice(0, 5).forEach(s => {
     if (s && typeof s === 'object') out.scenarios.push({ name: cut(s.name, 100), if: cut(s.if, 320), then: cut(s.then, 520) });
   });
-  if (actionOverridden) {
+  if (actionSource === 'reaksi rilis' && react) {
+    out.action_reason = cut('Arah final ' + action + ' mengikuti reaksi NYATA emas sesudah ' + react.tag + ' terbit: ' + (react.netPips > 0 ? '+' : '') + react.netPips + ' pip (' + react.bar + ', ' + react.agoMin + ' menit lalu, arah pertama ' + react.firstDir + ')' + (rawAct && rawAct !== action ? '; AI semula ' + rawAct + ' dan dikoreksi' : '') + '. Reaksi rilis dipakai karena gerak harga nyata lebih kuat daripada skor makro lambat seperti DXY/yield 5–20 hari.', 700);
+  } else if (actionOverridden) {
     const ev = market && Array.isArray(market.evidence) ? market.evidence.slice(0, 3).map(x => x.why).filter(Boolean).join('; ') : '';
     out.action_reason = cut('Arah final ' + action + ' dipilih mesin dari data pasar terbaru' + (rawAct && rawAct !== action ? '; AI semula ' + rawAct + ' dan dikoreksi' : '') + '. WAIT tidak dipakai di News.' + (ev ? ' Bukti: ' + ev + '.' : ''), 700);
   } else if (actionConflict) out.action_reason = cut((out.action_reason ? out.action_reason + ' ' : '') + 'AI berbeda arah dengan data pasar; keyakinan diturunkan dan arah pasar dipakai sebagai pembanding.', 700);
@@ -1886,10 +2048,20 @@ async function aiXau(g, focus, t0) {
   const mech = FT.map(t => MECH[t]).filter(Boolean).join('\n');
   const text = dataText(g, true), fxPack = xauFocus(g, F);
   const engine = (g.eng && g.eng.pairs && g.eng.pairs.XAUUSD) || null;
-  const fallback = xauDirFallback(g), market = xauMarket(g, fxPack, FT);
   let sigText = '', sigPack = null;
   try { sigPack = await xauSignalPack(); sigText = signalText(sigPack); } catch (e) { sigText = '[SG] SIGNAL ENTRY: tidak tersedia (' + msg(e, 120) + ').'; }
+  const fallback = xauDirFallback(g), market = xauMarket(g, fxPack, FT, sigPack), react0 = xauReaction(sigPack, fxPack, FT);
   const spike0 = xauSpikeOf(sigPack, fxPack, F === 'all' ? null : F.toUpperCase());
+  const reactTxt = react0
+    ? 'Rilis ' + react0.tag + ' sudah terbit ' + react0.agoMin + ' menit lalu. Emas bergerak ' + (react0.netPips > 0 ? '+' : '') + react0.netPips + ' pip sejak harga sebelum rilis (' + react0.anchor + ' → ' + react0.last + ', ' + react0.bar + '), arah pertama ' + react0.firstDir + ' (' + (react0.firstPips > 0 ? '+' : '') + react0.firstPips + ' pip), rentang ' + react0.rangePips + ' pip (naik ' + react0.upPips + ' / turun ' + react0.downPips + ').'
+    : 'belum ada reaksi rilis yang bisa diukur (tidak ada rilis terbaru, atau candle live belum mencakup jam rilis).';
+  const yt0 = (g && g.yt) || null, us0 = (g && g.us) || null;
+  const ytTxt = yt0 && Array.isArray(yt0.items) && yt0.items.length
+    ? yt0.items.map((x, i) => (i + 1) + '. [' + (x.trusted ? 'TERPERCAYA ' + x.trusted : 'komunitas') + '] ' + (x.channel || '?') + ' — ' + x.title + (x.ageH != null ? ' (' + x.ageH + ' jam lalu)' : '') + ' ' + x.url).join('\n')
+    : 'tidak tersedia';
+  const usTxt = us0 && Array.isArray(us0.items) && us0.items.length
+    ? us0.items.map((x, i) => (i + 1) + '. ' + (x.source || 'media AS') + ' — ' + x.title + (x.ageH != null ? ' (' + x.ageH + ' jam lalu)' : '') + ' ' + x.url).join('\n')
+    : 'tidak tersedia';
   const sys = `Kamu analis makroekonomi dan trader emas (XAUUSD) bergaya desk institusional. Waktu sekarang: ${new Date().toUTCString()}. Tugas: menentukan ke mana XAUUSD bergerak menjelang dan saat rilis ${FL}, memakai HANYA data di bawah.
 
 ATURAN KERAS:
@@ -1913,6 +2085,8 @@ ATURAN KERAS:
 16. WAJIB mengisi "spike": {"likely":true/false,"why":"...","size_pips":{"min":0,"max":0},"window_min":0,"first_dir":"BUY|SELL|DUA ARAH"} untuk rilis fokus terpilih: apakah rilis memicu lonjakan volatilitas XAUUSD, perkiraan besar lonjakan dalam pip, jendela waktunya, dan arah PERTAMA yang paling mungkin. [SPK] adalah baseline deterministik (kelas rilis + ATR live + reaksi candle bila sudah terbit) — pakai angkanya, sesuaikan hanya bila ada bukti lain di data. Bedakan spike dari arah akhir.
 17. WAJIB menjelaskan RANTAI SEBAB-AKIBAT arah di action_reason dan thesis: (a) data global yang paling menentukan, (b) dampaknya ke USD/yield riil, (c) dampaknya ke permintaan emas, (d) kesimpulan arah BUY/SELL dan level yang membatalkan. Tanpa rantai ini jawaban dianggap tidak valid. Jangan mengarang angka baru.
 18. [TV] = bacaan chart TradingView real-time (OANDA:XAUUSD): harga, rekomendasi 1m–1D, RSI, EMA, ATR. Pakai untuk momentum multi-timeframe dan sebut bila searah/berlawanan dengan mesin; level entry/SL/TP tetap dari [SG] karena level sudah dikalibrasi ke harga chart. Bila [TV] tidak ada, tulis sebagai risiko data. Jangan mengarang angka chart.
+19. [RX] adalah gerak harga NYATA sesudah rilis dihitung mesin: arah final WAJIB searah [RX] bila |net| ≥ 20 pip. Bila AI ingin berbeda, tulis alasan berbasis data lain di action_reason dan turunkan keyakinan — tetapi angka final tetap mengikuti [RX].
+20. [US] (Reuters/AP/Bloomberg/CNBC/WSJ/FT/MarketWatch/Barron's/Fox Business) dan [YT] (YouTube) adalah KONTEKS BERITA/NARASI, bukan sumber angka. Kutip judul, sumber, dan umurnya bila dipakai; dilarang mengambil harga, level, atau persentase dari judul video/berita. Kanal YouTube "komunitas" hanya boleh disebut sebagai sentimen, bukan bukti. Bila [US]/[YT] bertentangan dengan [RX]/[P], menangkan [RX]/[P].
 
 MEKANIKA RILIS FOKUS (wajib dipakai saat menganalisis ${FL}; jangan mencampur logika rilis lain ke dalam events):
 ${mech}
@@ -1924,6 +2098,15 @@ ${sigText}
 
 PAKET SPIKE DETERMINISTIK [SPK] (kelas rilis + ATR live + reaksi candle nyata; jadikan baseline):
 ${JSON.stringify(spike0).slice(0, 2600)}
+
+REAKSI RILIS NYATA [RX] (dihitung mesin dari candle live — ini BUKTI TERKUAT arah, mengalahkan skor makro lambat):
+${reactTxt}
+
+MEDIA AS TERPERCAYA [US] (judul + sumber + umur; konteks berita, BUKAN angka):
+${usTxt}
+
+YOUTUBE [YT] (judul + kanal + umur; konteks narasi saja, dilarang mengutip angka):
+${ytTxt}
 
 ${text}
 
@@ -3235,13 +3418,19 @@ async function xauHandler(req, res) {
   const c = !phase && !b.fresh && xauCache.get(ck);
   if (c && Date.now() - c.t < 60000) return res.status(200).json({ ...c.p, cached: true });
   if (b.fresh) bustData();
-  const errs = [], gg = await gatherAll(focus, errs, true, ['XAUUSD'], '1-5 hari');
+  const errs = [];
+  /* YouTube + media AS terpercaya diambil PARALEL dengan data global supaya
+     tidak menambah waktu tunggu; kegagalan salah satunya tidak mematikan News. */
+  const ytP = ytGold().catch(() => null), usP = usGoldNews().catch(() => null);
+  const gg = await gatherAll(focus, errs, true, ['XAUUSD'], '1-5 hari');
+  const [yt0, us0] = await Promise.all([ytP, usP]);
+  gg.yt = yt0; gg.us = us0;
   const fx0 = xauFocus(gg, focus);
   const sig0 = lockSignalDirection(await new Promise(resolve => {
     const timer = setTimeout(() => resolve({ error: 'Sinyal entry melewati batas 25 detik; data lain tetap ditampilkan' }), 25000);
     xauSignalPack().then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); resolve({ error: 'Sinyal entry gagal: ' + msg(e, 140) }); });
   }));
-  const base = { ...publicBase(gg, errs), focus, xau: fx0, spikePlan: xauSpikeOf(sig0, fx0, focus === 'all' ? null : focus.toUpperCase()), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: sig0, gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
+  const base = { ...publicBase(gg, errs), focus, xau: fx0, yt: yt0, us: us0, reaction: xauReaction(sig0, fx0, focus === 'all' ? null : focus.toUpperCase()), spikePlan: xauSpikeOf(sig0, fx0, focus === 'all' ? null : focus.toUpperCase()), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: sig0, gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
   if (phase === 'data') return res.status(200).json({ phase: 'data', ...base, g: compactG(gg) });
   const r = await aiXau(compactG(gg), focus, t0), payload = { ...base, ...r, notes: base.notes.concat(r.notes) };
   if (payload.xai) xauCache.set(ck, { t: Date.now(), p: payload });
