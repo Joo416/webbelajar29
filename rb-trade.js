@@ -166,7 +166,10 @@ function xauFocusCard(j) {
   const bucket = (f.focus || []).filter(function (b) { return b.tag === tag; })[0];
   const ev = bucket && bucket.events ? bucket.events[0] : null;
   const sp = x.spike || {}, act = x.action === 'SELL' ? 'SELL' : 'BUY';
-  const mk = x.market || {}, mdir = mk.bias || (act === 'BUY' ? 'BULLISH' : 'BEARISH');
+  const mk = x.market || {};
+  const mdir = (x.action_source === 'reaksi rilis' && x.reaction && x.reaction.dir && x.reaction.dir !== 'DUA ARAH')
+    ? (x.reaction.dir === 'BUY' ? 'BULLISH' : 'BEARISH')
+    : (mk.bias || (act === 'BUY' ? 'BULLISH' : 'BEARISH'));
   const mcol = mdir === 'BULLISH' ? 'var(--ok)' : mdir === 'BEARISH' ? 'var(--no)' : 'var(--warn)';
   const mev = (Array.isArray(mk.evidence) ? mk.evidence : []).slice(0, 5);
   const label = f.focusName || (tags.length ? tags.join(' · ') : 'Gabungan');
@@ -178,16 +181,28 @@ function xauFocusCard(j) {
   const spWhy = sp.why || (spPlan ? spPlan.why : '');
   const rx = (sp.reaction || (spPlan && spPlan.reaction)) || null;
   const spYes = sp.likely === true || !!(spPlan && spPlan.likely);
+  const srcLabel = x.action_source === 'reaksi rilis' ? 'Putusan mesin · reaksi rilis' : x.action_source === 'mesin' ? 'Putusan mesin' : 'Putusan AI';
   const verdict = '<div class="rb-verdict ' + (act === 'BUY' ? 'buy' : 'sell') + '">'
-    + '<div class="rb-verdict-label">Putusan AI · ' + esc(label) + '</div>'
+    + '<div class="rb-verdict-label">' + esc(srcLabel) + ' · ' + esc(label) + '</div>'
     + '<div class="rb-verdict-main">' + act + '</div>'
     + '<div class="rb-verdict-sub">XAUUSD — satu arah, tanpa WAIT</div>'
     + '<div class="rb-verdict-spike' + (spYes ? '' : ' no') + '">' + (spYes ? '⚡ Ada spike' : 'Tidak ada spike')
     + (spMin != null ? ' · ' + esc(String(spMin)) + '–' + esc(String(spMax)) + ' pip' : '')
     + (spWin != null ? ' · jendela ±' + esc(String(spWin)) + ' menit' : '')
     + (spFirst ? ' · arah pertama ' + esc(spFirst) : '') + '</div></div>';
+  const rxn = x.reaction || j.reaction || null;
+  const rCol = rxn && rxn.dir === 'BUY' ? 'var(--ok)' : rxn && rxn.dir === 'SELL' ? 'var(--no)' : 'var(--warn)';
+  const reactBlock = rxn ? '<div class="exp" style="margin-top:8px;color:var(--tx);border-color:' + rCol + '">'
+    + '<b>📈 Reaksi NYATA setelah ' + esc(rxn.tag) + ' terbit:</b> <b style="color:' + rCol + '">' + (rxn.netPips > 0 ? '+' : '') + esc(String(rxn.netPips)) + ' pip → ' + esc(rxn.dir) + '</b>'
+    + '<div class="small mut" style="margin-top:4px">' + esc(String(rxn.agoMin)) + ' menit lalu · ' + sigNum(rxn.anchor) + ' → ' + sigNum(rxn.last) + ' · arah pertama ' + esc(rxn.firstDir || '—') + ' · rentang ' + esc(String(rxn.rangePips)) + ' pip (' + esc(rxn.bar) + ') · ' + esc(rxn.source) + '</div>'
+    + (rxn.dir !== 'DUA ARAH' && x.action && rxn.dir !== x.action ? '<div class="small" style="margin-top:4px;color:var(--warn)">⚠️ Arah final ' + esc(x.action) + ' berbeda dari reaksi nyata ' + esc(rxn.dir) + ' — periksa ulang sebelum entry.</div>' : '')
+    + '</div>' : '';
+  const staleRel = !!(j.spikePlan && j.spikePlan.released && j.spikePlan.ts && j.fetchedAt && Date.parse(j.fetchedAt) < j.spikePlan.ts && !x.reaction);
+  const staleBlock = staleRel ? '<div class="warn" style="margin-top:8px">⏱️ Data ini diambil SEBELUM rilis terbit, jadi belum memuat reaksi harga. Tekan “Ambil data global terbaru” supaya putusan memakai harga sesudah rilis.</div>' : '';
   return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-dir ' + (act === 'BUY' ? 'buy' : 'sell') + '">' + act + ' XAUUSD</span></div>'
+    + staleBlock
     + verdict
+    + reactBlock
     + (ev ? '<div class="rb-release"><div class="rb-release-head"><div class="rb-release-title">' + esc(ev.title || ev.tag) + '</div>'
       + '<span class="rb-pill ' + (ev.verified === 'official' ? 'y' : '') + '">' + (ev.verified === 'official' ? '✅ jadwal resmi' : 'jadwal kalender') + '</span></div>'
       + '<div class="rb-release-meta">'
@@ -207,9 +222,32 @@ function xauFocusCard(j) {
     + (spWhy ? '<div class="small mut" style="margin-top:4px">' + esc(spWhy) + '</div>' : '')
     + (rx ? '<div class="small" style="margin-top:5px;color:var(--ok)">📈 Reaksi nyata (' + esc(rx.window) + ', ' + esc(rx.bar) + '): rentang <b>' + esc(String(rx.rangePips)) + ' pip</b> · naik ' + esc(String(rx.upPips)) + ' / turun ' + esc(String(rx.downPips)) + ' · net ' + (rx.netPips > 0 ? '+' : '') + esc(String(rx.netPips)) + ' pip → ' + esc(rx.firstDir) + '</div>' : '')
     + '</div>'
-    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>🧭 Kenapa arah ' + act + ':</b> <b style="color:' + mcol + '">' + esc(mdir) + '</b>' + (mk.score != null ? ' · skor ' + esc(String(mk.score)) : '') + (mk.strong ? ' · bukti kuat' : ' · bukti belum dominan') + '</div>'
+    + '<div class="exp" style="margin-top:8px;color:var(--tx)"><b>🧭 Kenapa arah ' + act + ':</b> <b style="color:' + mcol + '">' + esc(mdir) + '</b>' + (x.action_source === 'reaksi rilis' ? ' · dasar: reaksi harga sesudah rilis' : (mk.score != null ? ' · skor ' + esc(String(mk.score)) : '') + (mk.strong ? ' · bukti kuat' : ' · bukti belum dominan')) + '</div>'
     + (mev.length || x.action_reason ? '<div style="margin-top:4px">' + mev.map(function (e, i) { return '<div class="small mut">' + (i + 1) + '. ' + esc(e.why) + ' (' + (e.w > 0 ? '+' : '') + esc(String(e.w)) + ')</div>'; }).join('') + (x.action_reason ? '<div class="small" style="margin-top:5px;line-height:1.55">' + esc(x.action_reason) + '</div>' : '') + '</div>' : '<div class="small mut" style="margin-top:4px">Belum ada data pasar yang cukup untuk mengoreksi arah AI; keyakinan dibatasi.</div>')
-    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_overridden ? 'Arah AI dikoreksi mesin karena bertentangan dengan harga/DXY/yield/kejutan rilis.' : x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI dan sudah dicek terhadap data pasar.') + '</div></div>';
+    + '<div class="small mut" style="margin-top:6px">Analisis di bawah hanya untuk rilis ini; AI tetap memakai seluruh data global untuk satu keputusan akhir. ' + (x.action_source === 'reaksi rilis' ? 'Arah final mengikuti reaksi harga NYATA sesudah rilis, karena gerak harga lebih kuat daripada skor makro lambat (DXY/yield 5–20 hari).' : x.action_overridden ? 'Arah AI dikoreksi mesin karena bertentangan dengan harga/DXY/yield/kejutan rilis.' : x.action_forced ? 'Arah final dipilih mesin karena AI netral/WAIT.' : 'Arah final berasal dari AI dan sudah dicek terhadap data pasar.') + '</div></div>';
+}
+
+/* Sumber tambahan: YouTube (kanal resmi & komunitas) + media AS terpercaya.
+   Semua hanya konteks arah; angka harga tetap dari candle + kalender resmi. */
+function xauSrcCard(j) {
+  const yt = j.yt || {}, us = j.us || {};
+  const yi = Array.isArray(yt.items) ? yt.items.slice(0, 10) : [];
+  const ui = Array.isArray(us.items) ? us.items.slice(0, 8) : [];
+  if (!yi.length && !ui.length) return '';
+  const age = h => (h == null ? '' : h < 48 ? h + ' jam lalu' : Math.round(h / 24) + ' hari lalu');
+  const uRows = ui.map(function (x) {
+    return '<div class="item"><span><a href="' + esc(x.url) + '" target="_blank" rel="noopener" style="color:var(--b)">' + esc(x.title) + '</a>'
+      + '<div class="small mut">' + esc(x.source || 'media AS') + (x.ageH != null ? ' · ' + esc(age(x.ageH)) : '') + '</div></span></div>';
+  }).join('');
+  const yRows = yi.map(function (x) {
+    return '<div class="item"><span><a href="' + esc(x.url) + '" target="_blank" rel="noopener" style="color:var(--b)">' + esc(x.title) + '</a>'
+      + '<div class="small mut">' + (x.trusted ? '✅ ' + esc(x.trusted) : '👤 komunitas') + ' · ' + esc(x.channel || '') + (x.ageH != null ? ' · ' + esc(age(x.ageH)) : '') + '</div></span></div>';
+  }).join('');
+  return '<div class="card"><div class="rb-card-head"><h3>📺 YouTube &amp; media AS terpercaya</h3><span class="rb-pill">' + yi.length + ' video · ' + ui.length + ' berita</span></div>'
+    + '<div class="rb-note">YouTube dibaca dari judul, kanal, dan umur unggahan; media AS dari Google News RSS (Reuters, AP, Bloomberg, CNBC, WSJ, FT, MarketWatch, Fox Business). Keduanya dipakai sebagai <b>konteks arah</b> — bukan sumber angka harga. Angka tetap dari candle live, [P], dan kalender resmi.</div>'
+    + (ui.length ? '<div style="margin-top:8px"><b class="small">📰 Media AS · berita emas &amp; Fed</b>' + uRows + '</div>' : '')
+    + (yi.length ? '<div style="margin-top:8px"><b class="small">▶️ YouTube · pergerakan XAUUSD</b>' + yRows + '</div>' : '')
+    + '<div class="small mut" style="margin-top:8px">' + esc((yt && yt.note) || '') + '</div></div>';
 }
 
 /* Pembungkus renderXau: tampilan lama tetap, lalu tambah kartu validitas & prediksi. */
@@ -244,6 +282,8 @@ window.renderXau = function renderXau(j, stale) {
     + '<div class="small mut" style="margin-top:8px">Kesegaran paket data: ' + esc(fresh) + (j.cached ? ' · dari cache server' : '') + '. Tekan “Ambil data global terbaru” untuk membuang cache.</div>'
     + (srcRows ? '<div style="margin-top:8px"><b class="small">Sumber yang dipakai</b>' + srcRows + '</div>' : '')
     + '</div>';
+
+  add += xauSrcCard(j);
 
   add += '<div class="card"><h3>📈 Prediksi jalur XAUUSD</h3>'
     + (x.gold_path ? '<div class="exp" style="color:var(--tx);line-height:1.6">' + fmtMd(x.gold_path) + '</div>'
