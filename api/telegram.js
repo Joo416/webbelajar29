@@ -57,8 +57,16 @@ module.exports = async (req, res) => {
 
   const chatId = String((msg.chat && msg.chat.id) || '');
   const allowed = allowedChats();
-  if (!allowed.length) return res.status(200).json({ ok: true, denied: true, reason: 'TELEGRAM_CHAT_ID belum diisi' });
-  if (!allowed.includes(chatId)) return res.status(200).json({ ok: true, denied: true });
+  /* Jangan diam saat chat belum terdaftar: balas id-nya supaya pemilik bot bisa
+     langsung menyalinnya ke env. Tidak ada rahasia yang dibocorkan. */
+  if (!allowed.length) {
+    await chat.tgSendTo(chatId, '⚠️ Bot belum dikonfigurasi.\nID chat Anda: ' + chatId + '\nIsi TELEGRAM_CHAT_ID dengan angka itu di Vercel, lalu redeploy dan kirim /sinyal lagi.');
+    return res.status(200).json({ ok: true, denied: true, chatId, reason: 'TELEGRAM_CHAT_ID belum diisi' });
+  }
+  if (!allowed.includes(chatId)) {
+    await chat.tgSendTo(chatId, '⚠️ Chat ini belum terdaftar.\nID chat Anda: ' + chatId + '\nTambahkan angka itu ke TELEGRAM_CHAT_ID (boleh dipisah koma) di Vercel, redeploy, lalu kirim /sinyal lagi.');
+    return res.status(200).json({ ok: true, denied: true, chatId });
+  }
 
   const text = String(msg.text).trim();
   const cmd = (text.split(/\s+/)[0] || '').toLowerCase().replace(/@[a-z0-9_]+$/i, '');

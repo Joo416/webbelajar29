@@ -1137,7 +1137,14 @@ async function gatherAll(focus, errs, pro, pairs, horizon) {
   if (focus === 'cpi' || focus === 'all') feeds.push(['https://www.bls.gov/feed/cpi.rss', 'BLS CPI']);
   if (focus === 'ppi' || focus === 'all') feeds.push(['https://www.bls.gov/feed/ppi.rss', 'BLS PPI']);
   if (focus === 'fomc' || focus === 'all') feeds.push(['https://www.federalreserve.gov/feeds/press_monetary.xml', 'Federal Reserve'], ['https://www.federalreserve.gov/feeds/speeches_and_testimony.xml', 'Federal Reserve (pidato)']);
-  const safe = (name, p) => (p ? p.catch(e => { errs.push(name + ': ' + msg(e, 400)); return null; }) : Promise.resolve(null));
+  /* Batas waktu keras per sumber: satu koneksi yang menggantung tidak boleh menahan seluruh paket data. */
+  const safe = (name, p, ms = 28000) => {
+    if (!p) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { errs.push(name + ': melewati batas ' + Math.round(ms / 1000) + ' detik'); resolve(null); }, ms);
+      Promise.resolve(p).then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); errs.push(name + ': ' + msg(e, 400)); resolve(null); });
+    });
+  };
   const [cal, nfpS, cpiS, ppiS, fomcS, bls, feed, ns, mkt, yl, ef, fxs, px, ct, mr, fd, fund, cbf] = await Promise.all([
     safe('Kalender', calendar()), safe('Jadwal BLS NFP', blsSchedule('empsit')), safe('Jadwal BLS CPI', blsSchedule('cpi')), safe('Jadwal BLS PPI', blsSchedule('ppi')), safe('Jadwal FOMC', fomcSchedule()),
     safe('Data BLS', blsCached()), Promise.all(feeds.map(([u, n]) => safe(n, rssM(u, 3)))).then(a => a.flat().filter(Boolean)),
@@ -1848,6 +1855,15 @@ async function aiXau(g, focus, t0) {
   const F = ['nfp', 'cpi', 'ppi', 'fomc', 'all'].includes(String(focus || '').toLowerCase()) ? String(focus).toLowerCase() : 'all';
   const FT = F === 'all' ? ['NFP', 'PPI', 'CPI', 'FOMC'] : [F.toUpperCase()];
   const FL = FT.join(', ');
+  /* Mekanika tiap rilis — dipakai AI agar analisis benar-benar fokus pada
+     rilis yang dipilih, bukan kalimat umum soal "inflasi" atau "Fed". */
+  const MECH = {
+    NFP: 'NFP — baca: (1) perubahan payrolls (ribu) vs konsensus & rata-rata 3 bulan, (2) unemployment rate (naik = dovish), (3) average hourly earnings MoM & YoY (upah panas = hawkish), (4) revisi dua bulan sebelumnya, (5) partisipasi & jam kerja. Komposisi sektor (pemerintah vs swasta, leisure/hospitality, kesehatan) menentukan kualitas angka. Payrolls kuat + pengangguran turun + upah naik = USD/yield naik = tekanan turun XAUUSD; payrolls lemah + pengangguran naik = sebaliknya. Spike biasanya dua arah pada detik rilis lalu mengikuti arah kejutan.',
+    CPI: 'CPI — baca: headline MoM & YoY, core MoM & YoY, supercore/jasa inti, shelter (weight terbesar), dan barang inti. Bandingkan dengan konsensus, previous, serta 3 bulan terakhir (momentum inflasi). Inflasi lebih panas dari konsensus → ekspektasi Fed hawkish → yield riil naik → XAUUSD turun; lebih dingin → XAUUSD naik. CPI biasanya memicu spike besar dua arah; arah akhir mengikuti kejutan core/supercore.',
+    PPI: 'PPI — baca: final demand MoM & YoY, core ex food & energy, komponen yang masuk PCE (healthcare, portfolio management, airline fares), serta harga barang vs jasa di tingkat produsen. PPI adalah indikator awal tekanan harga ke konsumen: PPI panas = risiko CPI panas ke depan = hawkish = XAUUSD tertekan; PPI dingin = dukungan naik untuk XAUUSD. Reaksi biasanya lebih kecil dari CPI, tetapi bisa jadi sinyal awal bila komponen PCE meleset.',
+    FOMC: 'FOMC — baca: keputusan fed funds rate & target range, perubahan statement (bandingkan kalimat kunci dengan statement sebelumnya), dot plot/SEP (median proyeksi rate tahun ini & tahun depan), nada press conference (hawkish/dovish), dan dissenting votes. Rate hold + nada dovish = yield riil turun = XAUUSD naik; rate hold + nada hawkish/"higher for longer" = XAUUSD tertekan. Spike terbesar biasanya saat statement & press conference; arah bisa berbalik setelah pasar mencerna dot plot.'
+  };
+  const mech = FT.map(t => MECH[t]).filter(Boolean).join('\n');
   const text = dataText(g, true), fxPack = xauFocus(g, F);
   const engine = (g.eng && g.eng.pairs && g.eng.pairs.XAUUSD) || null;
   const fallback = xauDirFallback(g), market = xauMarket(g, fxPack, FT);
@@ -1871,11 +1887,14 @@ ATURAN KERAS:
 10. WAJIB memilih arah eksekusi XAUUSD: "action":"BUY" atau "SELL" berdasarkan gabungan SEMUA data global (BLS, FRED, yield, dolar, CFTC, bank sentral, berita). WAIT TIDAK DIPERBOLEHKAN. Bila data bertentangan, pilih arah dominan yang paling didukung data terbaru dan jelaskan konfliknya di action_reason.
 11. events WAJIB memuat tag ${FL} saja, termasuk rilis yang jadwalnya belum terbaca. Jangan menambah tag fokus lain ke events; tag lain hanya boleh menjadi konteks di clusters/action_reason.
 12. "related" dalam [XF] berisi rilis lain di waktu berdekatan (≤48 jam). Jelaskan efek gabungannya di clusters dan action_reason.
-13. Rencana entry [SG] berasal dari mesin deterministik (SL minimal 30 pip, TP1 minimal 100 pip, TP2 minimal 200 pip, TPmax dari target struktur/global). Jangan mengubah entry/SL/TP. Bila arah AI berbeda dengan mesin, sebut alasannya di action_reason dan turunkan keyakinan.
+13. Rencana entry [SG] berasal dari mesin deterministik (SL tepat 30 pip dan tidak boleh lebih, TP1 minimal 100 pip, TP2 minimal 200 pip, TPmax dari konfluensi struktur + likuiditas + ATR global). Jangan mengubah entry/SL/TP. Bila arah AI berbeda dengan mesin, sebut alasannya di action_reason dan turunkan keyakinan.
 14. Setiap rilis fokus WAJIB punya "validity": jelaskan mengapa angka/jadwal itu VALID — sebut sumber resmi (BLS / federalreserve.gov / FRED), periode data, kesegaran tanggal, dan hasil verifikasi silang bila ada. Dilarang menulis "valid" tanpa bukti sumber.
 15. WAJIB memberi "gold_path": prediksi jalur XAUUSD yang operasional (skenario utama, arah per rilis, level referensi dari [P]/[L], dan pemicu yang membatalkannya) menjelang dan saat rilis.
 16. WAJIB mengisi "spike": {"likely":true/false,"why":"...","size_pips":{"min":0,"max":0},"window_min":0,"first_dir":"BUY|SELL|DUA ARAH"} untuk rilis fokus terpilih: apakah rilis memicu lonjakan volatilitas XAUUSD, perkiraan besar lonjakan dalam pip, jendela waktunya, dan arah PERTAMA yang paling mungkin. [SPK] adalah baseline deterministik (kelas rilis + ATR live + reaksi candle bila sudah terbit) — pakai angkanya, sesuaikan hanya bila ada bukti lain di data. Bedakan spike dari arah akhir.
 17. WAJIB menjelaskan RANTAI SEBAB-AKIBAT arah di action_reason dan thesis: (a) data global yang paling menentukan, (b) dampaknya ke USD/yield riil, (c) dampaknya ke permintaan emas, (d) kesimpulan arah BUY/SELL dan level yang membatalkannya. Tanpa rantai ini jawaban dianggap tidak valid. Jangan mengarang angka baru.
+
+MEKANIKA RILIS FOKUS (wajib dipakai saat menganalisis ${FL}; jangan mencampur logika rilis lain ke dalam events):
+${mech}
 
 PAKET RILIS FOKUS [XF] (hasil pengelompokan server; jangan menambah rilis di luar ini):
 ${JSON.stringify(fxPack).slice(0, 14000)}
@@ -1923,10 +1942,11 @@ OUTPUT: HANYA JSON valid tanpa markdown, semua teks Bahasa Indonesia, backslash 
    DXY (DX-Y.NYB) & yield 10Y (^TNX), kalender rilis Forex Factory.
    Aturan tetap: SL 30 pip, TP 1:2, 1 pip XAUUSD = 0.1 harga.
    ===================================================================== */
-/* Aturan level yang diminta pengguna: SL WAJIB 30–40 pip (tidak boleh lebih),
-   TP1 ≥100 pip, TP2 ≥200 pip, TP3/TPmax mengikuti target struktur & likuiditas
-   global terjauh. Sinyal per siklus: minimal 3, maksimal 10, satu arah. */
-const SGP = { pip: 0.1, slPips: 30, slMaxPips: 40, rr: 2.5, tp1Pips: 100, tp2Pips: 200, minSignals: 3, maxSignals: 10, refreshSec: 900 };
+/* Aturan level yang diminta pengguna: SL 30 pip adalah MAKSIMUM — semua setup
+   memakai tepat 30 pip; TP1 ≥100, TP2 ≥200, TPmax = konfluensi struktur,
+   likuiditas, dan volatilitas global (maks 600 pip).
+   Sinyal per siklus: minimal 3, maksimal 10, satu arah. */
+const SGP = { pip: 0.1, slPips: 30, slMaxPips: 30, rr: 2.5, tp1Pips: 100, tp2Pips: 200, minSignals: 3, maxSignals: 10, refreshSec: 900 };
 const sgN = v => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : null);
 async function sgYahoo(sym, range, interval, t = 9000) {
   let last;
@@ -2329,23 +2349,90 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     .filter(z => z.mid != null && isFinite(z.mid))
     .sort((a, b) => Math.abs(a.mid - rawPrice) - Math.abs(b.mid - rawPrice))[0] || null;
   const poi = poiRaw ? { kind: poiRaw.kind, lo: sh(poiRaw.lo), hi: sh(poiRaw.hi), mid: sh(poiRaw.mid), dist: sgN(Math.abs(poiRaw.mid - rawPrice)) } : null;
-  const atrPipsNow = atr ? atr / SGP.pip : SGP.slPips;
-  const slPipsUse = Math.min(SGP.slMaxPips, Math.max(SGP.slPips, Math.round(atrPipsNow * 1.1)));
+  /* SL: permintaan pengguna = 30 pip sudah maksimal. Tidak ada lagi 31–40 pip,
+     semua setup memakai tepat 30 pip agar risiko seragam di scalping/day/swing. */
+  const slPipsUse = SGP.slPips;
   const slDist = sgN(slPipsUse * SGP.pip);
-  /* TP maksimum: target struktur/global terjauh (range, high/low 20 hari, range Asia). */
-  const xauMaxTp = (dir, from) => {
-    const cands = [];
-    if (isFinite(rangeLo) && isFinite(rangeHi)) cands.push(dir === 'BUY' ? sh(rangeHi) : sh(rangeLo));
-    if (dailyS) cands.push(dir === 'BUY' ? dailyS.hi20 : dailyS.lo20);
-    if (asiaS) cands.push(dir === 'BUY' ? asiaS.hi : asiaS.lo);
-    if (pdh != null) cands.push(dir === 'BUY' ? pdh : pdl);
-    (dir === 'BUY' ? pools.highs : pools.lows).slice(0, 3).forEach(v => cands.push(v));
-    if (h4 && h4.range) cands.push(dir === 'BUY' ? h4.range.hi : h4.range.lo);
-    const valid = cands.filter(v => v != null && isFinite(v) && (dir === 'BUY' ? v > from : v < from));
-    let d = valid.length ? Math.max(...valid.map(v => Math.abs(v - from))) : 0;
-    d = Math.max(d, SGP.tp2Pips * SGP.pip * 1.5);
-    d = Math.min(d, 600 * SGP.pip);
-    return sgN(d);
+  /* ------------------------------------------------------------------
+     TP MAKSIMUM — mesin konfluensi level global.
+     Setiap kandidat target diberi bobot sesuai kekuatan sumbernya:
+       D1 high/low 20 hari, PDH/PDL, range H4/M15/Asia, equal high/low
+       (pool stop retail), proyeksi ATR D1 & mingguan, measured move D1,
+       ekstensi Fib 1,272/1,618, dan level psikologis kelipatan 50.
+     Kandidat yang berdekatan digabung; target dengan bobot konfluensi
+     tertinggi (dan masih dalam 200–600 pip) dipakai sebagai TPmax.
+     ------------------------------------------------------------------ */
+  const atrD1 = cd.day && cd.day.rows.length > 20 ? sgAtr(cd.day.rows, 14) : null;
+  const atrWk = atrD1 ? atrD1 * Math.sqrt(5) : null;
+  const xauTpCands = (dir, from) => {
+    const out = [];
+    const up = dir === 'BUY';
+    const push = (v, why, w) => {
+      const n = Number(v);
+      if (!isFinite(n) || (up ? n <= from : n >= from)) return;
+      out.push({ v: sgN(n), why, w: w || 1 });
+    };
+    if (isFinite(rangeLo) && isFinite(rangeHi)) push(up ? sh(rangeHi) : sh(rangeLo), 'range 80 candle M15', 0.6);
+    if (dailyS) push(up ? dailyS.hi20 : dailyS.lo20, 'high/low 20 hari D1', 1.4);
+    if (pdh != null) push(up ? pdh : pdl, 'PDH/PDL (likuiditas harian)', 1.2);
+    if (asiaS) push(up ? asiaS.hi : asiaS.lo, 'range Asia', 0.5);
+    if (h4 && h4.range) push(up ? h4.range.hi : h4.range.lo, 'range H4', 1.0);
+    (up ? pools.highs : pools.lows).slice(0, 3).forEach((v, i) => push(v, 'equal ' + (up ? 'high' : 'low') + ' #' + (i + 1) + ' (pool stop retail)', 0.8));
+    if (atrD1) {
+      push(from + (up ? 1 : -1) * atrD1, 'proyeksi ATR harian ×1,0', 0.7);
+      push(from + (up ? 1 : -1) * atrD1 * 1.5, 'proyeksi ATR harian ×1,5', 0.9);
+      if (atrWk) push(from + (up ? 1 : -1) * atrWk * 0.5, 'proyeksi ATR mingguan ×0,5', 0.6);
+    }
+    if (cd.day && cd.day.rows.length >= 12) {
+      const w = cd.day.rows.slice(-12), hi12 = Math.max(...w.map(r => r.h)), lo12 = Math.min(...w.map(r => r.l)), rng = hi12 - lo12;
+      if (rng > 0) {
+        /* Kalibrasi ke spot emas sama seperti level struktur lain (sh). */
+        const base = up ? sh(hi12) : sh(lo12);
+        push(up ? base + rng : base - rng, 'measured move D1 (impuls 12 hari)', 1.1);
+        push(up ? base + rng * 0.272 : base - rng * 0.272, 'ekstensi Fib 1,272 D1', 0.6);
+        push(up ? base + rng * 0.618 : base - rng * 0.618, 'ekstensi Fib 1,618 D1', 0.6);
+      }
+    }
+    const step = 50;
+    const r1 = up ? Math.ceil((from + 0.01) / step) * step : Math.floor((from - 0.01) / step) * step;
+    push(r1, 'level psikologis kelipatan ' + step, 0.4);
+    push(up ? r1 + step : r1 - step, 'level psikologis kelipatan ' + step + ' berikutnya', 0.3);
+    return out;
+  };
+  const xauTpPlan = (dir, from) => {
+    const minPips = SGP.tp2Pips + 45, maxPips = 600;
+    const cands = xauTpCands(dir, from).filter(c => {
+      const d = Math.abs(c.v - from) / SGP.pip;
+      return d >= minPips && d <= maxPips;
+    });
+    const tol = Math.max(0.8, (atrD1 || 2) * 0.55);
+    const groups = [];
+    cands.forEach(c => {
+      const g = groups.find(x => Math.abs(x.v - c.v) <= tol);
+      if (g) { g.v = (g.v * g.n + c.v) / (g.n + 1); g.n++; g.parts.push(c); }
+      else groups.push({ v: c.v, n: 1, parts: [c] });
+    });
+    groups.forEach(g => {
+      g.score = g.parts.reduce((a, p) => a + p.w, 0) + (g.parts.length > 1 ? 0.5 * (g.parts.length - 1) : 0);
+      g.dist = Math.abs(g.v - from);
+    });
+    const best = groups.slice().sort((a, b) => (b.score - a.score) || (b.dist - a.dist))[0] || null;
+    if (!best) {
+      const d = Math.min(maxPips * SGP.pip, Math.max(minPips * SGP.pip, (atrWk || 30) * 0.6));
+      const level = sgN(from + (dir === 'BUY' ? 1 : -1) * d);
+      return {
+        level, pips: Math.round(d / SGP.pip), parts: [],
+        why: 'TPmax ' + level + ' (' + Math.round(d / SGP.pip) + ' pip) = proyeksi volatilitas ATR; belum ada level struktur global yang lebih kuat dalam batas 600 pip.'
+      };
+    }
+    const parts = best.parts.slice().sort((a, b) => b.w - a.w);
+    const labels = [...new Set(parts.map(p => p.why))];
+    return {
+      level: sgN(best.v), pips: Math.round(best.dist / SGP.pip),
+      parts: parts.map(p => ({ v: p.v, why: p.why, w: p.w })),
+      why: 'TPmax ' + sgN(best.v) + ' (' + Math.round(best.dist / SGP.pip) + ' pip) = konfluensi ' + labels.join(' + ') +
+        '. Basis: struktur harga live + likuiditas global + volatilitas (ATR D1 ' + (atrD1 ? sgN(atrD1) : '—') + ').'
+    };
   };
   let plan = null, entryType = null;
   if (direction !== 'WAIT') {
@@ -2362,8 +2449,9 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     entryType = useLimit ? 'LIMIT POI' : 'MARKET';
     const tp1D = sgN(Math.max(SGP.tp1Pips * SGP.pip, slDist * 2.5));
     const tp2D = sgN(Math.max(SGP.tp2Pips * SGP.pip, tp1D * 1.6));
-    const maxD = sgN(Math.max(tp2D + 40 * SGP.pip, xauMaxTp(direction, entryPx)));
-    plan = { dir: direction, entryType, entry: entryPx, sl: sgN(entryPx - s * slDist), tp: sgN(entryPx + s * tp1D), tp1: sgN(entryPx + s * tp1D), tp2: sgN(entryPx + s * tp2D), tpMax: sgN(entryPx + s * maxD), slPips: slPipsUse, tpPips: Math.round(tp1D / SGP.pip), tp1Pips: Math.round(tp1D / SGP.pip), tp2Pips: Math.round(tp2D / SGP.pip), tpMaxPips: Math.round(maxD / SGP.pip), rr: sgN(tp1D / slDist), slDist, tpDist: tp1D, perLotRisk: sgN(100 * slDist), minStopAtr: atr ? sgN(atr * 1.15) : null, tight: !!(atr && slDist < atr * 0.9), pullback: !!extreme };
+    const tppP = xauTpPlan(direction, entryPx);
+    const maxD = sgN(Math.max(tp2D + 40 * SGP.pip, Math.abs(tppP.level - entryPx)));
+    plan = { dir: direction, entryType, entry: entryPx, sl: sgN(entryPx - s * slDist), tp: sgN(entryPx + s * tp1D), tp1: sgN(entryPx + s * tp1D), tp2: sgN(entryPx + s * tp2D), tpMax: sgN(entryPx + s * maxD), slPips: slPipsUse, tpPips: Math.round(tp1D / SGP.pip), tp1Pips: Math.round(tp1D / SGP.pip), tp2Pips: Math.round(tp2D / SGP.pip), tpMaxPips: Math.round(maxD / SGP.pip), rr: sgN(tp1D / slDist), slDist, tpDist: tp1D, perLotRisk: sgN(100 * slDist), minStopAtr: atr ? sgN(atr * 1.15) : null, tight: !!(atr && slDist < atr * 0.9), pullback: !!extreme, tpMaxWhy: tppP.why, tpMaxParts: tppP.parts };
     }
   }
   if (direction === 'WAIT') conf = Math.min(conf, 40);
@@ -2391,7 +2479,7 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     { s: 'Premium / discount', ok: pos != null && ((direction === 'BUY' && pos <= 55) || (direction === 'SELL' && pos >= 45)), n: pos == null ? 'range tidak terbaca' : pos + '% range' },
     { s: 'Sesi / killzone', ok: !!sesi.kill, n: sesi.kill || ('sesi ' + sesi.ses) },
     { s: 'SMT / divergensi', ok: smtOk, n: smt ? smt.kind : 'tidak terdeteksi' },
-    { s: 'TP berjenjang (SL 30–40 · TP1 ≥100 · TP2 ≥200)', ok: true, n: 'SL ' + SGP.slPips + '–' + SGP.slMaxPips + ' pip · TP1 ' + SGP.tp1Pips + ' · TP2 ' + SGP.tp2Pips + ' · TP3/TPmax dari struktur' },
+    { s: 'TP berjenjang (SL 30 · TP1 ≥100 · TP2 ≥200)', ok: true, n: 'SL ' + SGP.slPips + ' pip (maksimal) · TP1 ' + SGP.tp1Pips + ' · TP2 ' + SGP.tp2Pips + ' · TPmax dari konfluensi global' },
     { s: 'Tidak dekat rilis besar', ok: news.length === 0, n: news.length ? news.map(x => x.title).join(', ') : 'aman dalam 90 menit' }
   ];
   const notes = [];
@@ -2446,18 +2534,18 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     if (dir === 'BUY' && !(sl < entry)) sl = sgN(entry - Math.max(2.5, (atr || 3) * 0.6));
     if (dir === 'SELL' && !(sl > entry)) sl = sgN(entry + Math.max(2.5, (atr || 3) * 0.6));
     let slDist = Math.abs(entry - sl);
-    /* SL WAJIB 30–40 pip: kurang dinaikkan, lebih dipangkas. Setup dengan
-       invalidasi struktur lebih jauh dari 40 pip tidak dipaksa, hanya dibatasi. */
-    const minDist = SGP.slPips * pipD, maxDist = SGP.slMaxPips * pipD;
-    if (slDist < minDist) slDist = minDist;
-    if (slDist > maxDist) slDist = maxDist;
+    /* SL 30 PIP WAJIB: semua gaya trading memakai jarak yang sama. Invalidasi
+       struktur di luar 30 pip tetap dicatat di kartu, tetapi stop eksekusi
+       tidak boleh melebar — ini permintaan eksplisit pengguna. */
+    slDist = sgN(SGP.slPips * pipD);
     sl = sgN(dir === 'BUY' ? entry - slDist : entry + slDist);
     const sign = dir === 'BUY' ? 1 : -1;
     /* TP berjenjang: TP1 ≥100 pip (≥2,5R), TP2 ≥200 pip, TP3/TPmax = target
        struktur & likuiditas global terjauh yang masih logis (maks 600 pip). */
     const tp1Dist = sgN(Math.max(SGP.tp1Pips * pipD, slDist * 2.5));
     const tp2Dist = sgN(Math.max(SGP.tp2Pips * pipD, tp1Dist * 1.6));
-    const maxDistT = sgN(Math.max(tp2Dist + 20 * pipD, xauMaxTp(dir, entry)));
+    const tppT = xauTpPlan(dir, entry);
+    const maxDistT = sgN(Math.max(tp2Dist + 20 * pipD, Math.abs(tppT.level - entry)));
     const tp = sgN(entry + sign * tp1Dist), tp1 = tp, tp2 = sgN(entry + sign * tp2Dist), tpMax = sgN(entry + sign * maxDistT);
     const tpDist = tp1Dist;
     const slPips = Math.round(slDist / pipD), tpPips = Math.round(tp1Dist / pipD), tp2Pips = Math.round(tp2Dist / pipD), tpMaxPips = Math.round(maxDistT / pipD), rr = sgN(tp1Dist / slDist);
@@ -2489,12 +2577,13 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     ].join(' · ');
     SB.push({
       id: o.id, method: o.method, dir, style, styleLabel: XAU_STYLE_LABEL[style], styleWhy, globalWhy,
-      type: o.type || 'LIMIT', entry, sl, tp, tp1, tp2, tp3: tpMax, tpMax, slPips, tpPips, tp2Pips, tp3Pips: tpMaxPips, tpMaxPips, rr,
+      type: o.type || 'LIMIT', entry, sl, tp, tp1, tp2, tp3: tpMax, tpMax, slPips, tpPips, tp1Pips: tpPips, tp2Pips, tp3Pips: tpMaxPips, tpMaxPips, rr,
       riskPerLot: sgN(100 * slDist), status, valid: blockers.length === 0,
       need: blockers.concat(notes).join(' · ') || 'semua syarat terpenuhi', why: o.why || '', score: sc,
       entryWhy: o.entryWhy || o.why || 'Entry diambil di POI setelah struktur dan likuiditas mendukung.',
-      slWhy: o.slWhy || ('SL di luar ' + (dir === 'BUY' ? 'low' : 'high') + ' pelindung + buffer ATR, lalu dibatasi wajib 30–40 pip (tidak boleh lebih) agar stop tetap di luar noise.'),
-      tpWhy: o.tpWhy || ('TP1 ' + tp1 + ' (minimal 100 pip / 2,5R), TP2 ' + tp2 + ' (minimal 200 pip), TP3/TPmax ' + tpMax + ' mengikuti likuiditas struktur terjauh.'),
+      slWhy: o.slWhy || ('Invalidasi struktur di ' + sl + ', tetapi jarak eksekusi dipatok 30 pip (maksimal) sesuai aturan: stop tidak pernah lebih lebar dari 30 pip.'),
+      tpWhy: o.tpWhy || tppT.why,
+      tpMaxWhy: tppT.why, tpMaxParts: tppT.parts,
       storyline: o.storyline || (dir === 'BUY'
         ? 'D1/H4 naik → harga di discount → sapuan low retail → MSS/CHoCH bullish → entry di POI, target likuiditas di atas.'
         : 'D1/H4 turun → harga di premium → sapuan high retail → MSS/CHoCH bearish → entry di POI, target likuiditas di bawah.'),
@@ -2707,8 +2796,8 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   }
   /* Jaminan MINIMAL 3 sinyal (maksimal 10): bila kandidat searah bias masih
      kurang dari 3, tambah level dealing range/struktur yang belum dipakai.
-     Level baru tetap memakai aturan yang sama: satu arah, SL 30–40 pip,
-     TP1 ≥100 pip, TP2 ≥200 pip, TP3 dari struktur. */
+     Level baru tetap memakai aturan yang sama: satu arah, SL 30 pip,
+     TP1 ≥100 pip, TP2 ≥200 pip, TPmax dari konfluensi global. */
   {
     const dir = biasDir;
     const fills = [
@@ -2771,7 +2860,17 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     quality, validation, dataValid, cross, setups, signals: setups, sources, notes,
     h4, intermarket, pools, pdh, pdl, pdo, dispStrength: disp && atr ? sgN(disp.body / atr) : null,
     minSignals: SGP.minSignals, maxSignals: SGP.maxSignals, refreshSec: SGP.refreshSec,
-    levelRule: { slMinPips: SGP.slPips, slMaxPips: SGP.slMaxPips, tp1MinPips: SGP.tp1Pips, tp2MinPips: SGP.tp2Pips, tp3: 'target struktur & likuiditas global terjauh (maks 600 pip)', rrTp1: '≥1:2,5' }
+    levelRule: { slMinPips: SGP.slPips, slMaxPips: SGP.slMaxPips, slFixed: true, tp1MinPips: SGP.tp1Pips, tp2MinPips: SGP.tp2Pips, tp3: 'konfluensi struktur + likuiditas + ATR global (maks 600 pip)', rrTp1: '≥1:2,5' },
+    tpMaxEngine: plan ? { dir: plan.dir, level: plan.tpMax, pips: plan.tpMaxPips, why: plan.tpMaxWhy, parts: plan.tpMaxParts } : null,
+    tfBias: [
+      { tf: 'M1', label: '1m', dir: m1rows && m1rows.length > 25 ? (sgEma(m1rows.map(r => r.c).slice(-90), 20) > sgEma(m1rows.map(r => r.c).slice(-90), 50) ? 1 : -1) : 0 },
+      { tf: 'M5', label: '5m', dir: st5 && st5.trend !== 'RANGE' ? (st5.trend === 'BULLISH' ? 1 : -1) : 0 },
+      { tf: 'M15', label: '15m', dir: st.trend !== 'RANGE' ? (st.trend === 'BULLISH' ? 1 : -1) : 0 },
+      { tf: 'H1', label: '1H', dir: h1dir },
+      { tf: 'H4', label: '4H', dir: h4 && h4.dir ? h4.dir : 0 },
+      { tf: 'D1', label: '1D', dir: daily && daily.trend ? (daily.trend === 'naik' ? 1 : -1) : 0 }
+    ],
+    tradingview: { symbol: 'OANDA:XAUUSD', embedded: true, note: 'Chart & Technical Analysis resmi TradingView disematkan di UI; level mesin memakai feed harga live yang sama (spot emas + candle M15/M5).' }
   };
 });
 function signalText(p) {
@@ -2793,6 +2892,8 @@ function signalText(p) {
   if (p.asia) L.push(`RANGE ASIA: ${p.asia.lo}–${p.asia.hi}${p.asia.judas ? ' · judas ' + p.asia.judas : ''}`);
   if (p.ocl) L.push(`OCL harian: open ${p.ocl.open} / close ${p.ocl.close}`);
   L.push(p.plan ? `RENCANA (${p.plan.entryType}): ${p.plan.dir} entry ${p.plan.entry} | SL ${p.plan.sl} (${p.plan.slPips} pip) | TP1 ${p.plan.tp1 != null ? p.plan.tp1 : p.plan.tp} (${p.plan.tp1Pips != null ? p.plan.tp1Pips : p.plan.tpPips} pip) | TP2 ${p.plan.tp2 != null ? p.plan.tp2 : '-'} (${p.plan.tp2Pips != null ? p.plan.tp2Pips : '-'} pip) | TPmax ${p.plan.tpMax != null ? p.plan.tpMax : '-'} (${p.plan.tpMaxPips != null ? p.plan.tpMaxPips : '-'} pip) | RR TP1 1:${p.plan.rr}` : 'RENCANA: WAIT — konfluensi belum cukup untuk entry.');
+  if (p.tpMaxEngine && p.tpMaxEngine.why) L.push('TPMAX GLOBAL: ' + p.tpMaxEngine.why);
+  if (p.tfBias && p.tfBias.length) L.push('BIAS MULTI-TIMEFRAME: ' + p.tfBias.map(t => t.label + ' ' + (t.dir > 0 ? 'naik' : t.dir < 0 ? 'turun' : 'range')).join(' · '));
   if (p.macro) L.push(`MAKRO: DXY ${p.macro.dxy} (10 hari ${p.macro.dxyChg10d}%) | yield 10Y ${p.macro.us10y}% (10 hari ${p.macro.us10yChg10d}%)`);
   if (p.daily) L.push(`HARIAN: ${p.daily.last} per ${p.daily.asOf} | tren ${p.daily.trend || 'n/a'} | RSI ${p.daily.rsi == null ? 'n/a' : p.daily.rsi} | range20 ${p.daily.lo20}–${p.daily.hi20}`);
   if (p.news && p.news.length) L.push('RISIKO RILIS ≤90 MENIT: ' + p.news.map(x => `${x.title} (${x.inMin} menit; forecast ${x.forecast || 'n/a'})`).join(' | '));
@@ -2818,7 +2919,7 @@ ATURAN KERAS:
 1. Fokus tunggal XAUUSD. Jangan menyebut pair lain.
 2. Entry, SL, TP, jarak pip, RR, dan tipe entry (LIMIT POI / MARKET) di [SG] adalah hasil mesin dan TIDAK BOLEH diubah, ditambah, atau diganti. Jangan mengarang angka, level, probabilitas, atau tanggal.
 3. Pakai hanya data [SG]. Bila data kurang, tulis di warnings.
-4. Metode Alchemist lengkap: top-down (H1 → M15 → M5), storyline, POI (FVG/OB/OCL), sapuan likuiditas + displacement + MSS/BOS, premium/discount, sesi/killzone, SMT, TP berjenjang (SL WAJIB 30–40 pip dan tidak boleh lebih, TP1 ≥100 pip, TP2 ≥200 pip, TP3/TPmax sesuai target struktur & likuiditas global terjauh), hindari rilis besar. Siklus berisi 3–10 sinyal dan SEMUANYA satu arah.
+4. Metode Alchemist lengkap: top-down (H1 → M15 → M5), storyline, POI (FVG/OB/OCL), sapuan likuiditas + displacement + MSS/BOS, premium/discount, sesi/killzone, SMT, TP berjenjang (SL WAJIB 30 pip dan tidak boleh lebih, TP1 ≥100 pip, TP2 ≥200 pip, TPmax = konfluensi struktur + likuiditas + ATR global), hindari rilis besar. Siklus berisi 3–10 sinyal dan SEMUANYA satu arah.
 5. verdict: CONFIRM hanya bila arah mesin bukan WAIT, minimal 2 konfirmasi Alchemist, dan tidak ada rilis High ≤90 menit; CAUTION bila ada syarat belum terpenuhi; REJECT bila arah WAIT, data usang, atau bertentangan dengan struktur/makro.
 6. Jelaskan risiko nyata: SL 30 pip bisa lebih rapat dari ATR, spread saat berita, pasar tutup, entry limit bisa tidak tersentuh.
 7. Ini edukasi, bukan saran finansial. Bahasa Indonesia.
@@ -2990,7 +3091,10 @@ async function xauHandler(req, res) {
   if (b.fresh) bustData();
   const errs = [], gg = await gatherAll(focus, errs, true, ['XAUUSD'], '1-5 hari');
   const fx0 = xauFocus(gg, focus);
-  const sig0 = lockSignalDirection(await xauSignalPack().catch(e => ({ error: 'Sinyal entry gagal: ' + msg(e, 140) })));
+  const sig0 = lockSignalDirection(await new Promise(resolve => {
+    const timer = setTimeout(() => resolve({ error: 'Sinyal entry melewati batas 25 detik; data lain tetap ditampilkan' }), 25000);
+    xauSignalPack().then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); resolve({ error: 'Sinyal entry gagal: ' + msg(e, 140) }); });
+  }));
   const base = { ...publicBase(gg, errs), focus, xau: fx0, spikePlan: xauSpikeOf(sig0, fx0, focus === 'all' ? null : focus.toUpperCase()), quality: quality(gg, true), fx: gg.fxs || null, yields: gg.yl || null, effr: gg.ef || null, cand: gg.eng && gg.eng.pairs ? gg.eng.pairs.XAUUSD : null, signal: sig0, gold: { price: gg.px && gg.px.pairs ? gg.px.pairs.XAUUSD || null : null } };
   if (phase === 'data') return res.status(200).json({ phase: 'data', ...base, g: compactG(gg) });
   const r = await aiXau(compactG(gg), focus, t0), payload = { ...base, ...r, notes: base.notes.concat(r.notes) };
@@ -3697,3 +3801,6 @@ module.exports.tgConf = tgConf;
 module.exports.notifyTelegram = notifyTelegram;
 module.exports.tgSendTo = tgSendTo;
 module.exports.tgHookSecret = tgHookSecret;
+
+module.exports.xauHandler = xauHandler;
+module.exports.xauFocus = xauFocus;
