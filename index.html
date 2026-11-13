@@ -2272,7 +2272,7 @@ function renderXau(j,stale){
   const clus=(x.clusters||[]).length?`<div class="card"><h3>📰 News bertabrakan — efek gabungan</h3>${x.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">${esc((c.tags||[]).join(' + ')||'beberapa rilis')} · ${esc(c.when)}</div><div class="small">${esc(c.why)}</div><div class="small" style="margin-top:4px"><b>Untuk XAUUSD:</b> ${esc(c.gold_note)}</div></div>`).join('')}</div>`:'';
   const scen=(x.scenarios||[]).length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${x.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:'';
   const flags=(j.flags||[]).length?`<div class="warn" style="margin-bottom:10px">⚠️ Angka yang TIDAK ditemukan di data terkumpul: <b>${esc(j.flags.join(', '))}</b>. Anggap belum valid.</div>`:'<div class="mut small" style="margin-bottom:10px">✅ Tidak ada angka harga/level dalam jawaban AI di luar data terkumpul.</div>';
-  box.innerHTML=`${actCard}${(typeof xauPlanHtml==='function'?xauPlanHtml(j.signal):'')}<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"> XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>✅ Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">💾 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Rencana entry di kartu  di atas memakai aturan tetap SL 30 pip dan TP 1:2 dari mesin deterministik; tetap edukasi berbasis data publik, bukan saran finansial. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
+  box.innerHTML=`${actCard}${(typeof xauPlanHtml==='function'?xauPlanHtml(j.signal):'')}<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"> XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>✅ Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">💾 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Rencana entry di kartu di atas memakai aturan tetap SL tepat 30 pip, TP1 ≥100 pip, TP2 ≥200 pip, dan TPmax dari konfluensi struktur + likuiditas + ATR global; tetap edukasi berbasis data publik, bukan saran finansial. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
 }
 /* ---------- riwayat analisis XAUUSD (maks 5, bisa dibuka & dihapus) ---------- */
 const XHKEY='xau_hist_v1',XHMAX=5;
@@ -2322,21 +2322,21 @@ function pXauNews(){
   xauHistPaint();if(c)renderXau(c,true);
 }
 async function runXau(){
-  busy('xbtn',true);setTxt('xmsg','⏳ Tahap 1/2: mengumpulkan jadwal resmi, angka BLS/FRED, yield, dolar, CFTC & berita global...');
-  let d;try{d=await tcall({action:'xau',phase:'data',fresh:true,focus:(typeof xauFocusGet==='function'?xauFocusGet():'all')})}catch(e){setTxt('xmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);busy('xbtn',false);return}
+  busy('xbtn',true);if(window.rb33Scan)rb33Scan.show('xscan','news');setTxt('xmsg','⏳ Tahap 1/2: mengumpulkan jadwal resmi, angka BLS/FRED, yield, dolar, CFTC & berita global...');
+  let d;try{d=await tcall({action:'xau',phase:'data',fresh:true,focus:(typeof xauFocusGet==='function'?xauFocusGet():'all')})}catch(e){setTxt('xmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);if(window.rb33Scan)rb33Scan.fail('xscan','Pengumpulan data gagal: '+e.message);busy('xbtn',false);return}
   XR.g=d.g;const base={...d};delete base.g;delete base.phase;base.pending=true;XR.cur=base;
   if(S.tab==='xau'&&$('xres'))renderXau(base,false);
-  setTxt('xmsg','⏳ Tahap 2/2: AI menganalisis paket data (data sudah tampil di bawah)...');await xauAI(base);
+  setTxt('xmsg','⏳ Tahap 2/2: AI menganalisis paket data (data sudah tampil di bawah)...');if(window.rb33Scan)rb33Scan.step('xscan','Data resmi terkumpul — AI menyusun arah & skenario…');await xauAI(base);
 }
 async function xauAI(base){
   try{const f=base.focus||(typeof xauFocusGet==='function'?xauFocusGet():'all');const a=await tcall({action:'xau',phase:'ai',g:XR.g,fresh:true,focus:f});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;XR.cur=j;
     if(j.xai){try{localStorage.setItem('xau_last_'+f,JSON.stringify(j));if(f==='all')localStorage.setItem('xau_last',JSON.stringify(j))}catch(e){}xauHistSave(j)}
     if(S.tab==='xau'&&$('xres'))renderXau(j,false);
-    setTxt('xmsg',j.xai?'✅ Selesai — analisis XAUUSD siap':'⚠️ AI belum memberi format valid (lihat catatan)');
-  }catch(e){const j={...base,pending:false,aiError:e.message};XR.cur=j;if(S.tab==='xau'&&$('xres'))renderXau(j,false);setTxt('xmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
+    if(window.rb33Scan){if(j.xai)rb33Scan.done('xscan','✅ Analisis siap — arah '+(j.xai.action||'—')+' · spike '+((j.xai.spike&&j.xai.spike.likely)?'YA':'TIDAK'));else rb33Scan.fail('xscan','AI belum memberi format valid (lihat catatan).')}setTxt('xmsg',j.xai?'✅ Selesai — analisis XAUUSD siap':'⚠️ AI belum memberi format valid (lihat catatan)');
+  }catch(e){const j={...base,pending:false,aiError:e.message};XR.cur=j;if(S.tab==='xau'&&$('xres'))renderXau(j,false);if(window.rb33Scan)rb33Scan.fail('xscan','Analisis AI gagal: '+e.message);setTxt('xmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
   busy('xbtn',false);
 }
-function retryXauAI(){if(!XR.g||!XR.cur)return;const base={...XR.cur};delete base.xai;delete base.raw;delete base.aiError;base.pending=true;XR.cur=base;renderXau(base,false);setTxt('xmsg','⏳ Mengulang analisis AI...');busy('xbtn',true);xauAI(base)}
+function retryXauAI(){if(!XR.g||!XR.cur)return;const base={...XR.cur};delete base.xai;delete base.raw;delete base.aiError;base.pending=true;XR.cur=base;renderXau(base,false);setTxt('xmsg','⏳ Mengulang analisis AI...');if(window.rb33Scan)rb33Scan.show('xscan','news','AI menilai ulang');busy('xbtn',true);xauAI(base)}
 async function saveXauNews(){
   const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disimpan.');
   const x=c.xai,b=x.bias||{};
@@ -2719,6 +2719,7 @@ input,select,textarea{background:var(--field)}
 @media(prefers-reduced-motion:reduce){.card,.btn{transition:none}}
 </style>
 <link rel="stylesheet" href="rb-modern.css">
+<link rel="stylesheet" href="rb-v33.css">
 <script src="bahasa-en-data.js"></script>
 <script src="bahasa-jp-data.js"></script>
 <script src="bahasa-jp-data2.js"></script>
@@ -2729,6 +2730,7 @@ input,select,textarea{background:var(--field)}
 <script src="rb-ui.js"></script>
 <script src="rb-alch.js"></script>
 <script src="rb-signal.js"></script>
+<script src="rb-v33.js"></script>
 <script src="rb-trade.js"></script>
 <script src="rb-admin.js"></script>
 </body>

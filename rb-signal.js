@@ -12,7 +12,8 @@ const SIG_ST = {
   data: null, ai: null, aiNotes: [], meta: null, tick: null, loading: false, loadingAI: false,
   auto: (function () { try { return localStorage.getItem('rb_sig_auto') !== '0'; } catch (e) { return true; } })(),
   fresh: {}, timer: 0, tickTimer: 0, pip: 0.1, slMode: 'fixed', bal: '1000', risk: '1', err: '', msg: '',
-  tvInt: (function () { try { var v = localStorage.getItem('rb_sig_tv'); return ['1', '5', '15', '60', '240'].indexOf(v) >= 0 ? v : '5'; } catch (e) { return '5'; } })()
+  tvInt: (function () { try { var v = localStorage.getItem('rb_sig_tv'); return ['1', '5', '15', '60', '240'].indexOf(v) >= 0 ? v : '15'; } catch (e) { return '15'; } })(),
+  tvMode: (function () { try { return localStorage.getItem('rb_sig_tvmode') === 'ta' ? 'ta' : 'chart'; } catch (e) { return 'chart'; } })()
 };
 const SIG_CACHE = 'rb_sig_last_v2', SIG_HIST = 'rb_sig_hist_v2';
 const SIG_STATES = 'rb_sig_states_v1', SIG_FRESH_MS = 10 * 60000, SIG_COOLDOWN = 5 * 60000, SIG_PREV_MAX = 6 * 3600000;
@@ -144,8 +145,8 @@ function pSignalEntry() {
   $('pane').innerHTML =
     '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
     + '<div class="rb-eyebrow">Trading · sinyal eksekusi</div><h2>🎯 Signal Entry XAUUSD</h2>'
-    + '<div class="rb-note">Mesin Alchemist membaca <b>M15 (struktur) + M5 (konfirmasi) + M1 (tick)</b>, bias H1/D1, lalu dikonfirmasi DXY, yield 10Y, <b>spot emas live + validasi silang PAXG</b>, dan kalender rilis global. Aturan tetap: <b>risiko 30 pip</b>, <b>TP 1:2</b>. Entry dipilih MARKET atau LIMIT di POI; entry ditahan bila data usang atau quote global tidak konsisten. AI hanya menilai kualitas setup — level tidak boleh diubah AI.</div>'
-    + '<div class="rb-pill-row"><span class="rb-pill y">SL 30 pip</span><span class="rb-pill">TP 1:2</span><span class="rb-pill">M15 · M5 · M1</span><span class="rb-pill">XAUUSD saja</span></div>'
+    + '<div class="rb-note">Mesin Alchemist membaca <b>M15 (struktur) + M5 (konfirmasi) + M1 (tick)</b>, bias H1/D1, lalu dikonfirmasi DXY, yield 10Y, <b>spot emas live + validasi silang PAXG</b>, dan kalender rilis global. Aturan tetap: <b>SL tepat 30 pip</b>, <b>TP1 ≥100 · TP2 ≥200 · TPmax konfluensi global</b>. Entry dipilih MARKET atau LIMIT di POI; entry ditahan bila data usang atau quote global tidak konsisten. AI hanya menilai kualitas setup — level tidak boleh diubah AI.</div>'
+    + '<div class="rb-pill-row"><span class="rb-pill y">SL 30 pip (maks)</span><span class="rb-pill">TP1 ≥100</span><span class="rb-pill">TP2 ≥200</span><span class="rb-pill">TPmax konfluensi</span><span class="rb-pill">XAUUSD saja</span></div>'
     + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>AU</b><span>XAUUSD</span></div></div></div>'
     + '<div class="rb-actions"><button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
     + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
@@ -177,19 +178,26 @@ function pSignalEntry() {
 function sigTv() {
   const el = $('sigTV');
   if (!el) return;
-  const intv = ['1', '5', '15', '60', '240'].indexOf(String(SIG_ST.tvInt)) >= 0 ? String(SIG_ST.tvInt) : '5';
-  const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  const u = 'https://s.tradingview.com/widgetembed/?symbol=OANDA%3AXAUUSD&interval=' + intv + '&hidesidetoolbar=0&symboledit=1&saveimage=0'
-    + '&toolbarbg=' + (theme === 'light' ? 'ffffff' : '0d1117') + '&studies=%5B%5D&theme=' + theme
-    + '&style=1&timezone=Asia%2FJakarta&locale=id&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=1&details=1';
-  el.innerHTML = '<iframe src="' + u + '" style="width:100%;height:100%;border:0" frameborder="0" allowtransparency="true" loading="lazy" title="Chart XAUUSD TradingView"></iframe>';
+  const intv = ['1', '5', '15', '60', '240'].indexOf(String(SIG_ST.tvInt)) >= 0 ? String(SIG_ST.tvInt) : '15';
+  const mode = SIG_ST.tvMode === 'ta' ? 'ta' : 'chart';
+  if (window.rb33Tv) {
+    if (mode === 'ta') window.rb33Tv.ta('sigTV', intv);
+    else window.rb33Tv.chart('sigTV', intv);
+  }
   const pill = $('sigTvPill');
-  if (pill) pill.textContent = 'LIVE · ' + ({ '1': 'M1', '5': 'M5', '15': 'M15', '60': 'H1', '240': 'H4' }[intv] || 'M5');
+  if (pill) pill.textContent = (mode === 'ta' ? 'TA · ' : 'LIVE · ') + ({ '1': 'M1', '5': 'M5', '15': 'M15', '60': 'H1', '240': 'H4' }[intv] || 'M15');
   const bs = document.querySelectorAll('[data-sigtv]');
   for (let i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-sigtv') === intv);
+  const ms = document.querySelectorAll('[data-sigmode]');
+  for (let j = 0; j < ms.length; j++) ms[j].classList.toggle('on', ms[j].getAttribute('data-sigmode') === mode);
+}
+function sigTvMode(m) {
+  SIG_ST.tvMode = m === 'ta' ? 'ta' : 'chart';
+  try { localStorage.setItem('rb_sig_tvmode', SIG_ST.tvMode); } catch (e) { }
+  sigTv();
 }
 function sigTvInt(n) {
-  SIG_ST.tvInt = ['1', '5', '15', '60', '240'].indexOf(String(n)) >= 0 ? String(n) : '5';
+  SIG_ST.tvInt = ['1', '5', '15', '60', '240'].indexOf(String(n)) >= 0 ? String(n) : '15';
   try { localStorage.setItem('rb_sig_tv', SIG_ST.tvInt); } catch (e) { }
   sigTv();
 }
@@ -388,6 +396,7 @@ async function sigLoad(dataOnly) {
   }
   SIG_ST.loading = true; SIG_ST.err = '';
   SIG_ST.msg = 'Mengambil candle XAUUSD (M15/M5/M1/H1/D1), DXY, yield 10Y, spot emas live, dan kalender rilis…';
+  if (window.rb33Scan) rb33Scan.show('sigScan', 'signal');
   sigPaint();
   try {
     const r = await tcall({ action: 'xauSignal', phase: 'data' });
@@ -402,6 +411,10 @@ async function sigLoad(dataOnly) {
     SIG_ST.msg = '';
   }
   SIG_ST.loading = false;
+  if (window.rb33Scan) {
+    if (SIG_ST.err) rb33Scan.fail('sigScan', SIG_ST.err);
+    else rb33Scan.done('sigScan', '✅ Data live terbaca — ' + (SIG_ST.data && SIG_ST.data.setups ? SIG_ST.data.setups.length : 0) + ' setup, arah ' + (SIG_ST.data && SIG_ST.data.direction || 'WAIT') + '.');
+  }
   sigPaint();
   if (!dataOnly && !SIG_ST.err && SIG_ST.data) sigRunAI();
 }
@@ -411,6 +424,7 @@ async function sigRunAI() {
   if (typeof user === 'undefined' || !user) { SIG_ST.err = 'Masuk dengan akun Google dulu.'; sigPaint(); return; }
   SIG_ST.loadingAI = true; SIG_ST.err = ''; SIG_ST.aiNotes = [];
   SIG_ST.msg = 'AI menilai checklist, struktur, dan risiko rilis (level tidak diubah)…';
+  if (window.rb33Scan) rb33Scan.show('sigScan', 'signal', 'AI menilai setup');
   sigPaint();
   try {
     const r = await tcall({ action: 'xauSignal', phase: 'ai' });
@@ -425,6 +439,10 @@ async function sigRunAI() {
     SIG_ST.msg = 'Penilaian AI gagal; sinyal mesin tetap bisa dipakai.';
   }
   SIG_ST.loadingAI = false;
+  if (window.rb33Scan) {
+    if (SIG_ST.ai) rb33Scan.done('sigScan', '✅ Penilaian AI selesai — level mesin tidak diubah.');
+    else rb33Scan.fail('sigScan', 'AI tidak memberi format valid; sinyal mesin tetap berlaku.');
+  }
   sigPaint();
 }
 async function sigTick() {
@@ -510,7 +528,7 @@ function xauPlanHtml(sig) {
   const col = dir === 'BUY' ? 'var(--ok)' : dir === 'SELL' ? 'var(--no)' : 'var(--warn)';
   const ok = (sig.checklist || []).filter(c => c.ok).length, n = (sig.checklist || []).length;
   return '<div class="card" style="border-left:5px solid ' + col + '">'
-    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL 30 pip · TP 1:2</span></div>'
+    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL 30 · TP1 ≥100 · TP2 ≥200 · TPmax konfluensi</span></div>'
     + '<div style="font-weight:900;font-size:1.2rem;color:' + col + ';letter-spacing:-.02em">'
     + (dir === 'BUY' ? '🟢 BUY XAUUSD' : dir === 'SELL' ? '🔴 SELL XAUUSD' : '🟡 WAIT — belum ada konfluensi') + '</div>'
     + (lv
