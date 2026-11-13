@@ -275,9 +275,16 @@ const etDate = ts => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_Y
 const tagOf = (t, cur) => {
   if (cur && cur !== 'USD') return '';
   t = String(t || '');
-  if (/non-?farm|\bnfp\b/i.test(t)) return /\badp\b|productivity|challenger|revision/i.test(t) ? '' : 'NFP';
+  if (/\badp\b/i.test(t) && /employment|payroll|jobs/i.test(t)) return 'ADP';
+  if (/jolts|indeed|hiring lab/i.test(t)) return '';
+  if (/non-?farm|\bnfp\b/i.test(t)) return /productivity|challenger|revision/i.test(t) ? '' : 'NFP';
   if (/\bcpi\b/i.test(t)) return /cleveland|median|trimmed|sticky|flash|import|expectations/i.test(t) ? '' : 'CPI';
   if (/\bppi\b|producer price/i.test(t)) return /core|ex-?food|commodit|crude|intermediate/i.test(t) ? '' : 'PPI';
+  if (/(core\s+)?pce (price )?index|pce deflator|personal consumption expenditures/i.test(t)) return 'PCE';
+  if (/retail sales/i.test(t)) return 'RETAIL';
+  if (/\bgdp\b/i.test(t)) return 'GDP';
+  if (/(unemployment|jobless) claims/i.test(t)) return 'CLAIMS';
+  if (/\bism\b/i.test(t) && /pmi|manufacturing|services|non-?manufacturing|report/i.test(t)) return 'ISM';
   if (/fomc|federal funds rate/i.test(t)) return 'FOMC';
   return '';
 };
@@ -1312,7 +1319,7 @@ const ISOD = /^\d{4}-\d\d-\d\d$/;
 function cleanG(x) {
   if (!x || typeof x !== 'object' || JSON.stringify(x).length > 160000) throw new Error('Data gabungan tidak valid atau terlalu besar');
   const S = (v, n) => cut(v, n), N = v => (typeof v === 'number' && isFinite(v) ? v : null);
-  const events = (Array.isArray(x.events) ? x.events : []).slice(0, 60).map(e => ({ title: S(e.title, 120), cur: S(e.cur, 3), ts: N(e.ts), impact: e.impact === 'High' ? 'High' : 'Medium', forecast: S(e.forecast, 30), previous: S(e.previous, 30), actual: S(e.actual, 30), tag: ['NFP', 'PPI', 'CPI', 'FOMC'].includes(e.tag) ? e.tag : '', verified: ['official', 'conflict'].includes(e.verified) ? e.verified : undefined, officialDate: ISOD.test(e.officialDate || '') ? e.officialDate : undefined, resmi: !!e.resmi })).filter(e => e.ts != null);
+  const events = (Array.isArray(x.events) ? x.events : []).slice(0, 60).map(e => ({ title: S(e.title, 120), cur: S(e.cur, 3), ts: N(e.ts), impact: e.impact === 'High' ? 'High' : 'Medium', forecast: S(e.forecast, 30), previous: S(e.previous, 30), actual: S(e.actual, 30), tag: XAU_TAGS.includes(e.tag) ? e.tag : '', verified: ['official', 'conflict'].includes(e.verified) ? e.verified : undefined, officialDate: ISOD.test(e.officialDate || '') ? e.officialDate : undefined, resmi: !!e.resmi })).filter(e => e.ts != null);
   const sources = (Array.isArray(x.sources) ? x.sources : []).slice(0, 18).filter(s => s && /^https?:\/\//.test(String(s.uri || ''))).map(s => ({ title: S(s.title, 200), uri: S(s.uri, 500), text: S(s.text, 320), date: S(s.date, 60), domain: S(s.domain, 80), official: !!s.official, tier: [1, 2, 3].includes(s.tier) ? s.tier : 3, ageH: N(s.ageH), corr: N(s.corr) }));
   const next = {};
   ['NFP', 'PPI', 'CPI', 'FOMC'].forEach(k => { const v = x.next && x.next[k]; if (v && ISOD.test(v.date || '')) next[k] = { date: v.date, time: S(v.time, 12), ref: S(v.ref, 30), source: S(v.source, 30) }; });
@@ -1504,8 +1511,15 @@ async function proHandler(req, res) {
 /* =====================================================================
    V22 — NEWS ANALISIS XAUUSD: NFP · PPI · CPI · FOMC (fokus tunggal emas)
    ===================================================================== */
-const XAU_TAGS = ['NFP', 'PPI', 'CPI', 'FOMC'];
-const XAU_NAME = { NFP: 'Non-Farm Payrolls', PPI: 'Producer Price Index', CPI: 'Consumer Price Index', FOMC: 'FOMC / suku bunga The Fed' };
+const XAU_TAGS = ['NFP', 'CPI', 'PPI', 'FOMC', 'PCE', 'RETAIL', 'GDP', 'CLAIMS', 'ADP', 'ISM'];
+const XAU_NAME = {
+  NFP: 'Non-Farm Payrolls', PPI: 'Producer Price Index', CPI: 'Consumer Price Index', FOMC: 'FOMC / suku bunga The Fed',
+  PCE: 'Core PCE Price Index', RETAIL: 'Retail Sales', GDP: 'Gross Domestic Product',
+  CLAIMS: 'Unemployment Claims', ADP: 'ADP Employment Change', ISM: 'ISM Manufacturing & Services PMI'
+};
+const XAU_KEYS = XAU_TAGS.map(t => t.toLowerCase());
+/* Satuan kejutan per rilis: dipakai untuk menilai arah aktual vs konsensus. */
+const XAU_UNIT = { NFP: 75, ADP: 40, CPI: 0.15, PPI: 0.15, PCE: 0.12, RETAIL: 0.3, GDP: 0.3, CLAIMS: 12, ISM: 1.5, FOMC: 0.25 };
 /* Angka RESMI (BLS/FRED) untuk rilis yang sudah terbit. Dipakai agar AI membaca
    nilai aktual yang valid, bukan hanya forecast dari agregator kalender. */
 function xauActualOf(e, b) {
@@ -1526,7 +1540,7 @@ function xauActualOf(e, b) {
   return { actualOfficial: Number(v), actualOfficialLabel: label, actualSource: 'BLS/FRED (resmi)' + (per ? ' · ' + per : '') };
 }
 function xauFocus(g, focus) {
-  const F = ['nfp', 'cpi', 'ppi', 'fomc', 'all'].includes(String(focus || '').toLowerCase()) ? String(focus).toLowerCase() : 'all';
+  const F = XAU_KEYS.concat('all').includes(String(focus || '').toLowerCase()) ? String(focus).toLowerCase() : 'all';
   const TAGS = F === 'all' ? XAU_TAGS : [F.toUpperCase()];
   const now = Date.now(), horizon = now + 60 * 86400000;
   const all = ((g && g.events) || []).filter(e => e && e.cur === 'USD' && e.ts >= now - 6 * 3600000 && e.ts <= horizon
@@ -1644,7 +1658,7 @@ function xauMarket(g, pack, tags) {
     const f = numOf(ev.forecast);
     if (a == null || f == null) return;
     focusShock = true;
-    const diff = a - f, unit = bk.tag === 'NFP' ? 75 : 0.15;
+    const diff = a - f, unit = XAU_UNIT[bk.tag] || 0.15;
     if (Math.abs(diff) < 1e-9) { add(0, `${bk.tag} sesuai konsensus`); return; }
     const inv = /unemployment|jobless|claims/i.test(String(ev.title || '')), sign = (diff > 0) !== inv ? -1 : 1;
     const actTxt = ev.actualOfficial != null ? ev.actualOfficial : ev.actual;
@@ -1669,7 +1683,7 @@ function xauMarket(g, pack, tags) {
    diskalakan dengan ATR M15 live dan besar kejutan aktual-vs-forecast; bila
    rilis sudah terbit, reaksi nyata diukur dari candle M5/M15 yang sama dengan
    chart mesin. */
-const XAU_SPIKE_BASE = { NFP: 260, CPI: 230, PPI: 175, FOMC: 360 }; // pip (1 pip XAUUSD = 0,1)
+const XAU_SPIKE_BASE = { NFP: 260, CPI: 230, PPI: 175, FOMC: 360, PCE: 215, RETAIL: 175, GDP: 160, CLAIMS: 120, ADP: 165, ISM: 155 }; // pip (1 pip XAUUSD = 0,1)
 function xauSpikeOf(sig, pack, tag) {
   const empty = { tag: tag || '', likely: false, released: false, sizePips: null, windowMin: null, firstDir: '', imminentH: null, why: 'Rilis fokus belum terbaca.', reaction: null, source: 'mesin (ATR + reaksi candle)' };
   if (!pack || typeof pack !== 'object') return empty;
@@ -1693,7 +1707,7 @@ function xauSpikeOf(sig, pack, tag) {
   const f = numOf(ev.forecast);
   const a = ev.actualOfficial != null ? Number(ev.actualOfficial) : numOf(ev.actual);
   if (released && f != null && a != null && isFinite(a) && isFinite(f)) {
-    const diff = a - f, unit = T === 'NFP' ? 75 : 0.15;
+    const diff = a - f, unit = XAU_UNIT[T] || 0.15;
     const inv = /unemployment|jobless|claims/i.test(String(ev.title || ''));
     const hot = (diff > 0) !== inv; // kejutan hawkish: USD kuat → emas tertekan
     surpriseK = 1 + Math.min(1.2, Math.abs(diff) / unit * 0.8);
@@ -1852,7 +1866,7 @@ function sanitizeXau(o, opts) {
 }
 // ✏️ [TEKS BISA DIUBAH] [PROMPT AI] aiXau: Perintah AI untuk analisis news XAUUSD (NFP/PPI/CPI/FOMC) dan format JSON-nya.
 async function aiXau(g, focus, t0) {
-  const F = ['nfp', 'cpi', 'ppi', 'fomc', 'all'].includes(String(focus || '').toLowerCase()) ? String(focus).toLowerCase() : 'all';
+  const F = XAU_KEYS.concat('all').includes(String(focus || '').toLowerCase()) ? String(focus).toLowerCase() : 'all';
   const FT = F === 'all' ? ['NFP', 'PPI', 'CPI', 'FOMC'] : [F.toUpperCase()];
   const FL = FT.join(', ');
   /* Mekanika tiap rilis — dipakai AI agar analisis benar-benar fokus pada
@@ -1861,7 +1875,13 @@ async function aiXau(g, focus, t0) {
     NFP: 'NFP — baca: (1) perubahan payrolls (ribu) vs konsensus & rata-rata 3 bulan, (2) unemployment rate (naik = dovish), (3) average hourly earnings MoM & YoY (upah panas = hawkish), (4) revisi dua bulan sebelumnya, (5) partisipasi & jam kerja. Komposisi sektor (pemerintah vs swasta, leisure/hospitality, kesehatan) menentukan kualitas angka. Payrolls kuat + pengangguran turun + upah naik = USD/yield naik = tekanan turun XAUUSD; payrolls lemah + pengangguran naik = sebaliknya. Spike biasanya dua arah pada detik rilis lalu mengikuti arah kejutan.',
     CPI: 'CPI — baca: headline MoM & YoY, core MoM & YoY, supercore/jasa inti, shelter (weight terbesar), dan barang inti. Bandingkan dengan konsensus, previous, serta 3 bulan terakhir (momentum inflasi). Inflasi lebih panas dari konsensus → ekspektasi Fed hawkish → yield riil naik → XAUUSD turun; lebih dingin → XAUUSD naik. CPI biasanya memicu spike besar dua arah; arah akhir mengikuti kejutan core/supercore.',
     PPI: 'PPI — baca: final demand MoM & YoY, core ex food & energy, komponen yang masuk PCE (healthcare, portfolio management, airline fares), serta harga barang vs jasa di tingkat produsen. PPI adalah indikator awal tekanan harga ke konsumen: PPI panas = risiko CPI panas ke depan = hawkish = XAUUSD tertekan; PPI dingin = dukungan naik untuk XAUUSD. Reaksi biasanya lebih kecil dari CPI, tetapi bisa jadi sinyal awal bila komponen PCE meleset.',
-    FOMC: 'FOMC — baca: keputusan fed funds rate & target range, perubahan statement (bandingkan kalimat kunci dengan statement sebelumnya), dot plot/SEP (median proyeksi rate tahun ini & tahun depan), nada press conference (hawkish/dovish), dan dissenting votes. Rate hold + nada dovish = yield riil turun = XAUUSD naik; rate hold + nada hawkish/"higher for longer" = XAUUSD tertekan. Spike terbesar biasanya saat statement & press conference; arah bisa berbalik setelah pasar mencerna dot plot.'
+    FOMC: 'FOMC — baca: keputusan fed funds rate & target range, perubahan statement (bandingkan kalimat kunci dengan statement sebelumnya), dot plot/SEP (median proyeksi rate tahun ini & tahun depan), nada press conference (hawkish/dovish), dan dissenting votes. Rate hold + nada dovish = yield riil turun = XAUUSD naik; rate hold + nada hawkish/"higher for longer" = XAUUSD tertekan. Spike terbesar biasanya saat statement & press conference; arah bisa berbalik setelah pasar mencerna dot plot.',
+    PCE: 'Core PCE — baca: core PCE MoM & YoY (target Fed 2%), supercore jasa, komponen jasa perumahan & kesehatan, serta revisi bulan lalu. Ini ukuran inflasi yang paling dipakai The Fed: core PCE lebih panas dari konsensus = jalur suku bunga lebih tinggi = yield riil naik = XAUUSD tertekan; lebih dingin = XAUUSD mendapat dukungan. Reaksi biasanya sedikit lebih kecil dari CPI, tetapi lebih persisten dan memengaruhi ekspektasi beberapa bulan ke depan.',
+    RETAIL: 'Retail Sales — baca: headline MoM, control group (dipakai untuk PDB), ex-auto, dan revisi bulan lalu. Konsumen kuat menandakan ekonomi tahan suku bunga tinggi → hawkish → USD/yield naik → XAUUSD turun; tetapi bila angka sangat lemah, emas bisa naik karena harapan pemotongan suku bunga — kecuali pasar sedang risk-off ekstrem. Spike umumnya sedang, dua arah pada detik rilis.',
+    GDP: 'GDP — baca: pertumbuhan kuartalan q/q (advance/prelim/final), konsumsi pribadi, investasi, deflator GDP, dan revisi. Pertumbuhan kuat disertai deflator panas = hawkish = XAUUSD tertekan; pertumbuhan lemah disertai deflator dingin = dovish = XAUUSD naik. Angka final biasanya bereaksi kecil; advance/prelim lebih besar.',
+    CLAIMS: 'Unemployment Claims — baca: initial claims, continuing claims, dan rata-rata 4 minggu, bandingkan dengan konsensus dan tren 2 bulan. Klaim naik = pasar kerja melemah = dovish = XAUUSD naik; klaim turun tajam = pasar kerja ketat = hawkish = XAUUSD tertekan. Spike kecil (biasanya <120 pip) kecuali angkanya sangat ekstrem.',
+    ADP: 'ADP Employment Change — baca: payroll swasta bulanan, sektor jasa vs barang, dan gaji (pay growth) bila tersedia. ADP adalah pratinjau NFP yang berisik: payroll kuat + gaji naik = hawkish = XAUUSD tertekan; payroll lemah = dovish = XAUUSD naik. Reaksi sering pendek sebelum NFP; gunakan sebagai konteks, bukan arah tunggal.',
+    ISM: 'ISM PMI — baca: headline (di atas 50 = ekspansi), new orders, employment, dan prices paid. Prices paid panas + headline kuat = hawkish = XAUUSD tertekan; headline di bawah 50 dengan prices paid dingin = dovish = XAUUSD naik. ISM Services biasanya lebih penting untuk emas karena porsi jasa dominan di ekonomi AS.'
   };
   const mech = FT.map(t => MECH[t]).filter(Boolean).join('\n');
   const text = dataText(g, true), fxPack = xauFocus(g, F);
@@ -1891,7 +1911,8 @@ ATURAN KERAS:
 14. Setiap rilis fokus WAJIB punya "validity": jelaskan mengapa angka/jadwal itu VALID — sebut sumber resmi (BLS / federalreserve.gov / FRED), periode data, kesegaran tanggal, dan hasil verifikasi silang bila ada. Dilarang menulis "valid" tanpa bukti sumber.
 15. WAJIB memberi "gold_path": prediksi jalur XAUUSD yang operasional (skenario utama, arah per rilis, level referensi dari [P]/[L], dan pemicu yang membatalkannya) menjelang dan saat rilis.
 16. WAJIB mengisi "spike": {"likely":true/false,"why":"...","size_pips":{"min":0,"max":0},"window_min":0,"first_dir":"BUY|SELL|DUA ARAH"} untuk rilis fokus terpilih: apakah rilis memicu lonjakan volatilitas XAUUSD, perkiraan besar lonjakan dalam pip, jendela waktunya, dan arah PERTAMA yang paling mungkin. [SPK] adalah baseline deterministik (kelas rilis + ATR live + reaksi candle bila sudah terbit) — pakai angkanya, sesuaikan hanya bila ada bukti lain di data. Bedakan spike dari arah akhir.
-17. WAJIB menjelaskan RANTAI SEBAB-AKIBAT arah di action_reason dan thesis: (a) data global yang paling menentukan, (b) dampaknya ke USD/yield riil, (c) dampaknya ke permintaan emas, (d) kesimpulan arah BUY/SELL dan level yang membatalkannya. Tanpa rantai ini jawaban dianggap tidak valid. Jangan mengarang angka baru.
+17. WAJIB menjelaskan RANTAI SEBAB-AKIBAT arah di action_reason dan thesis: (a) data global yang paling menentukan, (b) dampaknya ke USD/yield riil, (c) dampaknya ke permintaan emas, (d) kesimpulan arah BUY/SELL dan level yang membatalkan. Tanpa rantai ini jawaban dianggap tidak valid. Jangan mengarang angka baru.
+18. [TV] = bacaan chart TradingView real-time (OANDA:XAUUSD): harga, rekomendasi 1m–1D, RSI, EMA, ATR. Pakai untuk momentum multi-timeframe dan sebut bila searah/berlawanan dengan mesin; level entry/SL/TP tetap dari [SG] karena level sudah dikalibrasi ke harga chart. Bila [TV] tidak ada, tulis sebagai risiko data. Jangan mengarang angka chart.
 
 MEKANIKA RILIS FOKUS (wajib dipakai saat menganalisis ${FL}; jangan mencampur logika rilis lain ke dalam events):
 ${mech}
@@ -2175,6 +2196,65 @@ const spotYahoo = () => memoize('sigspoty', 20000, async () => {
   }
   return null;
 });
+/* ===== CHART TRADINGVIEW REAL-TIME (dibaca mesin, bukan hanya iframe) =====
+   Endpoint scanner resmi TradingView memberi kutipan live + rekomendasi
+   multi-timeframe, RSI, EMA, dan ATR untuk simbol OANDA:XAUUSD — angka yang
+   sama dengan chart dan gauge "Technical Analysis" TradingView. Dipakai untuk
+   konfirmasi Alchemist; level entry/SL/TP tetap milik candle mesin. */
+const TV_SYMBOL = 'OANDA:XAUUSD';
+const TV_REC_LABEL = v => v == null || !isFinite(v) ? 'NETRAL' : v >= 0.5 ? 'STRONG BUY' : v >= 0.1 ? 'BUY' : v <= -0.5 ? 'STRONG SELL' : v <= -0.1 ? 'SELL' : 'NETRAL';
+const tvRead = () => memoize('tvread', 30000, async () => {
+  const base = 'https://scanner.tradingview.com/symbol?symbol=' + encodeURIComponent(TV_SYMBOL) + '&no_404=true&fields=';
+  const fields = [
+    'close', 'change', 'change_abs', 'open', 'high', 'low', 'volume',
+    'Recommend.All', 'Recommend.MA', 'Recommend.Other',
+    'Recommend.All|1', 'Recommend.All|5', 'Recommend.All|15', 'Recommend.All|60', 'Recommend.All|240',
+    'Recommend.MA|15', 'Recommend.Other|15',
+    'RSI', 'RSI|1', 'RSI|5', 'RSI|15', 'RSI|60', 'RSI|240',
+    'EMA20', 'EMA50', 'EMA200', 'EMA20|15', 'EMA50|15', 'EMA200|15', 'EMA20|60', 'EMA50|60',
+    'ATR', 'ATR|15', 'ATR|60'
+  ];
+  const fail = e => ({ ok: false, symbol: TV_SYMBOL, at: Date.now(), error: String(e && e.message ? e.message : e).slice(0, 160) });
+  try {
+    const r = await fetch(base + fields.join(','), {
+      headers: { 'User-Agent': UA, Accept: 'application/json', Referer: 'https://www.tradingview.com/' },
+      signal: AbortSignal.timeout(9000)
+    });
+    if (!r.ok) return fail(new Error('TradingView membalas ' + r.status));
+    let j;
+    try { j = await r.json(); } catch (e) { return fail(new Error('Balasan TradingView bukan JSON')); }
+    const n = k => { const v = j ? j[k] : null; return v == null || typeof v === 'boolean' ? null : (isFinite(Number(v)) ? Number(v) : null); };
+    const price = n('close');
+    if (!(price > 0)) return fail(new Error('Harga TradingView tidak terbaca'));
+    const mk = (rec, rsi, ema20, ema50, ema200, atr) => ({
+      rec: rec == null ? null : sgN(rec), recLabel: TV_REC_LABEL(rec),
+      rsi: rsi == null ? null : sgN(rsi), ema20: ema20 == null ? null : sgN(ema20),
+      ema50: ema50 == null ? null : sgN(ema50), ema200: ema200 == null ? null : sgN(ema200),
+      atr: atr == null ? null : sgN(atr)
+    });
+    const tf = {
+      '1': mk(n('Recommend.All|1'), n('RSI|1'), null, null, null, null),
+      '5': mk(n('Recommend.All|5'), n('RSI|5'), null, null, null, null),
+      '15': mk(n('Recommend.All|15'), n('RSI|15'), n('EMA20|15'), n('EMA50|15'), n('EMA200|15'), n('ATR|15')),
+      '60': mk(n('Recommend.All|60'), n('RSI|60'), n('EMA20|60'), n('EMA50|60'), null, n('ATR|60')),
+      '240': mk(n('Recommend.All|240'), n('RSI|240'), null, null, null, null),
+      'D': mk(n('Recommend.All'), n('RSI'), n('EMA20'), n('EMA50'), n('EMA200'), n('ATR'))
+    };
+    const wts = { D: 1.6, 240: 1.2, 60: 1, 15: 0.9, 5: 0.5, 1: 0.3 };
+    let sum = 0, wt = 0;
+    Object.keys(wts).forEach(k => { const v = tf[k] && tf[k].rec; if (v == null) return; sum += v * wts[k]; wt += wts[k]; });
+    const wavg = wt ? sum / wt : 0;
+    return {
+      ok: true, symbol: TV_SYMBOL, exchange: 'OANDA', at: Date.now(),
+      price: sgN(price), changePct: n('change'), changeAbs: n('change_abs'),
+      open: n('open'), high: n('high'), low: n('low'), volume: n('volume'),
+      tf, weighted: sgN(wavg), bias: wavg >= 0.1 ? 1 : wavg <= -0.1 ? -1 : 0,
+      strength: Math.round(Math.min(100, Math.abs(wavg) * 100)),
+      biasLabel: TV_REC_LABEL(wavg),
+      source: 'TradingView Scanner (OANDA:XAUUSD) — chart & TA real-time'
+    };
+  } catch (e) { return fail(e); }
+});
 const xauSignalPack = () => memoize('xausig', 20000, async () => {
   const cd = await sigCandles();
   const rows = cd.m15.rows.slice(-320), last = rows[rows.length - 1], closes = rows.map(r => r.c);
@@ -2247,6 +2327,10 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     const dp = Math.abs(spot - paxg.price) / spot * 100;
     cross = { price: paxg.price, src: paxg.src, diffPct: sgN(dp), ok: dp <= 1.5 };
   }
+  /* Chart TradingView real-time: dipakai sebagai konfirmasi & validasi silang.
+     Gagal membaca chart TIDAK boleh mematikan mesin — hanya ditandai. */
+  let tv = null;
+  try { tv = await tvRead(); } catch (e) { tv = { ok: false, symbol: TV_SYMBOL, at: Date.now(), error: msg(e, 160) }; }
   const basis = [], add = (w, why) => { basis.push({ w: sgN(w), why }); };
   let score = 0;
   if (ema20 != null && ema50 != null) { const w = ema20 > ema50 ? 1.4 : -1.4; score += w; add(w, `EMA20 ${ema20 > ema50 ? 'di atas' : 'di bawah'} EMA50 (${tf})`); }
@@ -2269,6 +2353,12 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   if (asia && asia.judas) { const w = asia.judas === 'bull' ? 0.7 : -0.7; score += w; add(w, `Judas swing: range Asia sisi ${asia.judas === 'bull' ? 'bawah' : 'atas'} disapu`); }
   if (sesi.kill) { score += 0.3; add(0.3, `Sesi aktif: ${sesi.kill}`); }
   if (ocl && atr && Math.abs(last.c - ocl.close) <= atr * 0.5) { score += 0.3; add(0.3, `Harga di level OCL (close harian ${ocl.close})`); }
+  /* Konfirmasi chart TradingView real-time (bobot naik seiring kekuatan bias). */
+  if (tv && tv.ok && tv.bias) {
+    const w = sgN(tv.bias * (0.6 + Math.min(1, tv.strength / 100)));
+    score += w;
+    add(w, 'Chart TradingView live: ' + tv.biasLabel + ' · M15 ' + ((tv.tf['15'] || {}).recLabel || '—') + ' · D1 ' + ((tv.tf.D || {}).recLabel || '—') + ' (kekuatan ' + tv.strength + '%)');
+  }
   const sigTot = basis.reduce((a, b) => a + Math.abs(b.w || 0), 0) || 1;
   const agree = Math.round(basis.filter(b => b.w > 0).reduce((a, b) => a + Math.abs(b.w || 0), 0) / sigTot * 100);
   let direction = score >= 2 ? 'BUY' : score <= -2 ? 'SELL' : 'WAIT';
@@ -2292,6 +2382,7 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   if (daily && daily.trend) dirVote(daily.trend === 'naik' ? 1 : -1, 2.2, 'tren D1');
   if (st.bos) dirVote(st.bos.dir === 'BULLISH' ? 1 : -1, 1.2, 'BOS terakhir');
   if (pos != null) dirVote(pos < 50 ? 1 : -1, 0.35, 'posisi range');
+  if (tv && tv.ok && tv.bias) dirVote(tv.bias, 1.5, 'chart TradingView live (' + tv.biasLabel + ')');
   const dirSum = dirVotes.reduce((a, v) => a + v.v * v.w, 0);
   const dirTot = dirVotes.reduce((a, v) => a + v.w, 0) || 1;
   const biasDir = dirSum === 0 ? (direction === 'SELL' ? 'SELL' : 'BUY') : (dirSum > 0 ? 'BUY' : 'SELL');
@@ -2326,9 +2417,33 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   if (direction === 'WAIT') conf = Math.min(conf, 40);
   if (cd.degraded) conf = Math.min(conf, 55);
   const rawPrice = sgN(last.c);
-  let calib = 0, price = rawPrice;
-  if (spot && rawPrice && spot > 0 && Math.abs(spot / rawPrice - 1) < 0.02) { calib = sgN(spot - rawPrice); price = sgN(spot); }
+  /* ACUAN HARGA: chart TradingView real-time diutamakan karena itulah chart
+     yang dibaca trader; lalu spot emas, lalu candle mentah. Semua level digeser
+     dengan satu kalibrasi yang sama sehingga entry/SL/TP konsisten dengan chart
+     yang terlihat — tidak ada level yang "melayang" dari chart. */
+  let calib = 0, price = rawPrice, priceAnchor = 'candle', tvWarn = '';
+  const tvUsable = !!(tv && tv.ok && tv.price > 0 && rawPrice > 0 && Math.abs(tv.price / rawPrice - 1) < 0.02);
+  const spotUsable = !!(spot && rawPrice > 0 && Math.abs(spot / rawPrice - 1) < 0.02);
+  if (tvUsable) { calib = sgN(tv.price - rawPrice); price = sgN(tv.price); priceAnchor = 'tradingview'; }
+  else if (spotUsable) { calib = sgN(spot - rawPrice); price = sgN(spot); priceAnchor = 'spot'; }
   const sh = v => (v == null ? null : sgN(v + calib));
+  /* Verifikasi silang sumber harga. Level mengikuti chart TradingView; spot emas
+     hanya pembanding, dan selisih sumber dilaporkan apa adanya. */
+  let tvSync = null;
+  if (tv && tv.ok && tv.price > 0) {
+    const gapPct = price ? (tv.price - price) / price * 100 : null;
+    tvSync = {
+      price: sgN(tv.price), anchor: priceAnchor,
+      gapPct: sgN(gapPct), gapPips: price ? Math.round(Math.abs(tv.price - price) / SGP.pip) : null,
+      spot: spot ? sgN(spot) : null,
+      spotGapPips: spot ? Math.round(Math.abs(tv.price - spot) / SGP.pip) : null,
+      spotGapPct: spot ? sgN(Math.abs(tv.price - spot) / spot * 100) : null,
+      ok: priceAnchor === 'tradingview',
+      at: new Date(tv.at).toISOString(),
+      source: priceAnchor === 'tradingview' ? 'Level dikalibrasi ke chart TradingView' : 'Chart TradingView tidak dipakai sebagai acuan level'
+    };
+    if (!tvUsable) tvWarn = 'harga chart TradingView ' + tv.price + ' menyimpang >2% dari candle ' + rawPrice + '; acuan level memakai ' + priceAnchor + '.';
+  }
   const poolsRaw = sgPools(rows, atr);
   const prevDay = cd.day && cd.day.rows.length > 1 ? cd.day.rows[cd.day.rows.length - 2] : null;
   const pdh = sh(prevDay ? prevDay.h : null), pdl = sh(prevDay ? prevDay.l : null), pdo = sh(prevDay ? prevDay.o : null);
@@ -2480,7 +2595,9 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     { s: 'Sesi / killzone', ok: !!sesi.kill, n: sesi.kill || ('sesi ' + sesi.ses) },
     { s: 'SMT / divergensi', ok: smtOk, n: smt ? smt.kind : 'tidak terdeteksi' },
     { s: 'TP berjenjang (SL 30 · TP1 ≥100 · TP2 ≥200)', ok: true, n: 'SL ' + SGP.slPips + ' pip (maksimal) · TP1 ' + SGP.tp1Pips + ' · TP2 ' + SGP.tp2Pips + ' · TPmax dari konfluensi global' },
-    { s: 'Tidak dekat rilis besar', ok: news.length === 0, n: news.length ? news.map(x => x.title).join(', ') : 'aman dalam 90 menit' }
+    { s: 'Tidak dekat rilis besar', ok: news.length === 0, n: news.length ? news.map(x => x.title).join(', ') : 'aman dalam 90 menit' },
+    { s: 'Chart TradingView real-time', ok: !!(tv && tv.ok), n: tv && tv.ok ? tv.symbol + ' · ' + tv.biasLabel + ' · M15 ' + ((tv.tf['15'] || {}).recLabel || '—') + ' · D1 ' + ((tv.tf.D || {}).recLabel || '—') : 'tidak terbaca (' + ((tv && tv.error) || 'jaringan') + ')' },
+    { s: 'Level dari chart TradingView', ok: priceAnchor === 'tradingview', n: tvSync ? 'chart ' + tvSync.price + ' · acuan ' + (priceAnchor === 'tradingview' ? 'TradingView' : priceAnchor) + (tvSync.spotGapPips != null ? ' · spot beda ' + tvSync.spotGapPips + ' pip' : '') : 'tidak terbaca' }
   ];
   const notes = [];
   if (cd.degraded && cd.errs && cd.errs.length) notes.push('Candle intraday gagal; dipakai data harian: ' + cd.errs.slice(0, 2).join(' | '));
@@ -2490,9 +2607,11 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   if (ageMin > 180) notes.push('Candle terakhir berumur ' + ageMin + ' menit (pasar kemungkinan tutup).');
   if (plan && plan.tight) notes.push('SL 30 pip lebih rapat dari 1×ATR (' + sgN(atr) + '); risiko tersentuh noise tinggi.');
   if (spot && price && Math.abs(spot / price - 1) * 100 > 0.6) notes.push('Harga candle vs spot emas berbeda ' + sgN(Math.abs(spot / price - 1) * 100) + '%; periksa sumber.');
+  if (tvSync && tvSync.spotGapPips != null && tvSync.spotGapPips > 20) notes.push('Chart TradingView dan spot emas berbeda ' + tvSync.spotGapPips + ' pip (' + tvSync.spotGapPct + '%); level entry/SL/TP mengikuti chart TradingView.');
+  if (tvWarn) notes.push(tvWarn);
   if (news.length) notes.push('Ada rilis USD High impact dalam 90 menit; spread bisa melebar.');
   if (gates.length) notes.push('Entry ditahan: ' + gates.join(' | ') + '.');
-  if (calib) notes.push('Level harga dikalibrasi ke spot emas (selisih futures ' + calib + ').');
+  if (calib) notes.push('Level harga dikalibrasi ke ' + (priceAnchor === 'tradingview' ? 'chart TradingView' : 'spot emas') + ' (selisih candle ' + calib + ').');
   const quality = [
     { k: 'Candle ' + tf, ok: rows.length >= 30, d: rows.length + ' bar · terakhir ' + new Date(last.t).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' },
     { k: 'Candle M5 (konfirmasi)', ok: !!cd.m5, d: cd.m5 ? cd.m5.rows.length + ' bar' : 'tidak tersedia' },
@@ -2501,7 +2620,8 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     { k: 'Candle harian', ok: !!daily, d: daily ? 'per ' + daily.asOf : 'tidak tersedia' },
     { k: 'Makro DXY & yield 10Y', ok: !!macro, d: macro ? 'per ' + macro.asOf : 'tidak tersedia' },
     { k: 'Spot emas (verifikasi)', ok: !!spot, d: spot ? String(sgN(spot)) : 'tidak tersedia' },
-    { k: 'Kalender rilis', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
+    { k: 'Kalender rilis', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' },
+    { k: 'Chart TradingView real-time', ok: !!(tv && tv.ok), d: tv && tv.ok ? tv.symbol + ' · ' + tv.price + ' · ' + tv.biasLabel + ' (' + tv.strength + '%)' : ((tv && tv.error) || 'tidak tersedia') }
   ];
   const dataValid = ageMin <= 60 && !!spot && !!cd.m5 && calOk && (!cross || cross.ok);
   const validation = [
@@ -2509,7 +2629,9 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     { k: 'Validasi silang PAXG', ok: !!(cross && cross.ok), d: cross ? cross.src + ' ' + cross.price + ' (selisih ' + cross.diffPct + '%)' : 'tidak terbaca' },
     { k: 'Kesegaran candle', ok: ageMin <= 60, d: ageMin + ' menit' },
     { k: 'Struktur intraday lengkap', ok: !!(cd.m15 && cd.m5 && cd.h1), d: (cd.m5 ? 'M5 ' + cd.m5.rows.length + ' bar' : 'M5 tidak ada') + ' · ' + (cd.h1 ? 'H1 ' + cd.h1.rows.length + ' bar' : 'H1 tidak ada') },
-    { k: 'Kalender rilis global', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' }
+    { k: 'Kalender rilis global', ok: calOk, d: calOk ? news.length + ' rilis High ≤90 menit' : 'tidak tersedia' },
+    { k: 'Chart TradingView real-time', ok: !!(tv && tv.ok), d: tv && tv.ok ? 'OANDA:XAUUSD ' + tv.price + ' · ' + tv.biasLabel : ((tv && tv.error) || 'tidak tersedia') },
+    { k: 'Acuan level: chart TradingView', ok: priceAnchor === 'tradingview', d: tvSync ? 'chart ' + tvSync.price + ' · spot ' + (tvSync.spot == null ? 'n/a' : tvSync.spot) + ' (' + (tvSync.spotGapPips == null ? 'n/a' : tvSync.spotGapPips + ' pip') + ')' : 'tidak terbaca' }
   ];
   /* ---------- 5+ setup entry Alchemist: entry, SL, TP dari struktur live ---------- */
   const XAU_STYLE_LABEL = { SCALPING: 'Scalping', DAY: 'Day Trading', SWING: 'Swing Trading' };
@@ -2833,6 +2955,7 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
   sorted.forEach(s => { if (picks.length < 10 && picks.indexOf(s) < 0) picks.push(s); });
   const setups = picks.slice(0, 10).filter(s => s.dir === biasDir);
   const sources = [
+    { name: 'TradingView — chart & TA real-time (OANDA:XAUUSD)', ok: !!(tv && tv.ok) },
     { name: 'Yahoo Finance — ' + cd.m15.sym, ok: true },
     { name: 'gold-api.com (spot emas live)', ok: !!spot },
     { name: 'Yahoo Finance — DXY intraday & ^TNX', ok: !!(cd.dxy && macro) },
@@ -2847,8 +2970,10 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
     poi, fvg: fvg.map(z => ({ kind: z.kind, lo: sh(z.lo), hi: sh(z.hi) })),
     m5: st5 ? { trend: st5.trend, bos: st5.bos ? { dir: st5.bos.dir, level: sh(st5.bos.level) } : null, sweep: sw5 ? { kind: sw5.kind, level: sh(sw5.level) } : null } : null,
     range: { hi: sh(rangeHi), lo: sh(rangeLo) }, macro, daily: dailyS, direction, score: sgN(score), confidence: conf,
-    basis, plan, entryType, checklist, news, watch, spot: spot ? sgN(spot) : null, gates, calib, rawPrice,
-    priceSource: calib ? spotSrc + ' (level dikalibrasi ke candle ' + cd.m15.sym + ')' : (cd.m15.sym || 'Yahoo') + (spot ? ' + spot ' + spotSrc : ''),
+    tv, tvSync, basis, plan, entryType, checklist, news, watch, spot: spot ? sgN(spot) : null, gates, calib, rawPrice,
+    priceSource: priceAnchor === 'tradingview'
+      ? 'chart TradingView OANDA:XAUUSD (level dikalibrasi ke candle ' + cd.m15.sym + (spot ? '; spot ' + sgN(spot) + ' untuk verifikasi' : '') + ')'
+      : calib ? spotSrc + ' (level dikalibrasi ke candle ' + cd.m15.sym + ')' : (cd.m15.sym || 'Yahoo') + (spot ? ' + spot ' + spotSrc : ''),
     chart: {
       tf: cd.degraded ? 'D1' : 'M15', pip: SGP.pip,
       rows: rows.slice(-120).map(r => ({ t: r.t, o: sgN(r.o), h: sgN(r.h), l: sgN(r.l), c: sgN(r.c) })),
@@ -2870,7 +2995,7 @@ const xauSignalPack = () => memoize('xausig', 20000, async () => {
       { tf: 'H4', label: '4H', dir: h4 && h4.dir ? h4.dir : 0 },
       { tf: 'D1', label: '1D', dir: daily && daily.trend ? (daily.trend === 'naik' ? 1 : -1) : 0 }
     ],
-    tradingview: { symbol: 'OANDA:XAUUSD', embedded: true, note: 'Chart & Technical Analysis resmi TradingView disematkan di UI; level mesin memakai feed harga live yang sama (spot emas + candle M15/M5).' }
+    tradingview: { symbol: TV_SYMBOL, embedded: true, liveRead: !!(tv && tv.ok), price: tv && tv.ok ? sgN(tv.price) : null, bias: tv && tv.ok ? tv.biasLabel : null, strength: tv && tv.ok ? tv.strength : null, at: tv && tv.ok ? new Date(tv.at).toISOString() : null, note: 'Chart TradingView real-time dibaca mesin (harga, rekomendasi 6 timeframe, RSI, EMA, ATR) sebagai konfirmasi Alchemist; level entry/SL/TP tetap dihitung dari candle live mesin.' }
   };
 });
 function signalText(p) {
@@ -2878,6 +3003,16 @@ function signalText(p) {
   const L = [];
   L.push('[SG] SIGNAL ENTRY XAUUSD — mesin Alchemist deterministik (' + p.timeframe + ' entry, M5 konfirmasi, H1 bias). Level di bawah berasal dari mesin, BUKAN karangan AI.');
   L.push(`Harga ${p.price}${p.priceSource ? ' (' + p.priceSource + ')' : ''} (candle ${p.candleAt}${p.stale ? '; USANG / pasar kemungkinan tutup' : ''}) | arah ${p.direction} | skor ${p.score} | keyakinan ${p.confidence}% | konfirmasi ${p.confirms}/6`);
+  if (p.tv && p.tv.ok) {
+    L.push('[TV] CHART TRADINGVIEW REAL-TIME (' + p.tv.symbol + '): harga ' + p.tv.price +
+      ' (' + (p.tv.changePct == null ? 'n/a' : (p.tv.changePct > 0 ? '+' : '') + p.tv.changePct + '%') + ')' +
+      ' | bias gabungan ' + p.tv.biasLabel + ' (kekuatan ' + p.tv.strength + '%)' + ' | ' +
+      ['D', '240', '60', '15', '5', '1'].map(k => (k === 'D' ? '1D' : k === '240' ? '4H' : k === '60' ? '1H' : k + 'm') + ' ' + ((p.tv.tf[k] || {}).recLabel || '—')).join(' · ') +
+      ' | RSI 1D ' + (((p.tv.tf.D || {}).rsi) == null ? 'n/a' : (p.tv.tf.D || {}).rsi) + ' · RSI 15m ' + (((p.tv.tf['15'] || {}).rsi) == null ? 'n/a' : (p.tv.tf['15'] || {}).rsi));
+  } else {
+    L.push('[TV] CHART TRADINGVIEW: tidak tersedia (' + ((p.tv && p.tv.error) || 'jaringan') + ') — analisis memakai candle live mesin saja.');
+  }
+  if (p.tvSync) L.push('[TV] Sinkron harga: chart ' + p.tvSync.price + ' vs mesin ' + p.price + ' = ' + p.tvSync.gapPips + ' pip (' + p.tvSync.gapPct + '%) → ' + (p.tvSync.ok ? 'SINKRON' : 'BEDA, entry ditahan'));
   if (p.gates && p.gates.length) L.push('ENTRY DITAHAN: ' + p.gates.join(' | '));
   L.push(`Struktur M15 ${p.structure}${p.bos ? ' | ' + p.bos.kind + ' ' + p.bos.dir + ' @' + p.bos.level : ''}${p.sweep ? ' | sapuan ' + p.sweep.kind + ' @' + p.sweep.level : ''} | posisi range ${p.position == null ? 'n/a' : p.position + '%'} | RSI ${p.rsi == null ? 'n/a' : p.rsi} | ATR ${p.atr == null ? 'n/a' : p.atr}`);
   if (p.m5) L.push(`M5: struktur ${p.m5.trend}${p.m5.bos ? ' | BOS ' + p.m5.bos.dir : ''}${p.m5.sweep ? ' | sweep ' + p.m5.sweep.kind : ''}`);
@@ -2923,6 +3058,7 @@ ATURAN KERAS:
 5. verdict: CONFIRM hanya bila arah mesin bukan WAIT, minimal 2 konfirmasi Alchemist, dan tidak ada rilis High ≤90 menit; CAUTION bila ada syarat belum terpenuhi; REJECT bila arah WAIT, data usang, atau bertentangan dengan struktur/makro.
 6. Jelaskan risiko nyata: SL 30 pip bisa lebih rapat dari ATR, spread saat berita, pasar tutup, entry limit bisa tidak tersentuh.
 7. Ini edukasi, bukan saran finansial. Bahasa Indonesia.
+8. Baris [TV] adalah bacaan chart TradingView real-time (OANDA:XAUUSD): harga, rekomendasi 1m–1D, RSI, EMA, ATR. Pakai untuk menilai momentum multi-timeframe dan sebut bila searah/berlawanan dengan mesin. Jangan menyalin angka chart menjadi level entry/SL/TP; level tetap milik [SG]. Bila [TV] tidak tersedia atau sinkron harga BEDA, tulis sebagai risiko data dan turunkan keyakinan. Jangan mengarang angka chart.
 
 DATA [SG]:
 ${signalText(pack).slice(0, 9000)}
@@ -3064,9 +3200,19 @@ async function xauSignalHandler(req, res) {
   }
   if (phase === 'tick') {
     try {
-      const s = await liveSpot();
-      return res.status(200).json({ phase: 'tick', tick: { price: s.price, at: s.at, source: 'gold-api.com (spot)' } });
-    } catch (e) { return res.status(200).json({ phase: 'tick', tick: null, error: msg(e, 120) }); }
+      const [s, tv] = await Promise.allSettled([liveSpot(), tvRead()]);
+      const spotP = s.status === 'fulfilled' ? s.value : null;
+      const tvP = tv.status === 'fulfilled' ? tv.value : null;
+      return res.status(200).json({
+        phase: 'tick',
+        tick: spotP ? { price: spotP.price, at: spotP.at, source: 'gold-api.com (spot)' } : null,
+        tv: tvP && tvP.ok ? {
+          price: tvP.price, at: tvP.at, bias: tvP.bias, strength: tvP.strength, label: tvP.biasLabel,
+          rec15: tvP.tf['15'] ? tvP.tf['15'].recLabel : null, recD: tvP.tf.D ? tvP.tf.D.recLabel : null,
+          symbol: tvP.symbol, source: tvP.source
+        } : { error: (tvP && tvP.error) || 'TradingView tidak tersedia' }
+      });
+    } catch (e) { return res.status(200).json({ phase: 'tick', tick: null, tv: null, error: msg(e, 120) }); }
   }
   let pack;
   try { pack = lockSignalDirection(await xauSignalPack()); } catch (e) { return res.status(200).json({ error: 'Data candle XAUUSD tidak tersedia: ' + msg(e, 200) }); }
@@ -3080,7 +3226,7 @@ const xauCache = new Map();
 // ✏️ [TEKS BISA DIUBAH] [PESAN] xauHandler: Pesan error News Analisis XAUUSD.
 async function xauHandler(req, res) {
   const b = req.body || {}, phase = b.phase, t0 = Date.now();
-  const focus = ['nfp', 'cpi', 'ppi', 'fomc', 'all'].includes(String(b.focus || '').toLowerCase()) ? String(b.focus).toLowerCase() : 'all';
+  const focus = XAU_KEYS.concat('all').includes(String(b.focus || '').toLowerCase()) ? String(b.focus).toLowerCase() : 'all';
   if (phase === 'ai') {
     let g; try { g = cleanG(b.g); } catch (e) { return res.status(400).json({ error: e.message }); }
     return res.status(200).json({ phase: 'ai', focus, ...(await aiXau(g, focus, t0)) });
