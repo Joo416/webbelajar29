@@ -1,0 +1,667 @@
+/* ==========================================================================
+   RUANG BELAJAR V34 — LAPISAN VISUAL FINAL (dimuat paling akhir)
+   Tujuan:
+   • Tampilan hangat & premium, tidak kaku (aurora lembut, kartu berlapis).
+   • Tipografi yang nyaman dibaca: ukuran fluid, line-height longgar,
+     letter-spacing normal, angka tabular.
+   • Tidak ada teks yang tertimpa/tertindih oleh teks tebal: semua heading,
+     pill, tombol, dan baris data boleh membungkus, tidak dipaksa satu baris.
+   • Aman untuk mode gelap & terang.
+   ========================================================================== */
+
+/* ---------- 1. Token warna & font ---------- */
+:root {
+  --font-ui: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+
+  --bg: #070a12;
+  --bg2: #0b1019;
+  --card: #0f1420;
+  --card2: #151c2a;
+  --field: #0b111c;
+  --line: #1f2a3a;
+  --line2: #304056;
+  --tx: #eef3fb;
+  --mut: #b9c5d8;
+  --tx-soft: #dbe4f1;
+  --a: #ffffff;
+  --b: #d9e2f0;
+  --bad: #a9b5c7;
+
+  --accent: #93a6ff;
+  --accent2: #5eead4;
+  --accent-soft: rgba(147, 166, 255, .14);
+  --action: #5262e6;
+  --action2: #8b5cf6;
+
+  --ok: #45e0a0;
+  --ok-soft: rgba(69, 224, 160, .13);
+  --no: #ff7d8d;
+  --no-soft: rgba(255, 125, 141, .13);
+  --warn: #f5c56b;
+  --warn-soft: rgba(245, 197, 107, .13);
+  --warn-line: rgba(245, 197, 107, .3);
+
+  --btn-tx: #ffffff;
+  --nav: rgba(9, 13, 21, .86);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 26px 60px -46px rgba(0, 0, 0, .95);
+  --ring: 0 0 0 3px rgba(147, 166, 255, .18);
+  color-scheme: dark;
+}
+html[data-theme=light] {
+  --bg: #f4f6fb;
+  --bg2: #ffffff;
+  --card: #ffffff;
+  --card2: #f3f6fc;
+  --field: #f8fafd;
+  --line: #e2e8f2;
+  --line2: #cbd5e4;
+  --tx: #0d1421;
+  --mut: #4a5568;
+  --tx-soft: #1d2635;
+  --a: #0d1421;
+  --b: #26303f;
+  --bad: #64707f;
+
+  --accent: #4759d8;
+  --accent2: #0d9488;
+  --accent-soft: rgba(71, 89, 216, .09);
+  --action: #4759d8;
+  --action2: #7c3aed;
+
+  --ok: #0a8a5c;
+  --ok-soft: rgba(10, 138, 92, .09);
+  --no: #cc3146;
+  --no-soft: rgba(204, 49, 70, .08);
+  --warn: #8a5a00;
+  --warn-soft: rgba(138, 90, 0, .08);
+  --warn-line: rgba(138, 90, 0, .22);
+
+  --btn-tx: #ffffff;
+  --nav: rgba(255, 255, 255, .88);
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 22px 50px -40px rgba(16, 24, 40, .5);
+  color-scheme: light;
+}
+
+/* ---------- 2. Latar aurora yang tenang ---------- */
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-ui) !important;
+  font-size: clamp(15.5px, 1.05vw + 11px, 16.75px);
+  line-height: 1.72;
+  letter-spacing: .002em;
+  color: var(--tx);
+  background-color: var(--bg) !important;
+  background-image:
+    radial-gradient(52vw 42vh at 82% -6%, rgba(147, 166, 255, .18), transparent 68%),
+    radial-gradient(46vw 38vh at 6% 6%, rgba(94, 234, 212, .11), transparent 66%),
+    radial-gradient(60vw 40vh at 50% 100%, rgba(139, 92, 246, .08), transparent 70%) !important;
+  background-attachment: fixed, fixed, fixed !important;
+  background-repeat: no-repeat !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+html[data-theme=light] body {
+  background-image:
+    radial-gradient(52vw 42vh at 84% -8%, rgba(71, 89, 216, .12), transparent 68%),
+    radial-gradient(46vw 38vh at 4% 4%, rgba(13, 148, 136, .1), transparent 66%),
+    radial-gradient(60vw 40vh at 50% 102%, rgba(124, 58, 237, .07), transparent 70%) !important;
+}
+::selection { background: var(--action); color: #fff; }
+
+/* ---------- 3. Tipografi yang memanjakan mata ---------- */
+h1, h2, h3, h4, .big, .v21-hero-title, .rb-dhead b, .rb-gbar b {
+  font-family: var(--font-display) !important;
+  letter-spacing: -.012em;
+  line-height: 1.32;
+  color: var(--tx);
+  font-weight: 600;
+  text-wrap: balance;
+}
+h1 { font-size: clamp(1.22rem, 3.4vw, 1.58rem); font-weight: 650; }
+h2 { font-size: clamp(1.06rem, 2.8vw, 1.32rem); font-weight: 650; margin: 0 0 10px; }
+h3 { font-size: clamp(1rem, 2.2vw, 1.1rem); font-weight: 600; }
+h4 { font-size: .98rem; }
+p, li, .small, .mut, .rb-note, .exp, .note, .item, .hint, .msg {
+  line-height: 1.72;
+  text-wrap: pretty;
+}
+p { margin: 0 0 10px; }
+.small { font-size: .875rem; }
+.mut { color: var(--mut); }
+.big { font-weight: 700; letter-spacing: -.02em; line-height: 1.12; font-variant-numeric: tabular-nums; }
+code, kbd, samp, .rb-plan, .rb-ai-log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* Tebal tidak lagi "menabrak" teks lain: bobot diturunkan & ruang baris cukup */
+b, strong { font-weight: 650; color: var(--tx); }
+h1 b, h2 b, h3 b, .card h3 b { font-weight: 650; }
+a { color: var(--accent); text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 3px; }
+
+/* Semua wadah teks boleh membungkus — ini kunci "tidak ada teks tertimpa" */
+.card, .exp, .warn, .hint, .note, .item, .msg, .rb-note, .q, .opt, td, th,
+.rb-pill, .rb-dir, .badge, .rb-sig, .rb-release, .rb-kpi, .rb-lv, .rb-calc-out > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.card h3, .rb-card-head, .rb-release-head, .rb-sig-head, .rb-hero-top {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 10px;
+  align-items: center;
+}
+.rb-pill, .rb-dir, .badge, .x, .btn {
+  white-space: normal;
+  max-width: 100%;
+}
+.rb-pill { line-height: 1.45; }
+.item { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+
+/* ---------- 4. Kerangka halaman ---------- */
+.wrap {
+  max-width: 1080px;
+  padding: clamp(16px, 2.4vw, 28px) clamp(13px, 2.2vw, 24px) calc(112px + env(safe-area-inset-bottom));
+}
+.topbar {
+  margin-bottom: 18px;
+  gap: 12px;
+  align-items: center;
+}
+.topbar h1 { display: flex; align-items: center; gap: 11px; margin: 0 0 4px; }
+.logo {
+  width: 42px; height: 42px; margin: 0;
+  border-radius: 14px;
+  display: inline-grid; place-items: center;
+  font-size: 1.12rem;
+  background: linear-gradient(150deg, var(--action), var(--action2));
+  color: #fff;
+  box-shadow: 0 16px 30px -20px rgba(82, 98, 230, .95);
+  vertical-align: middle;
+}
+.sub {
+  font-size: .715rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 650;
+  margin: 0;
+}
+html[data-theme=light] .logo { color: #fff; }
+
+/* ---------- 5. Navigasi utama (pill mengambang) ---------- */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: flex;
+  gap: 5px;
+  margin: 0 0 18px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--nav);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 18px 40px -34px rgba(0, 0, 0, .95);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button {
+  flex: 1 0 auto;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px clamp(6px, 1.6vw, 14px);
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--mut);
+  font-family: var(--font-ui);
+  font-size: clamp(.78rem, 2.4vw, .9rem);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background .18s ease, color .18s ease, transform .15s ease;
+}
+.tabs button:hover { color: var(--tx); background: var(--card2); }
+.tabs button.on {
+  background: linear-gradient(150deg, var(--action), var(--action2));
+  color: #fff;
+  box-shadow: 0 12px 26px -18px rgba(82, 98, 230, .95);
+}
+.stabs {
+  position: sticky;
+  top: calc(58px + env(safe-area-inset-top));
+  z-index: 70;
+  display: flex;
+  gap: 5px;
+  margin: 0 0 14px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--nav);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stabs::-webkit-scrollbar { display: none; }
+.stabs button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--mut);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+.stabs button:hover { color: var(--tx); background: var(--card2); }
+.stabs button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* ---------- 6. Kartu & permukaan ---------- */
+.card {
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  padding: clamp(15px, 2vw, 20px);
+  margin-bottom: 14px;
+  background: linear-gradient(168deg, var(--card2) 0%, var(--card) 46%, var(--card) 100%);
+  box-shadow: var(--shadow);
+  transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.card + .card { margin-top: 0; }
+@media (hover: hover) {
+  .card:hover { border-color: var(--line2); }
+}
+.card h3 { font-size: clamp(.98rem, 2vw, 1.06rem); margin: 0 0 12px; }
+.card > h3:only-child { margin-bottom: 0; }
+.exp, .warn, .hint, .note, .msg {
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.warn { background: var(--warn-soft); border-color: var(--warn-line); }
+.hint { background: var(--card2); }
+.rb-note { color: var(--tx-soft); font-size: .855rem; line-height: 1.7; }
+.rb-card-head { margin-bottom: 10px; }
+.rb-card-head h3 { margin: 0; }
+details > summary { line-height: 1.5; }
+
+/* ---------- 7. Tombol & form ---------- */
+.btn {
+  min-height: 46px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(150deg, var(--action), var(--action2));
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: .94rem;
+  font-weight: 650;
+  letter-spacing: -.005em;
+  line-height: 1.35;
+  box-shadow: 0 16px 32px -24px rgba(82, 98, 230, .95);
+  cursor: pointer;
+  transition: filter .16s ease, transform .12s ease, box-shadow .16s ease;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.btn.alt {
+  background: var(--card2);
+  color: var(--tx);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.btn.alt:hover { border-color: var(--line2); background: var(--field); }
+.btn.red { background: var(--no-soft); color: var(--no); border: 1px solid color-mix(in srgb, var(--no) 32%, transparent); box-shadow: none; }
+.btn.full { width: 100%; margin-top: 12px; }
+.x {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card2);
+  color: var(--tx);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+.x:hover { border-color: var(--line2); }
+.x.on, .x[aria-pressed=true] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+input, select, textarea {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--tx);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.55;
+  padding: 12px 13px;
+}
+@media (min-width: 641px) {
+  input, select, textarea { font-size: .94rem; }
+  textarea { font-size: .92rem; }
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: var(--ring); outline: 0; }
+label { color: var(--tx-soft); font-size: .74rem; font-weight: 650; letter-spacing: .04em; }
+::placeholder { color: var(--mut); opacity: 1; }
+:where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+.bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar i { background: linear-gradient(90deg, var(--action), var(--accent2)); }
+
+/* ---------- 8. Badge & angka ---------- */
+.rb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card2);
+  color: var(--tx-soft);
+  font-size: .71rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.rb-pill.y { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-soft); color: var(--accent); }
+.rb-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 13px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+}
+.rb-dir.buy { background: var(--ok-soft); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 55%, transparent); }
+.rb-dir.sell { background: var(--no-soft); color: var(--no); border: 1px solid color-mix(in srgb, var(--no) 55%, transparent); }
+.rb-dir.wait { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
+.rb-kpi, .rb-lv, .rb-calc-out > div {
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  padding: 10px 12px;
+}
+.rb-kpi b, .rb-lv b { font-variant-numeric: tabular-nums; font-weight: 650; }
+.rb-kpi span, .rb-lv span { letter-spacing: .05em; color: var(--mut); font-weight: 650; }
+
+/* ---------- 9. Komponen Trading ---------- */
+.rb-trade-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--line2);
+  padding: clamp(16px, 2.4vw, 24px);
+  margin-bottom: 14px;
+  background: linear-gradient(158deg, var(--card2), var(--card) 62%);
+  box-shadow: var(--shadow);
+}
+.rb-trade-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 80% at 0% 0%, rgba(147, 166, 255, .16), transparent 60%),
+    radial-gradient(80% 90% at 100% 0%, rgba(94, 234, 212, .1), transparent 62%);
+}
+.rb-trade-hero > * { position: relative; z-index: 1; }
+.rb-trade-hero h2 { margin: 4px 0 10px; }
+.rb-eyebrow {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.rb-trade-hero .rb-note { color: var(--tx-soft); font-size: .865rem; }
+.rb-live-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.rb-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: rb34Pulse 2s infinite; }
+@keyframes rb34Pulse {
+  0% { box-shadow: 0 0 0 0 rgba(69, 224, 160, .45); }
+  70% { box-shadow: 0 0 0 9px rgba(69, 224, 160, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(69, 224, 160, 0); }
+}
+
+/* Tab rilis berita: deretan chip yang bisa digeser, tidak berdesakan */
+.rb-rel-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 6px;
+  padding: 2px 2px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.rb-rel-tabs::-webkit-scrollbar { display: none; }
+.rb-rel-tabs button {
+  flex: 0 0 auto;
+  min-width: 84px;
+  min-height: 58px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--tx-soft);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 650;
+  line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .12s ease;
+}
+.rb-rel-tabs button em { font-style: normal; font-size: 1.06rem; line-height: 1; }
+.rb-rel-tabs button small { font-size: .62rem; font-weight: 600; color: var(--mut); letter-spacing: .02em; }
+.rb-rel-tabs button:hover { border-color: var(--line2); background: var(--card2); }
+.rb-rel-tabs button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.rb-rel-tabs button.on small { color: var(--accent); }
+
+/* Kartu putusan: jawaban tunggal BUY/SELL + status spike */
+.rb-verdict {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  margin-bottom: 12px;
+}
+.rb-verdict.buy { border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: linear-gradient(150deg, var(--ok-soft), var(--field) 70%); }
+.rb-verdict.sell { border-color: color-mix(in srgb, var(--no) 45%, transparent); background: linear-gradient(150deg, var(--no-soft), var(--field) 70%); }
+.rb-verdict-label { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); font-weight: 650; }
+.rb-verdict-main {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 6vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1.1;
+}
+.rb-verdict.buy .rb-verdict-main { color: var(--ok); }
+.rb-verdict.sell .rb-verdict-main { color: var(--no); }
+.rb-verdict-sub { font-size: .82rem; color: var(--tx-soft); font-weight: 600; }
+.rb-verdict-spike {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: .78rem;
+  font-weight: 650;
+  width: fit-content;
+  max-width: 100%;
+}
+.rb-verdict-spike.no { border-color: var(--line); background: var(--card2); color: var(--mut); }
+
+.rb-release { border-radius: 14px; border: 1px solid var(--line); background: var(--field); padding: 13px; margin-top: 10px; }
+.rb-release-title { font-size: .93rem; font-weight: 650; line-height: 1.45; }
+.rb-release-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+@media (max-width: 400px) { .rb-release-meta { grid-template-columns: 1fr 1fr; } }
+.rb-release-meta > div { border-radius: 10px; border: 1px solid var(--line); background: var(--card); padding: 8px 9px; }
+.rb-release-meta span { display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); font-weight: 650; }
+.rb-release-meta b { display: block; margin-top: 3px; font-size: .87rem; font-weight: 650; overflow-wrap: anywhere; }
+
+.rb-sig { border-radius: 16px; border: 1px solid var(--line); background: var(--field); padding: 14px; margin-bottom: 10px; }
+.rb-sig.top { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--card2); }
+.rb-sig-title { font-size: .95rem; font-weight: 650; line-height: 1.45; }
+.rb-sig-sub { font-size: .77rem; color: var(--mut); margin-top: 3px; line-height: 1.5; }
+.rb-lv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 640px) { .rb-lv-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.rb-lv b { font-size: .92rem; }
+.rb-tf.chip, .rb-tf { border-radius: 999px; }
+.rb-tv { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.rb-ai-scan { border-radius: 18px; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--card); }
+.rb-ai-scan .rb-ai-title { font-weight: 650; }
+.rb-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.rb-table th, .rb-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.rb-table th { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: var(--mut); font-weight: 650; }
+.rb-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Checklist & basis skor */
+.rb-note code { padding: 1px 5px; border-radius: 6px; background: var(--card2); }
+
+/* ---------- 10. Animasi halus (tidak kaku) ---------- */
+@keyframes rb34Rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+#pane > *, #app > .card, .rb-trade-hero, .stabs + #pane > .card {
+  animation: rb34Rise .34s cubic-bezier(.2, .7, .3, 1) both;
+}
+#pane > *:nth-child(2) { animation-delay: .04s; }
+#pane > *:nth-child(3) { animation-delay: .08s; }
+#pane > *:nth-child(4) { animation-delay: .12s; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- 11. Mobile ---------- */
+@media (max-width: 640px) {
+  .wrap { padding: 13px 12px calc(104px + env(safe-area-inset-bottom)); }
+  body { font-size: 15.9px; }
+  .card { padding: 15px; border-radius: 18px; }
+  .rb-trade-hero { padding: 16px; border-radius: 20px; }
+  .tabs { border-radius: 0 0 16px 16px; margin-left: -12px; margin-right: -12px; padding: 6px 12px; }
+  .stabs { top: calc(60px + env(safe-area-inset-top)); }
+  .rb-lv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rb-verdict-main { font-size: 1.9rem; }
+  .rb-actions { grid-template-columns: 1fr; }
+}
+
+/* ---------- 12. Mode terang ---------- */
+html[data-theme=light] .card { background: linear-gradient(168deg, #ffffff, #fbfdff 60%, #f8fafd); }
+html[data-theme=light] .rb-trade-hero { background: linear-gradient(158deg, #ffffff, #f7faff 62%); }
+html[data-theme=light] .tabs { background: var(--nav); }
+html[data-theme=light] button.on { color: #fff; }
+html[data-theme=light] .stabs button.on { color: var(--accent); }
+html[data-theme=light] body::after { content: none; }
+html[data-theme=light] .rb-verdict.buy { background: linear-gradient(150deg, var(--ok-soft), #ffffff 72%); }
+html[data-theme=light] .rb-verdict.sell { background: linear-gradient(150deg, var(--no-soft), #ffffff 72%); }
+
+/* ---------- 13. Prioritas tertinggi ----------
+   rb-ui.js menyuntikkan <style> saat runtime (paling akhir di <head>). Blok ini
+   memakai selektor berawalan html agar lapisan V34 tetap menang tanpa
+   mengubah urutan muat atau menghapus gaya lama. */
+html body {
+  font-family: var(--font-ui) !important;
+  font-size: clamp(15.5px, 1.05vw + 11px, 16.75px);
+  line-height: 1.72;
+  letter-spacing: .002em;
+  background-color: var(--bg) !important;
+}
+html .wrap { max-width: 1080px; }
+html h1, html h2, html h3, html h4 { font-family: var(--font-display) !important; font-weight: 600; letter-spacing: -.012em; }
+html .card {
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  padding: clamp(15px, 2vw, 20px);
+  background: linear-gradient(168deg, var(--card2) 0%, var(--card) 46%, var(--card) 100%);
+  box-shadow: var(--shadow);
+}
+html[data-theme=light] .card { background: linear-gradient(168deg, #ffffff, #fbfdff 60%, #f8fafd); }
+html .btn {
+  border-radius: 13px;
+  min-height: 46px;
+  background: linear-gradient(150deg, var(--action), var(--action2));
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 650;
+}
+html .btn.alt { background: var(--card2); color: var(--tx); border: 1px solid var(--line); }
+html .btn.red { background: var(--no-soft); color: var(--no); }
+html .x { border-radius: 10px; font-size: .8rem; }
+html .tabs {
+  position: sticky;
+  top: 0;
+  margin: 0 0 18px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--nav);
+  box-shadow: 0 18px 40px -34px rgba(0, 0, 0, .95);
+}
+html .stabs {
+  top: calc(58px + env(safe-area-inset-top));
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--nav);
+}
+html .tabs button.on, html .stabs button.on {
+  background: linear-gradient(150deg, var(--action), var(--action2));
+  color: #fff;
+}
+html .stabs button.on { background: var(--accent-soft); color: var(--accent); }
+html .rb-actions { gap: 8px; }
+
+@media (max-width: 640px) {
+  html .tabs { margin: 0 0 14px; padding: 5px; border-radius: 0 0 16px 16px; }
+  html .stabs { top: calc(60px + env(safe-area-inset-top)); }
+}

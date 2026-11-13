@@ -2201,10 +2201,10 @@ async function pPapan(){
 </script>
 <script>
 /* ===== UPDATE V22: tab 🎯 News Analisis — NFP · PPI · CPI · FOMC → XAUUSD ===== */
-const XTAGS=['NFP','PPI','CPI','FOMC'];
+const XTAGS=['NFP','CPI','PPI','FOMC','PCE','RETAIL','GDP','CLAIMS','ADP','ISM'];
 const XCOL={BULLISH:'var(--ok)',BEARISH:'var(--no)',NETRAL:'var(--mut)'};
 const XARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
-const XNAME={NFP:'Non-Farm Payrolls',PPI:'Producer Price Index',CPI:'Consumer Price Index',FOMC:'FOMC / suku bunga The Fed'};
+const XNAME={NFP:'Non-Farm Payrolls',PPI:'Producer Price Index',CPI:'Consumer Price Index',FOMC:'FOMC / suku bunga The Fed',PCE:'Core PCE Price Index',RETAIL:'Retail Sales',GDP:'Gross Domestic Product',CLAIMS:'Unemployment Claims',ADP:'ADP Employment Change',ISM:'ISM Manufacturing & Services PMI'};
 let XR={g:null,cur:null};
 const xauTitle=t=>XNAME[t]||t;
 function xauCountdown(ts){
@@ -2218,13 +2218,14 @@ function xauNextHtml(j){
   const f=j.xau;if(!f)return'';
   const tags=(f.focusTags&&f.focusTags.length?f.focusTags:XTAGS);
   const nx=tags.map(t=>{
-    const e=(f.next||{})[t];
+    const bk=(f.focus||[]).filter(b=>b&&b.tag===t)[0];
+    const e=(f.next||{})[t]||(bk&&bk.events&&bk.events[0])||null;
     if(!e)return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">jadwal belum terbaca</div><div class="small mut">sumber resmi tidak tersedia saat ini</div></div>`;
     const badge=e.verified==='official'?'✅ dikonfirmasi sumber resmi':e.verified==='conflict'?'⚠️ kalender agregator'+(e.officialDate?' (resmi: '+esc(e.officialDate)+')':''):'• jadwal agregator';
     return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">${esc(ldt(e.ts,{dateStyle:'medium',timeStyle:'short'}))}</div><div class="small mut">${badge}</div><div class="small" style="color:var(--warn);font-weight:700">⏳ ${esc(xauCountdown(e.ts))}</div></div>`;
   }).join('');
   const cl=(f.clusters||[]).length?f.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800"> ${esc(c.tags.join(' + '))} · ${esc(c.from)} → ${esc(c.to)}</div><div class="small mut">selisih ${esc(String(c.spanH))} jam · ${c.tags.length} rilis berbeda tag</div>${c.items.map(i=>`<div class="small" style="margin-top:4px">• <b>${esc(i.tag)}</b> ${esc(i.timeUTC)} — ${esc(i.title)}${i.forecast?' · forecast '+esc(i.forecast):''}${i.previous?' · prev '+esc(i.previous):''}</div>`).join('')}</div>`).join(''):'<div class="mut small">Tidak ada dua rilis fokus berbeda yang berjarak ≤48 jam dalam data yang terkumpul saat ini.</div>';
-  const rel=(f.related||[]).length?`<div class="card"><h3>📰 Berita lain di waktu yang sama</h3><div class="mut small" style="margin-bottom:8px">Rilis USD lain dalam ±48 jam dari NFP/CPI/PPI/FOMC; AI menggabungkan efeknya dengan rilis fokus.</div>${f.related.map(r=>`<div class="item"><span><b>${esc(r.title)}</b><div class="small mut">${esc(r.timeUTC)}${r.forecast?' · forecast '+esc(r.forecast):''}${r.previous?' · prev '+esc(r.previous):''}${r.actual?' · aktual '+esc(r.actual):''}</div></span><span class="small mut">${esc(r.impact||'')}</span></div>`).join('')}</div>`:'';
+  const rel=(f.related||[]).length?`<div class="card"><h3>📰 Berita lain di waktu yang sama</h3><div class="mut small" style="margin-bottom:8px">Rilis USD lain dalam ±48 jam dari rilis fokus; AI menggabungkan efeknya dengan rilis fokus.</div>${f.related.map(r=>`<div class="item"><span><b>${esc(r.title)}</b><div class="small mut">${esc(r.timeUTC)}${r.forecast?' · forecast '+esc(r.forecast):''}${r.previous?' · prev '+esc(r.previous):''}${r.actual?' · aktual '+esc(r.actual):''}</div></span><span class="small mut">${esc(r.impact||'')}</span></div>`).join('')}</div>`:'';
   const clCard=(tags.length>1||(f.clusters||[]).length)?`<div class="card"><h3>📰 News yang bertabrakan</h3><div class="mut small" style="margin-bottom:8px">Rilis berbeda tag yang berdekatan digabung (≤48 jam): pasar menilai kombinasi data, bukan satu angka saja.</div>${cl}</div>`:'';
   return `<div class="card"><h3>🗓️ Jadwal rilis fokus</h3><div class="mut small" style="margin-bottom:8px">Waktu perangkatmu. ✅ berarti tanggalnya sudah dicocokkan ke jadwal resmi BLS / federalreserve.gov. Cakupan ${esc(String(f.horizonDays||60))} hari${f.nearest?' · terdekat <b>'+esc(f.nearest.tag)+'</b> ('+esc(xauCountdown(f.nearest.ts))+')':''}.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${nx}</div></div>${clCard}${rel}`;
 }
@@ -2718,8 +2719,12 @@ input,select,textarea{background:var(--field)}
 }
 @media(prefers-reduced-motion:reduce){.card,.btn{transition:none}}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="rb-modern.css">
 <link rel="stylesheet" href="rb-v33.css">
+<link rel="stylesheet" href="rb-v34.css">
 <script src="bahasa-en-data.js"></script>
 <script src="bahasa-jp-data.js"></script>
 <script src="bahasa-jp-data2.js"></script>

@@ -27,10 +27,16 @@ const rb31pct = v => (v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '
    1. NEWS ANALISIS XAUUSD
    ===================================================================== */
 const XAU_FOCUS = {
-  nfp: { tag: 'NFP', label: 'NFP', name: 'Non-Farm Payrolls', icon: '👷', desc: 'Perubahan lapangan kerja, pengangguran, dan upah AS — pemicu utama arah USD & emas.' },
-  cpi: { tag: 'CPI', label: 'CPI', name: 'Consumer Price Index', icon: '🛒', desc: 'Inflasi konsumen AS — menentukan ekspektasi suku bunga The Fed.' },
-  ppi: { tag: 'PPI', label: 'PPI', name: 'Producer Price Index', icon: '🏭', desc: 'Inflasi produsen AS — indikator awal tekanan harga ke konsumen.' },
-  fomc: { tag: 'FOMC', label: 'FOMC', name: 'FOMC / suku bunga The Fed', icon: '🏛️', desc: 'Keputusan suku bunga, statement, dan nada The Fed — penggerak terbesar emas.' }
+  nfp: { tag: 'NFP', label: 'NFP', name: 'Non-Farm Payrolls', icon: '👷', sub: 'tenaga kerja', src: 'bls.gov', desc: 'Perubahan lapangan kerja, pengangguran, dan upah AS — pemicu utama arah USD & emas.' },
+  cpi: { tag: 'CPI', label: 'CPI', name: 'Consumer Price Index', icon: '🛒', sub: 'inflasi', src: 'bls.gov', desc: 'Inflasi konsumen AS — menentukan ekspektasi suku bunga The Fed.' },
+  ppi: { tag: 'PPI', label: 'PPI', name: 'Producer Price Index', icon: '🏭', sub: 'harga produsen', src: 'bls.gov', desc: 'Inflasi produsen AS — indikator awal tekanan harga ke konsumen.' },
+  fomc: { tag: 'FOMC', label: 'FOMC', name: 'FOMC / suku bunga The Fed', icon: '🏛️', sub: 'suku bunga', src: 'federalreserve.gov', desc: 'Keputusan suku bunga, statement, dan dot plot The Fed — penggerak terbesar emas.' },
+  pce: { tag: 'PCE', label: 'PCE', name: 'Core PCE Price Index', icon: '📉', sub: 'inflasi Fed', src: 'bea.gov + FRED', desc: 'Ukuran inflasi favorit The Fed — penentu arah kebijakan suku bunga berikutnya.' },
+  retail: { tag: 'RETAIL', label: 'Retail', name: 'Retail Sales', icon: '🛍️', sub: 'konsumsi', src: 'census.gov', desc: 'Belanja konsumen AS (headline & control group) — pembaca kekuatan ekonomi riil.' },
+  gdp: { tag: 'GDP', label: 'GDP', name: 'Gross Domestic Product', icon: '📊', sub: 'pertumbuhan', src: 'bea.gov', desc: 'Pertumbuhan ekonomi AS kuartalan beserta deflator — konteks besar untuk yield & dolar.' },
+  claims: { tag: 'CLAIMS', label: 'Claims', name: 'Unemployment Claims', icon: '🧾', sub: 'klaim kerja', src: 'dol.gov', desc: 'Klaim pengangguran mingguan — indikator paling cepat perubahan pasar tenaga kerja.' },
+  adp: { tag: 'ADP', label: 'ADP', name: 'ADP Employment Change', icon: '🏢', sub: 'payroll swasta', src: 'ADP Research', desc: 'Perkiraan lapangan kerja swasta dari ADP — pratinjau NFP yang sering menggerakkan emas.' },
+  ism: { tag: 'ISM', label: 'ISM', name: 'ISM Manufacturing & Services PMI', icon: '🏗️', sub: 'aktivitas', src: 'ismworld.org', desc: 'Aktivitas manufaktur & jasa AS termasuk harga yang dibayar — sinyal awal inflasi.' }
 };
 function xauFocusGet() {
   try { const k = localStorage.getItem('xau_focus_v1'); return XAU_FOCUS[k] ? k : 'nfp'; } catch (e) { return 'nfp'; }
@@ -79,7 +85,7 @@ function pXauNews() {
   const ev = bucket && bucket.events ? bucket.events[0] : null;
   const tabs = Object.keys(XAU_FOCUS).map(function (k) {
     const x = XAU_FOCUS[k], on = k === F;
-    const sub = k === 'nfp' ? 'tenaga kerja' : k === 'cpi' ? 'inflasi' : k === 'ppi' ? 'harga produsen' : 'suku bunga';
+    const sub = x.sub || 'rilis AS';
     return '<button type="button" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="xauFocusSet(\'' + k + '\')">'
       + '<em>' + x.icon + '</em>' + x.label + '<small>' + sub + '</small></button>';
   }).join('');
@@ -91,14 +97,14 @@ function pXauNews() {
     + '<div class="rb-hero-top"><div style="min-width:0;flex:1">'
     + '<div class="rb-eyebrow">Trading · rilis global XAUUSD</div>'
     + '<h2>📰 News Analisis XAUUSD</h2>'
-    + '<div class="rb-note">Pilih <b>satu</b> rilis. AI membaca jadwal resmi <b>BLS</b> (NFP · CPI · PPI) & <b>federalreserve.gov</b> (FOMC), angka aktual BLS/FRED, EFFR NY Fed, yield Treasury &amp; yield riil, DXY, posisi CFTC, dan berita Reuters/Bloomberg/CNBC. Setiap rilis dinilai dengan mekanika datanya sendiri, lalu digabung dengan data global lain menjadi satu arah <b>BUY / SELL</b> + status spike.</div>'
+    + '<div class="rb-note">Pilih <b>satu</b> rilis. Semua model AI fokus pada rilis itu saja: jadwal resmi <b>BLS</b> (NFP · CPI · PPI) &amp; <b>federalreserve.gov</b> (FOMC), angka aktual BLS/FRED, EFFR NY Fed, yield Treasury &amp; yield riil, DXY, posisi CFTC, dan berita Reuters/Bloomberg/CNBC/FXStreet. Hasilnya satu jawaban <b>BUY</b> atau <b>SELL</b> XAUUSD plus status <b>spike</b> (besar &amp; arah pertamanya) — tanpa WAIT.</div>'
     + '</div>'
     + '<div class="rb-live-chip"><span class="rb-live-dot"></span><span id="xauLive">live: —</span></div></div>'
     + '<div class="rb-rel-tabs">' + tabs + '</div>'
     + '<div class="rb-release"><div class="rb-release-head"><div class="rb-release-title">' + FX.icon + ' ' + FX.label + ' — ' + esc(FX.name) + '</div>'
     + '<span class="rb-pill y">fokus tunggal</span></div>'
     + '<div class="small mut" style="margin-top:5px">' + esc(FX.desc) + '</div>'
-    + '<div class="small" style="margin-top:6px"><b>' + esc(sched) + '</b> · sumber: ' + (FX.tag === 'FOMC' ? 'federalreserve.gov' : 'bls.gov') + '</div></div>'
+    + '<div class="small" style="margin-top:6px"><b>' + esc(sched) + '</b> · sumber: ' + esc(FX.src || (FX.tag === 'FOMC' ? 'federalreserve.gov' : 'bls.gov')) + '</div></div>'
     + '<div class="rb-actions">'
     + '<button class="btn" type="button" id="xbtn" onclick="runXau()">' + FX.icon + ' Ambil data ' + FX.label + ' &amp; analisis</button>'
     + '<button class="btn alt" type="button" onclick="retryXauAI()">🤖 Nilai ulang AI</button>'
@@ -172,7 +178,16 @@ function xauFocusCard(j) {
   const spWhy = sp.why || (spPlan ? spPlan.why : '');
   const rx = (sp.reaction || (spPlan && spPlan.reaction)) || null;
   const spYes = sp.likely === true || !!(spPlan && spPlan.likely);
+  const verdict = '<div class="rb-verdict ' + (act === 'BUY' ? 'buy' : 'sell') + '">'
+    + '<div class="rb-verdict-label">Putusan AI · ' + esc(label) + '</div>'
+    + '<div class="rb-verdict-main">' + act + '</div>'
+    + '<div class="rb-verdict-sub">XAUUSD — satu arah, tanpa WAIT</div>'
+    + '<div class="rb-verdict-spike' + (spYes ? '' : ' no') + '">' + (spYes ? '⚡ Ada spike' : 'Tidak ada spike')
+    + (spMin != null ? ' · ' + esc(String(spMin)) + '–' + esc(String(spMax)) + ' pip' : '')
+    + (spWin != null ? ' · jendela ±' + esc(String(spWin)) + ' menit' : '')
+    + (spFirst ? ' · arah pertama ' + esc(spFirst) : '') + '</div></div>';
   return '<div class="card" style="border-left:5px solid var(--accent)"><div class="rb-card-head"><h3>📌 Fokus analisis: ' + esc(label) + '</h3><span class="rb-dir ' + (act === 'BUY' ? 'buy' : 'sell') + '">' + act + ' XAUUSD</span></div>'
+    + verdict
     + (ev ? '<div class="rb-release"><div class="rb-release-head"><div class="rb-release-title">' + esc(ev.title || ev.tag) + '</div>'
       + '<span class="rb-pill ' + (ev.verified === 'official' ? 'y' : '') + '">' + (ev.verified === 'official' ? '✅ jadwal resmi' : 'jadwal kalender') + '</span></div>'
       + '<div class="rb-release-meta">'
@@ -264,10 +279,11 @@ function xauPlanHtml(sig) {
       + '</div>';
   }
   return '<div class="card" style="border-left:5px solid ' + col + '">'
-    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL 30 · TP1 ≥100 · TP2 ≥200 · TPmax konfluensi</span></div>'
+    + '<div class="rb-card-head"><h3>🎯 Rencana entry dari data global (mesin)</h3><span class="rb-pill">SL tepat 30 · TP1 ≥100 · TP2 ≥200 · TPmax target maksimal</span></div>'
     + '<div style="font-weight:900;font-size:1.2rem;color:' + col + ';letter-spacing:-.02em">'
     + (dir === 'BUY' ? '🟢 BUY XAUUSD' : dir === 'SELL' ? '🔴 SELL XAUUSD' : '🟡 WAIT — belum ada konfluensi') + '</div>'
     + (levels || '<div class="small" style="margin-top:6px">Mesin menolak memaksa entry. ' + ((sig.gates || []).length ? 'Ditahan karena: ' + sig.gates.map(esc).join(' · ') + '.' : 'Tunggu checklist terpenuhi.') + '</div>')
+    + (sig.tv && sig.tv.ok ? '<div class="small" style="margin-top:8px">📺 Chart TradingView real-time: <b style="color:' + (sig.tv.bias === 1 ? 'var(--ok)' : sig.tv.bias === -1 ? 'var(--no)' : 'var(--mut)') + '">' + esc(sig.tv.biasLabel) + '</b> · M15 ' + esc(((sig.tv.tf || {})['15'] || {}).recLabel || '—') + ' · D1 ' + esc(((sig.tv.tf || {}).D || {}).recLabel || '—') + (sig.tvSync ? ' · level mengikuti chart ' + sigNum(sig.tvSync.price) + (sig.tvSync.spotGapPips != null ? ' · spot beda ' + esc(String(sig.tvSync.spotGapPips)) + ' pip' : '') : '') + '</div>' : '<div class="small mut" style="margin-top:8px">📺 Chart TradingView belum terbaca — rencana memakai candle mesin.</div>')
     + '<div class="small mut" style="margin-top:8px">Keyakinan ' + sig.confidence + '% · skor ' + sig.score + ' · checklist ' + ok + '/' + n + ' OK · konfirmasi ' + (sig.confirms == null ? '—' : sig.confirms + '/6') + ' · ' + esc(sig.timeframe || 'M15') + ' · harga ' + sigNum(sig.price) + (sig.news && sig.news.length ? ' · ⚠️ rilis ≤90 menit' : '') + '</div>'
     + '<div class="small mut" style="margin-top:4px">Level dari mesin deterministik. TPmax = konfluensi struktur, likuiditas (PDH/PDL, pool, range H4/D1/Asia), ATR D1/mingguan, measured move, Fib, dan level psikologis.</div>'
     + '<button class="btn alt full" type="button" style="margin-top:8px" onclick="S.sec=\'trading\';S.tab=\'signal\';home()">Buka tab  Signal Entry</button>'
@@ -658,6 +674,41 @@ function rb31Notify(d) {
    digambar bersama level entry/SL/TP1/TP2/TP3 dan zona FVG. Widget TradingView
    di bawah tetap dipakai untuk verifikasi visual; isi iframe tidak bisa dibaca
    lintas-domain, jadi level dihitung dari feed harga yang sama dengan chart itu. */
+/* Kartu bacaan chart TradingView real-time: angka yang benar-benar dipakai
+   mesin (harga, rekomendasi 6 timeframe, RSI) + status sinkron harga. */
+function rb31TvCard(d) {
+  const t = (d && d.tv) || null, s = (d && d.tvSync) || null, ok = !!(t && t.ok);
+  const tcol = v => (v === 1 ? 'var(--ok)' : v === -1 ? 'var(--no)' : 'var(--mut)');
+  const tfs = [['D', '1D'], ['240', '4H'], ['60', '1H'], ['15', '15m'], ['5', '5m'], ['1', '1m']];
+  const cells = tfs.map(function (x) {
+    const f = (ok && t.tf && t.tf[x[0]]) || {};
+    const dir = f.rec == null ? 0 : f.rec >= 0.1 ? 1 : f.rec <= -0.1 ? -1 : 0;
+    return '<div class="rb-lv"><span>' + x[1] + '</span><b style="color:' + tcol(dir) + '">' + esc(f.recLabel || '—') + '</b>'
+      + (f.rsi != null ? '<div class="small mut" style="margin-top:2px">RSI ' + esc(String(f.rsi)) + '</div>' : '') + '</div>';
+  }).join('');
+  const strength = ok && t.strength != null ? Math.max(0, Math.min(100, Number(t.strength))) : 0;
+  const chg = ok && t.changePct != null ? Number(t.changePct) : null;
+  const chgCol = chg == null ? 'var(--mut)' : chg > 0 ? 'var(--ok)' : chg < 0 ? 'var(--no)' : 'var(--mut)';
+  const syncTxt = s
+    ? 'Level entry/SL/TP mengikuti <b>chart TradingView ' + sigNum(s.price) + '</b>'
+      + (s.spotGapPips != null ? ' · spot emas beda ' + esc(String(s.spotGapPips)) + ' pip (' + esc(String(s.spotGapPct)) + '%) sebagai pembanding' : '')
+      + ' · ' + (s.ok ? '<span style="color:var(--ok)">✅ level dan chart satu acuan</span>' : '<span style="color:var(--warn)">⚠️ acuan level bukan chart</span>')
+    : 'acuan harga chart belum terbaca';
+  return '<div class="card"><div class="rb-card-head"><h3>📺 Chart TradingView — dibaca mesin</h3>'
+    + '<span class="rb-pill" style="color:' + (ok ? 'var(--ok)' : 'var(--warn)') + ';border-color:' + (ok ? 'var(--ok)' : 'var(--warn)') + '">' + (ok ? '● LIVE ' + esc(t.symbol) : '⚠️ TIDAK TERSEDIA') + '</span></div>'
+            + '<div class="rb-note">Harga, rekomendasi 6 timeframe, RSI, EMA, dan ATR di bawah diambil langsung dari TradingView (simbol <b>OANDA:XAUUSD</b>), bukan dari iframe dan bukan tebakan. Harga chart ini menjadi <b>acuan level</b>: entry, SL, dan TP digeser dengan kalibrasi yang sama, jadi tidak ada level yang melayang dari chart yang kamu lihat. Rekomendasi TradingView juga ikut menilai setiap setup Alchemist.</div>'
+    + (ok
+      ? '<div class="exp" style="margin-top:10px;color:var(--tx)"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap">'
+        + '<div><div class="small mut">Harga chart TradingView</div><div style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;letter-spacing:-.01em;line-height:1.2">' + sigNum(t.price) + '</div></div>'
+        + '<div style="text-align:right"><div class="small mut">Perubahan hari ini</div><div style="font-weight:700;color:' + chgCol + '">' + (chg == null ? '—' : (chg > 0 ? '+' : '') + chg.toFixed(2) + '%') + (t.changeAbs != null ? ' · ' + (t.changeAbs > 0 ? '+' : '') + Number(t.changeAbs).toFixed(2) : '') + '</div></div></div>'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px;font-size:.82rem"><span>Bias gabungan</span><b style="color:' + tcol(t.bias) + '">' + esc(t.biasLabel) + ' · ' + esc(String(t.strength)) + '%</b></div>'
+        + '<div class="rb-meter" style="margin-top:5px"><i style="flex:' + Math.max(1, strength) + ';background:' + tcol(t.bias) + '"></i><i style="flex:' + Math.max(1, 100 - strength) + ';background:var(--line2)"></i></div></div>'
+        + '<div class="rb-lv-grid" style="margin-top:10px">' + cells + '</div>'
+        + '<div class="small mut" style="margin-top:8px">' + syncTxt + '</div>'
+        + '<div class="small mut" style="margin-top:4px">Diambil ' + esc(new Date(t.at).toLocaleTimeString('id-ID')) + ' · ' + esc(t.source) + ' · RSI 15m ' + esc(String((t.tf['15'] || {}).rsi == null ? '—' : (t.tf['15'] || {}).rsi)) + ' · ATR 15m ' + esc(String((t.tf['15'] || {}).atr == null ? '—' : (t.tf['15'] || {}).atr)) + '</div>'
+      : '<div class="warn" style="margin-top:10px">Chart TradingView belum bisa dibaca: <b>' + esc((t && t.error) || 'jaringan') + '</b>. Mesin tetap berjalan dengan candle live Yahoo + spot emas, dan setiap setup ditandai belum terkonfirmasi chart TradingView — tidak ada angka chart yang dikarang.</div>')
+    + '</div>';
+}
 function rb31ChartHtml(d) {
   const ch = d && d.chart;
   if (!ch || !Array.isArray(ch.rows) || ch.rows.length < 12) return '';
@@ -719,7 +770,7 @@ function rb31ListHtml(price, d) {
   const head = '<div class="card"><div class="rb-card-head"><h3>🎯 ' + list.length + ' sinyal · satu arah</h3>'
     + '<span class="rb-dir ' + dcls + '">' + (dir === 'BUY' ? '🟢 BUY' : dir === 'SELL' ? '🔴 SELL' : '🟡 WAIT') + ' XAUUSD</span></div>'
     + '<div class="rb-pill-row" style="margin-bottom:8px"><span class="rb-pill y">⏱️ refresh 15 menit · <b id="sigNext">—</b></span>'
-    + '<span class="rb-pill">SL 30 pip (maks)</span><span class="rb-pill">TP1 ≥100</span><span class="rb-pill">TP2 ≥200</span><span class="rb-pill">TPmax konfluensi</span></div>'
+    + '<span class="rb-pill">SL tepat 30 pips</span><span class="rb-pill">TP1 ≥100</span><span class="rb-pill">TP2 ≥200</span><span class="rb-pill">TPmax target maksimal</span></div>'
     + (d && d.tfBias && window.rb33Tv ? window.rb33Tv.tfChips(d.tfBias) : '')
     + (d && d.tpMaxEngine && d.tpMaxEngine.why ? '<div class="small mut" style="margin:2px 0 8px"><b>TPmax:</b> ' + esc(d.tpMaxEngine.why) + '</div>' : '');
   if (!list.length) return head + '<div class="warn" style="margin:0">Mesin belum mengeluarkan sinyal pada siklus ini. Tekan “Ambil data terbaru” atau tunggu refresh 15 menit berikutnya.</div></div>';
@@ -782,10 +833,10 @@ function pSignalEntry() {
     + '<div class="rb-hero-top"><div style="min-width:0;flex:1">'
     + '<div class="rb-eyebrow">Trading · eksekusi XAUUSD</div>'
     + '<h2>🎯 Signal Entry Alchemist</h2>'
-    + '<div class="rb-note">Mesin membaca <b>candle live</b> M1 · M5 · M15 · H1 · D1, struktur &amp; likuiditas Alchemist, DXY, yield 10Y, spot emas (validasi PAXG), dan kalender rilis. Hasilnya <b>3–10 setup satu arah</b> berlabel <b>Scalping</b>, <b>Day</b>, atau <b>Swing</b>. Semua setup memakai <b>SL tepat 30 pip</b>; TP1 ≥100 pip, TP2 ≥200 pip, <b>TPmax</b> dari konfluensi struktur + likuiditas + ATR global. Level tidak boleh diubah AI.</div>'
+    + '<div class="rb-note">Mesin membaca <b>candle live</b> M1 · M5 · M15 · H1 · D1, seluruh teknikal Alchemist (struktur, BOS/MSS, FVG, order block, OTE, sapuan likuiditas, premium/discount, CRT, SMT), DXY, yield 10Y, spot emas (validasi PAXG), berita global terbaru, dan kalender rilis. Hasilnya <b>3–10 setup satu arah</b> berlabel <b>Scalping</b>, <b>Day</b>, atau <b>Swing</b>. Semua setup memakai <b>SL tepat 30 pips</b>; TP1 ≥100 pip, TP2 ≥200 pip, dan <b>TPmax</b> adalah target <b>maksimal</b> dari konfluensi seluruh analisis Alchemist + data terbaru (likuiditas, ATR, measured move). Level tidak boleh diubah AI.</div>'
     + '</div>'
     + '<div class="rb-live-chip"><span class="rb-live-dot"></span><span id="sigTopLive">live: —</span></div></div>'
-    + '<div class="rb-pill-row"><span class="rb-pill y">SL 30 pip (maks)</span><span class="rb-pill">Scalping · Day · Swing</span><span class="rb-pill">3–10 sinyal satu arah</span><span class="rb-pill">Auto 15 menit</span></div>'
+    + '<div class="rb-pill-row"><span class="rb-pill y">SL tepat 30 pips</span><span class="rb-pill">TPmax = target maksimal</span><span class="rb-pill">Chart TradingView real-time</span><span class="rb-pill">Scalping · Day · Swing</span><span class="rb-pill">3–10 sinyal satu arah</span><span class="rb-pill">Auto 15 menit</span></div>'
     + '<div class="rb-actions">'
     + '<button class="btn" type="button" onclick="sigLoad(false)">📡 Ambil data terbaru</button>'
     + '<button class="btn alt" type="button" onclick="sigRunAI()">🤖 Nilai ulang AI</button>'
@@ -849,9 +900,11 @@ function sigLivePaint() {
   const lv = rb31PlanOf(SIG_ST.data);
   let extra = '';
   if (lv) extra = ' · selisih entry ' + Math.round(Math.abs(t.price - lv.entry) / 0.1) + ' pip';
-  el.innerHTML = '🔴 live <b>' + sigNum(t.price) + '</b> · ' + esc(new Date(t.at).toLocaleTimeString('id-ID')) + extra;
+  const tv = t.tv && t.tv.price ? t.tv : null;
+  el.innerHTML = '🔴 live <b>' + sigNum(t.price) + '</b> · ' + esc(new Date(t.at).toLocaleTimeString('id-ID')) + extra
+    + (tv ? ' · <span class="rb-pill" style="margin-left:4px">📺 TV <b>' + sigNum(tv.price) + '</b> ' + esc(tv.label || '') + '</span>' : '');
   const top = $('sigTopLive');
-  if (top) top.innerHTML = '<b>' + sigNum(t.price) + '</b> · ' + esc(new Date(t.at).toLocaleTimeString('id-ID'));
+  if (top) top.innerHTML = (tv ? '📺 <b>' + sigNum(tv.price) + '</b> ' + esc(tv.label || '') + ' · ' : '') + '<b>' + sigNum(t.price) + '</b> · ' + esc(new Date(t.at).toLocaleTimeString('id-ID'));
 }
 let rb31Painting = false;
 function sigPaint() {
@@ -963,7 +1016,7 @@ function rb31PaintNow() {
     + ((d.validation || []).length ? '<div class="small mut" style="margin-top:8px">Validasi: ' + d.validation.map(function (v) { return (v.ok ? '✅ ' : '⚠️ ') + esc(v.k) + ' — ' + esc(v.d); }).join(' · ') + '</div>' : '')
     + '<div class="small mut" style="margin-top:8px">Sumber: ' + (d.sources || []).map(function (s) { return (s.ok ? '✅ ' : '⚠️ ') + esc(s.name); }).join(' · ') + '</div></div>';
 
-  box.innerHTML = planCard + rb31ChartHtml(d) + rb31ListHtml(price, d) + rb31ActiveHtml(price, d) + ctx + globalCard + cek + aiCard + basis + qual;
+  box.innerHTML = planCard + rb31TvCard(d) + rb31ChartHtml(d) + rb31ListHtml(price, d) + rb31ActiveHtml(price, d) + ctx + globalCard + cek + aiCard + basis + qual;
   rb31ClosedPaint();
   sigLivePaint();
 }
