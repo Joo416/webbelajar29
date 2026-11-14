@@ -1845,8 +1845,8 @@ function homeBase(){
   if(S.sec==='kamus')return kamusView();
   ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
   if(S.sec==='trading'){
-    S.mapel='Trading';if(!['xau','tutor','jurnal'].includes(S.tab))S.tab='xau';
-    const T=[['xau',' News Analisis'],['tutor',' Tutor'],['jurnal',' Jurnal']];
+    S.mapel='Trading';if(!['xau','signal','tutor','jurnal'].includes(S.tab))S.tab='xau';
+    const T=[['xau',' News Analisis'],['signal',' Signal Entry'],['tutor',' Tutor'],['jurnal',' Jurnal']];
     $('app').innerHTML=`<div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
     return pane();
   }
@@ -1857,7 +1857,7 @@ function homeBase(){
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
   pane();
 }
-function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews})[S.tab]()}
+function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,signal:pSignalEntry})[S.tab]()}
 // Tab Catatan lama sudah dihapus; catatan trade & news kini berada di tab Jurnal.
 Object.assign(STARTERS18,{'Trading':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Bagaimana arah USD dan pair utama berdasarkan data terbaru?','Jelaskan order block dan fair value gap dengan contoh','Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip']});
 /* ---------- kamus: definisi dibantu sumber kamus global ---------- */
@@ -2207,146 +2207,6 @@ const XARR={BULLISH:'▲',BEARISH:'▼',NETRAL:'▶'};
 const XNAME={NFP:'Non-Farm Payrolls',PPI:'Producer Price Index',CPI:'Consumer Price Index',FOMC:'FOMC / suku bunga The Fed',PCE:'Core PCE Price Index',RETAIL:'Retail Sales',GDP:'Gross Domestic Product',CLAIMS:'Unemployment Claims',ADP:'ADP Employment Change',ISM:'ISM Manufacturing & Services PMI'};
 let XR={g:null,cur:null};
 const xauTitle=t=>XNAME[t]||t;
-function xauCountdown(ts){
-  const d=Number(ts)-Date.now();if(!isFinite(d))return'';
-  if(d<0)return'sudah lewat';
-  const h=Math.floor(d/3600000),m=Math.floor(d%3600000/60000),dd=Math.floor(h/24);
-  if(dd>=1)return dd+' hari '+String(h%24).padStart(2,'0')+' jam';
-  return h+' jam '+String(m).padStart(2,'0')+' menit';
-}
-function xauNextHtml(j){
-  const f=j.xau;if(!f)return'';
-  const tags=(f.focusTags&&f.focusTags.length?f.focusTags:XTAGS);
-  const nx=tags.map(t=>{
-    const bk=(f.focus||[]).filter(b=>b&&b.tag===t)[0];
-    const e=(f.next||{})[t]||(bk&&bk.events&&bk.events[0])||null;
-    if(!e)return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">jadwal belum terbaca</div><div class="small mut">sumber resmi tidak tersedia saat ini</div></div>`;
-    const badge=e.verified==='official'?'✅ dikonfirmasi sumber resmi':e.verified==='conflict'?'⚠️ kalender agregator'+(e.officialDate?' (resmi: '+esc(e.officialDate)+')':''):'• jadwal agregator';
-    return `<div class="exp" style="color:var(--tx)"><div class="small mut"><b>${t}</b> · ${esc(xauTitle(t))}</div><div style="font-weight:800">${esc(ldt(e.ts,{dateStyle:'medium',timeStyle:'short'}))}</div><div class="small mut">${badge}</div><div class="small" style="color:var(--warn);font-weight:700">⏳ ${esc(xauCountdown(e.ts))}</div></div>`;
-  }).join('');
-  const cl=(f.clusters||[]).length?f.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800"> ${esc(c.tags.join(' + '))} · ${esc(c.from)} → ${esc(c.to)}</div><div class="small mut">selisih ${esc(String(c.spanH))} jam · ${c.tags.length} rilis berbeda tag</div>${c.items.map(i=>`<div class="small" style="margin-top:4px">• <b>${esc(i.tag)}</b> ${esc(i.timeUTC)} — ${esc(i.title)}${i.forecast?' · forecast '+esc(i.forecast):''}${i.previous?' · prev '+esc(i.previous):''}</div>`).join('')}</div>`).join(''):'<div class="mut small">Tidak ada dua rilis fokus berbeda yang berjarak ≤48 jam dalam data yang terkumpul saat ini.</div>';
-  const rel=(f.related||[]).length?`<div class="card"><h3>📰 Berita lain di waktu yang sama</h3><div class="mut small" style="margin-bottom:8px">Rilis USD lain dalam ±48 jam dari rilis fokus; AI menggabungkan efeknya dengan rilis fokus.</div>${f.related.map(r=>`<div class="item"><span><b>${esc(r.title)}</b><div class="small mut">${esc(r.timeUTC)}${r.forecast?' · forecast '+esc(r.forecast):''}${r.previous?' · prev '+esc(r.previous):''}${r.actual?' · aktual '+esc(r.actual):''}</div></span><span class="small mut">${esc(r.impact||'')}</span></div>`).join('')}</div>`:'';
-  const clCard=(tags.length>1||(f.clusters||[]).length)?`<div class="card"><h3>📰 News yang bertabrakan</h3><div class="mut small" style="margin-bottom:8px">Rilis berbeda tag yang berdekatan digabung (≤48 jam): pasar menilai kombinasi data, bukan satu angka saja.</div>${cl}</div>`:'';
-  return `<div class="card"><h3>🗓️ Jadwal rilis fokus</h3><div class="mut small" style="margin-bottom:8px">Waktu perangkatmu. ✅ berarti tanggalnya sudah dicocokkan ke jadwal resmi BLS / federalreserve.gov. Cakupan ${esc(String(f.horizonDays||60))} hari${f.nearest?' · terdekat <b>'+esc(f.nearest.tag)+'</b> ('+esc(xauCountdown(f.nearest.ts))+')':''}.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${nx}</div></div>${clCard}${rel}`;
-}
-function xauDataHtml(j){
-  const g=j.gold&&j.gold.price,y=j.yields,e=j.effr,m=j.mr||{},d=j.data||{},cards=[];
-  if(d.nfp)cards.push(['NFP '+d.nfp.period,nfmt(d.nfp.change,'K',true),'sebelumnya '+nfmt(d.nfp.prevChange,'K',true)]);
-  if(d.ur)cards.push(['Pengangguran '+d.ur.period,d.ur.value+'%','sebelumnya '+d.ur.prev+'%']);
-  if(d.ahe)cards.push(['Upah/jam '+d.ahe.period,nfmt(d.ahe.mom,'%',true)+' MoM','YoY '+nfmt(d.ahe.yoy,'%',true)]);
-  if(d.cpi)cards.push(['CPI '+d.cpi.period,nfmt(d.cpi.yoy,'%')+' YoY','MoM '+nfmt(d.cpi.mom,'%',true)]);
-  if(d.core)cards.push(['Core CPI '+d.core.period,nfmt(d.core.yoy,'%')+' YoY','MoM '+nfmt(d.core.mom,'%',true)]);
-  if(d.ppi)cards.push(['PPI '+d.ppi.period,nfmt(d.ppi.yoy,'%')+' YoY','MoM '+nfmt(d.ppi.mom,'%',true)+' · prev '+nfmt(d.ppi.prevMom,'%',true)]);
-  const gold=g?`<div class="card"><h3>📈 XAUUSD — harga harian yang terbaca</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px"><div class="exp" style="color:var(--tx)"><div class="small mut">Harga terakhir</div><div style="font-size:1.3rem;font-weight:800">${esc(String(g.last))}</div><div class="small mut">per ${esc(String(g.asOf))} · ${esc(String(g.src||''))}${g.live?' · spot intraday':''}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">1 hari</div><div style="font-weight:800">${nfmt(g.chg1d,'%',true)}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">5 hari</div><div style="font-weight:800">${nfmt(g.chg5d,'%',true)}</div></div><div class="exp" style="color:var(--tx)"><div class="small mut">20 hari</div><div style="font-weight:800">${nfmt(g.chg20d,'%',true)}</div></div></div><div class="small mut" style="margin-top:6px">${g.rsi!=null?'RSI14 '+esc(String(g.rsi))+' · ATR14 '+esc(String(g.atrPct))+'% · ':''}${g.hi20!=null&&g.lo20!=null?'range20 '+esc(String(g.lo20))+'–'+esc(String(g.hi20))+' · ':''}${g.check?'verifikasi silang '+(g.check.ok?'cocok':'BEDA')+' · ':''}${g.partial?'Hanya spot terakhir; OHLC harian tidak tersedia saat ini.':'Data harian, bukan real-time.'}</div></div>`:`<div class="card"><h3> XAUUSD</h3><div class="warn">Harga emas tidak terbaca dari sumber harga saat ini. Analisis arah tetap disusun dari data makro, tetapi keyakinan dibatasi SEDANG dan level harga tidak ditampilkan.</div></div>`;
-  const kd=[];
-  if(y)kd.push(`<div class="item"><span>Yield Treasury 2Y / 10Y (${esc(String(y.date))})</span><b>${esc(String(y.y2))}% / ${esc(String(y.y10))}%</b></div><div class="item"><span>Spread 10Y−2Y</span><b>${esc(String(y.spread))}</b></div>`);
-  if(e)kd.push(`<div class="item"><span>EFFR (NY Fed, ${esc(String(e.date))})</span><b>${esc(String(e.rate))}%</b></div>`);
-  if(m.ry)kd.push(`<div class="item"><span>Yield riil 10Y / TIPS (${esc(String(m.ry.date))})</span><b>${esc(String(m.ry.v))}%</b></div>`);
-  if(m.dxy)kd.push(`<div class="item"><span>Indeks dolar luas / Fed (${esc(String(m.dxy.date))})</span><b>${esc(String(m.dxy.v))}</b></div>`);
-  if(m.us&&m.us.pce)kd.push(`<div class="item"><span>PCE YoY (${esc(String(m.us.pce.date))})</span><b>${nfmt(m.us.pce.yoy,'%')}</b></div>`);
-  if(m.us&&m.us.corePce)kd.push(`<div class="item"><span>Core PCE YoY (${esc(String(m.us.corePce.date))})</span><b>${nfmt(m.us.corePce.yoy,'%')}</b></div>`);
-  if(m.us&&m.us.claims)kd.push(`<div class="item"><span>Klaim pengangguran mingguan (${esc(String(m.us.claims.date))})</span><b>${esc(String(m.us.claims.v))}</b></div>`);
-  const key=kd.length?`<div class="card"><h3> Data makro kunci untuk emas</h3>${kd.join('')}<div class="small mut" style="margin-top:6px">XAUUSD umumnya berlawanan dengan yield riil dan USD; ini konteks data, bukan sinyal entry.</div></div>`:'';
-  const official=cards.length?`<div class="card"><h3>📊 Angka resmi terbaru (NFP · PPI · CPI)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${cards.map(c=>`<div class="exp" style="color:var(--tx)"><div class="small mut">${esc(c[0])}</div><div style="font-size:1.18rem;font-weight:800">${esc(c[1])}</div><div class="small mut">${esc(c[2])}</div></div>`).join('')}</div><div class="small mut" style="margin-top:6px">Sumber: ${esc((d.meta&&d.meta.src)||'BLS')}. Angka bisa direvisi.</div></div>`:'<div class="card"><div class="warn">Angka resmi BLS tidak tersedia saat ini.</div></div>';
-  return gold+official+key;
-}
-function renderXau(j,stale){
-  const box=$('xres');if(!box)return;
-  const x=j.xai,t=new Date(j.fetchedAt||Date.now());
-  const head=`<div class="mut small" style="margin:0 0 8px">${stale?' TERSIMPAN (bukan data baru) · ':''}Diambil: ${esc(t.toLocaleString('id-ID'))} · AI: ${esc(j.provider||'-')} ${esc(j.model||'')}${j.cached?' · cache':''}</div>`;
-  if(!x){
-    box.innerHTML=`<div class="card">${head}${(typeof xauPlanHtml==='function'?xauPlanHtml(j.signal):'')}${j.pending?'<div class="exp">⏳ AI sedang menganalisis paket data di atas. Data mentah sudah tampil dan tidak perlu menunggu.</div>':`<div class="warn">AI belum menghasilkan analisis XAUUSD yang valid${j.aiError?': '+esc(j.aiError):''}.</div>${j.raw?`<div class="exp" style="color:var(--tx);margin-top:8px">${fmtMd(j.raw)}</div>`:''}<button class="btn full" style="margin-top:8px" onclick="retryXauAI()">🔁 Ulangi analisis AI saja</button>`}</div>${xauNextHtml(j)}${xauDataHtml(j)}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}`;
-    return;
-  }
-  const b=x.bias||{},sched=(j.xau&&j.xau.next)||{};
-  const act=x.action==='SELL'||(x.action!=='BUY'&&b.bias==='BEARISH')?'SELL':'BUY';
-  const AC={BUY:'var(--ok)',SELL:'var(--no)'},AL={BUY:'🟢 BUY XAUUSD',SELL:'🔴 SELL XAUUSD'};
-  const actCard=`<div class="card" style="border-left:5px solid ${AC[act]}"><div class="mut small">Keputusan final XAUUSD — hanya BUY/SELL</div><div style="font-size:1.55rem;font-weight:900;color:${AC[act]};letter-spacing:-.02em;margin:4px 0">${AL[act]}</div>${x.action_reason?`<div class="exp" style="color:var(--tx);line-height:1.55">${fmtMd(x.action_reason)}</div>`:'<div class="mut small">Alasan aksi tidak diberikan AI; baca ringkasan dan skenario di bawah.</div>'}${x.action_overridden?'<div class="warn" style="margin-top:8px">⚠️ Arah AI'+(x.action_ai?' ('+esc(x.action_ai)+')':'')+' dikoreksi mesin karena bertentangan dengan bukti pasar XAUUSD (harga/DXY/yield riil/kejutan rilis). Arah final: '+esc(act)+'.</div>':x.action_forced?'<div class="warn" style="margin-top:8px">⚠️ Arah final dipilih mesin dari data global karena AI netral/WAIT; WAIT tidak ditampilkan.</div>':''}<div class="mut small" style="margin-top:8px">Edukasi berbasis data publik, bukan sinyal entry/SL/TP.</div></div>`;
-  const eng=j.eng?' · mesin skor XAUUSD: '+esc(j.eng.bias)+' (skor '+esc(String(j.eng.score))+')':'';
-  const lv=(b.key_levels||[]).length?`<div style="margin-top:10px"><b>Level referensi (dari data harga)</b>${b.key_levels.map(l=>`<div class="item"><span>${esc(l.label)} <span class="small mut">${esc(l.source||'')}</span></span><b>${esc(l.value)}</b></div>`).join('')}<div class="small mut" style="margin-top:4px">Area referensi berbasis data harian, bukan entry/SL/TP.</div></div>`:'';
-  const drivers=(b.drivers||[]).length?`<div style="margin-top:10px"><b>Pendorong utama</b>${b.drivers.map(d=>`<div class="small" style="margin:3px 0">• ${esc(d)}</div>`).join('')}</div>`:'';
-  const evs=(x.events||[]).map(e=>{
-    const s=sched[e.tag], ea=(e.gold_action==='SELL'||(!e.gold_action&&e.gold_bias==='BEARISH'))?'SELL':'BUY';
-    const when=s?` <b>${esc(ldt(s.ts,{dateStyle:'full',timeStyle:'short'}))}</b> · ${s.verified==='official'?'✅ jadwal resmi':'⚠️ jadwal agregator'} · ⏳ ${esc(xauCountdown(s.ts))}`:` ${esc(e.date||'-')} ${esc(e.time_utc||'')}`;
-    return `<div class="card" style="border-left:4px solid ${XCOL[e.gold_bias]||'var(--line2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${esc(e.tag)} — ${esc(xauTitle(e.tag))}</h3><span style="color:${ea==='BUY'?'var(--ok)':'var(--no)'};font-weight:800">${ea==='BUY'?'🟢':'🔴'} XAU ${ea}</span></div><div class="mut small" style="margin:4px 0 8px">${when} · keyakinan analisis <b>${esc(e.confidence)}</b></div><div class="small">Forecast: <b>${esc(e.forecast||'konsensus tidak ditemukan')}</b>${e.previous?' · Previous: '+esc(e.previous):''}${(!e.forecast&&s&&s.forecast)?' · kalender: '+esc(s.forecast):''}</div>${e.consensus_note?`<div class="small mut">${esc(e.consensus_note)}</div>`:''}<div style="line-height:1.55;margin-top:8px">${fmtMd(e.why)}</div><div class="exp" style="margin-top:8px;color:var(--tx)"><b>🟢 Skenario XAUUSD naik:</b> ${esc(e.gold_bull_if)}</div><div class="exp" style="margin-top:6px;color:var(--tx)"><b>🔴 Skenario XAUUSD turun:</b> ${esc(e.gold_bear_if)}</div></div>`;
-  }).join('');
-  const clus=(x.clusters||[]).length?`<div class="card"><h3>📰 News bertabrakan — efek gabungan</h3>${x.clusters.map(c=>`<div class="exp" style="color:var(--tx);margin-bottom:8px"><div style="font-weight:800">${esc((c.tags||[]).join(' + ')||'beberapa rilis')} · ${esc(c.when)}</div><div class="small">${esc(c.why)}</div><div class="small" style="margin-top:4px"><b>Untuk XAUUSD:</b> ${esc(c.gold_note)}</div></div>`).join('')}</div>`:'';
-  const scen=(x.scenarios||[]).length?`<div class="card"><h3>🔀 Skenario bersyarat</h3>${x.scenarios.map(s=>`<div class="exp" style="margin-bottom:8px;color:var(--tx)"><b>${esc(s.name)}</b><div class="small">Jika: ${esc(s.if)}</div><div class="small">Maka: ${esc(s.then)}</div></div>`).join('')}</div>`:'';
-  const flags=(j.flags||[]).length?`<div class="warn" style="margin-bottom:10px">⚠️ Angka yang TIDAK ditemukan di data terkumpul: <b>${esc(j.flags.join(', '))}</b>. Anggap belum valid.</div>`:'<div class="mut small" style="margin-bottom:10px">✅ Tidak ada angka harga/level dalam jawaban AI di luar data terkumpul.</div>';
-  box.innerHTML=`${actCard}${(typeof xauPlanHtml==='function'?xauPlanHtml(j.signal):'')}<div class="card" style="border-left:4px solid ${XCOL[b.bias]||'var(--line2)'}">${head}<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"> XAUUSD — bias hari-H</h3><span style="color:${XCOL[b.bias]||'var(--mut)'};font-weight:800;font-size:1.05rem">${XARR[b.bias]||'▶'} ${esc(b.bias||'NETRAL')}</span></div><div class="mut small" style="margin:4px 0 8px">Keyakinan: <b>${esc(b.confidence||'RENDAH')}</b>${eng}${b.conflict?' · ⚠️ konflik dengan mesin':''}</div><div class="exp" style="color:var(--tx);line-height:1.6">${fmtMd(x.summary||'')}</div>${b.thesis?`<div style="line-height:1.6;margin-top:10px">${fmtMd(b.thesis)}</div>`:''}${drivers}${b.invalidation?`<div class="exp" style="margin-top:10px;color:var(--tx)"><b>Bias batal jika:</b> ${esc(b.invalidation)}</div>`:''}${lv}${(b.watch||[]).length?`<div class="small mut" style="margin-top:8px">Pantau: ${esc(b.watch.join(' · '))}</div>`:''}</div>${xauNextHtml(j)}${evs?`<div class="mut small" style="margin:4px 0 8px">Analisis per rilis fokus:</div>${evs}`:''}${clus}${scen}${(x.risks||[]).length?`<div class="card"><h3>⚠️ Risiko & batasan analisis</h3>${x.risks.map(r=>`<div class="small" style="margin:4px 0">• ${esc(r)}</div>`).join('')}</div>`:''}${(x.data_quality||[]).length?`<div class="card"><h3>✅ Catatan kualitas data dari AI</h3>${x.data_quality.map(d=>`<div class="small" style="margin:4px 0">• ${esc(d)}</div>`).join('')}</div>`:''}${xauDataHtml(j)}${flags}${qualityHtml(j.quality)}${sourcesHtml(j.sources)}${(j.notes||[]).length?`<div class="mut small">⚠️ Catatan teknis: ${esc((j.notes||[]).join(' | ').slice(0,1600))}</div>`:''}<button class="btn alt full" onclick="saveXauNews()">💾 Simpan ringkasan ke Catatan</button><button class="btn alt full" style="margin-top:8px" onclick="copyXauNews(this)">📋 Salin ringkasan</button><div class="mut small" style="margin-top:8px">Rencana entry di kartu di atas memakai aturan tetap SL tepat 30 pip, TP1 ≥100 pip, TP2 ≥200 pip, dan TPmax dari konfluensi struktur + likuiditas + ATR global; tetap edukasi berbasis data publik, bukan saran finansial. Emas sangat sensitif terhadap yield riil, USD, dan posisi pasar; hasil rilis bisa berbeda dari skenario mana pun.</div>`;
-}
-/* ---------- riwayat analisis XAUUSD (maks 5, bisa dibuka & dihapus) ---------- */
-const XHKEY='xau_hist_v1',XHMAX=5;
-function xauHist(){
-  try{const a=JSON.parse(localStorage.getItem(XHKEY)||'[]');return Array.isArray(a)?a.filter(x=>x&&x.j&&x.j.xai):[]}catch(e){return[]}
-}
-function xauHistSave(j){
-  if(!j||!j.xai)return;
-  const id=String(j.fetchedAt||'');
-  let h=xauHist().filter(x=>String((x.j&&x.j.fetchedAt)||'')!==id);
-  h.unshift({ts:Date.now(),j});
-  for(const n of [XHMAX,3,1]){
-    try{localStorage.setItem(XHKEY,JSON.stringify(h.slice(0,n)));return}catch(e){}
-  }
-}
-function xauHistPaint(){
-  const el=$('xhist');if(!el)return;
-  const h=xauHist();
-  if(!h.length){el.innerHTML='';return}
-  el.innerHTML=`<div class="card"><div class="v21-board-head"><h3>🕘 Riwayat analisis</h3><button class="x" onclick="xauHistClear()">Hapus semua</button></div><div class="mut small" style="margin-bottom:6px">Tersimpan di perangkat ini (maks ${XHMAX}). Buka kembali tanpa mengambil data baru.</div>${h.map((it,i)=>{
-    const j=it.j,x=j.xai||{},b=x.bias||{},t=new Date(j.fetchedAt||it.ts),bi=b.bias||'NETRAL',fo=String(j.focusKey||(j.xau&&j.xau.focusKey)||j.focus||'all').toUpperCase(),act=x.action==='SELL'||(x.action!=='BUY'&&bi==='BEARISH')?'SELL':'BUY';
-    const ic=act==='BUY'?'🟢':'🔴';
-    return `<div class="item" style="align-items:center;gap:8px"><div style="min-width:0"><div><b>${ic} ${esc(act)} XAU</b> <span class="small mut">${esc(fo)} · ${esc(bi)} · ${esc(b.confidence||'RENDAH')}</span></div><div class="small mut">${esc(t.toLocaleString('id-ID'))} · ${esc(j.provider||'-')}${j.model?' · '+esc(String(j.model).slice(0,28)):''}</div></div><div style="display:flex;gap:6px;flex:none"><button class="x" onclick="xauHistOpen(${i})">Buka</button><button class="x" onclick="xauHistDel(${i})" aria-label="Hapus riwayat ini" title="Hapus">Hapus</button></div></div>`;
-  }).join('')}</div>`;
-}
-function xauHistOpen(i){
-  const it=xauHist()[i];if(!it)return;
-  const fk=it.j.focusKey||(it.j.xau&&it.j.xau.focusKey)||it.j.focus;if(fk&&typeof XAU_FOCUS!=='undefined'&&XAU_FOCUS[fk]){try{localStorage.setItem('xau_focus_v1',fk)}catch(e){}if(typeof pXauNews==='function')pXauNews();}XR.cur=it.j;renderXau(it.j,true);
-  const r=$('xres');if(r&&r.scrollIntoView)r.scrollIntoView({behavior:'smooth',block:'start'});
-  v21Toast('Riwayat dibuka — data lama, bukan data baru');
-}
-function xauHistDel(i){
-  const h=xauHist();if(!h[i])return;
-  h.splice(i,1);
-  try{localStorage.setItem(XHKEY,JSON.stringify(h))}catch(e){}
-  xauHistPaint();v21Toast('Riwayat dihapus');
-}
-function xauHistClear(){
-  if(!xauHist().length)return;
-  if(!confirm('Hapus semua riwayat analisis XAUUSD di perangkat ini?'))return;
-  try{localStorage.removeItem(XHKEY)}catch(e){}
-  xauHistPaint();v21Toast('Semua riwayat dihapus');
-}
-function pXauNews(){
-  let c=null;try{c=JSON.parse(localStorage.getItem('xau_last')||'null')}catch(e){}
-  $('pane').innerHTML=`<div class="card"><h3>📰 News Analisis — NFP · PPI · CPI · FOMC → XAUUSD</h3><div class="mut small" style="margin-bottom:10px">Fokus tunggal XAUUSD. Setiap klik mengambil ULANG data tanpa cache: jadwal resmi BLS (NFP, PPI, CPI) dan The Fed (FOMC), angka resmi BLS/FRED, EFFR NY Fed, yield Treasury, yield riil, indeks dolar, posisi spekulan CFTC, serta berita Reuters/Bloomberg/CNBC dkk. Server mengelompokkan keempat rilis dan mendeteksi rilis berbeda yang bertabrakan (≤48 jam), lalu AI menyusun skenario ke mana emas bergerak menjelang dan saat rilis. Edukasi, bukan saran finansial.</div><button class="btn full" id="xbtn" onclick="runXau()">📡 Ambil data global & analisis XAUUSD</button><div id="xmsg" class="mut small" style="margin-top:8px"></div></div><div id="xhist"></div><div id="xres"></div>`;
-  xauHistPaint();if(c)renderXau(c,true);
-}
-async function runXau(){
-  busy('xbtn',true);if(window.rb33Scan)rb33Scan.show('xscan','news');setTxt('xmsg','⏳ Tahap 1/2: mengumpulkan jadwal resmi, angka BLS/FRED, yield, dolar, CFTC & berita global...');
-  let d;try{d=await tcall({action:'xau',phase:'data',fresh:true,focus:(typeof xauFocusGet==='function'?xauFocusGet():'all')})}catch(e){setTxt('xmsg','⚠️ Tahap 1 (pengumpulan data) gagal: '+e.message);if(window.rb33Scan)rb33Scan.fail('xscan','Pengumpulan data gagal: '+e.message);busy('xbtn',false);return}
-  XR.g=d.g;const base={...d};delete base.g;delete base.phase;base.pending=true;XR.cur=base;
-  if(S.tab==='xau'&&$('xres'))renderXau(base,false);
-  setTxt('xmsg','⏳ Tahap 2/2: AI menganalisis paket data (data sudah tampil di bawah)...');if(window.rb33Scan)rb33Scan.step('xscan','Data resmi terkumpul — AI menyusun arah & skenario…');await xauAI(base);
-}
-async function xauAI(base){
-  try{const f=base.focus||(typeof xauFocusGet==='function'?xauFocusGet():'all');const a=await tcall({action:'xau',phase:'ai',g:XR.g,fresh:true,focus:f});const j={...base,...a,pending:false,notes:(base.notes||[]).concat(a.notes||[])};delete j.phase;delete j.g;XR.cur=j;
-    if(j.xai){try{localStorage.setItem('xau_last_'+f,JSON.stringify(j));if(f==='all')localStorage.setItem('xau_last',JSON.stringify(j))}catch(e){}xauHistSave(j)}
-    if(S.tab==='xau'&&$('xres'))renderXau(j,false);
-    if(window.rb33Scan){if(j.xai)rb33Scan.done('xscan','✅ Analisis siap — arah '+(j.xai.action||'—')+' · spike '+((j.xai.spike&&j.xai.spike.likely)?'YA':'TIDAK'));else rb33Scan.fail('xscan','AI belum memberi format valid (lihat catatan).')}setTxt('xmsg',j.xai?'✅ Selesai — analisis XAUUSD siap':'⚠️ AI belum memberi format valid (lihat catatan)');
-  }catch(e){const j={...base,pending:false,aiError:e.message};XR.cur=j;if(S.tab==='xau'&&$('xres'))renderXau(j,false);if(window.rb33Scan)rb33Scan.fail('xscan','Analisis AI gagal: '+e.message);setTxt('xmsg','⚠️ Tahap 2 (analisis AI) gagal: '+e.message)}
-  busy('xbtn',false);
-}
-function retryXauAI(){if(!XR.g||!XR.cur)return;const base={...XR.cur};delete base.xai;delete base.raw;delete base.aiError;base.pending=true;XR.cur=base;renderXau(base,false);setTxt('xmsg','⏳ Mengulang analisis AI...');if(window.rb33Scan)rb33Scan.show('xscan','news','AI menilai ulang');busy('xbtn',true);xauAI(base)}
-async function saveXauNews(){
-  const c=XR.cur;if(!c||!c.xai)return alert('Belum ada analisis untuk disimpan.');
-  const x=c.xai,b=x.bias||{};
-  const txt=`[News Analisis XAUUSD · ${new Date(c.fetchedAt||Date.now()).toLocaleString('id-ID')}]\nBias: ${b.bias} (keyakinan ${b.confidence}) · Aksi: ${x.action==='SELL'?'SELL':'BUY'}\nFokus: ${String(c.focusKey||(c.xau&&c.xau.focusKey)||c.focus||'all').toUpperCase()} · Spike: ${x.spike&&x.spike.likely?'YA':'TIDAK'}${x.spike&&x.spike.why?' — '+x.spike.why:''}\n${x.action_reason?x.action_reason+'\n':''}${x.summary||''}\n`+((x.events||[]).map(e=>`• ${e.tag}: XAU ${e.gold_action||(e.gold_bias==='BEARISH'?'SELL':'BUY')} — ${e.why}`).join('\n'))+((x.clusters||[]).length?'\nGabungan: '+x.clusters.map(k=>(k.tags||[]).join('+')+' → '+k.gold_note).join(' | '):'');
-  await db.collection('catatan').add({uid:user.uid,teks:txt,jenis:'news',waktu:firebase.firestore.FieldValue.serverTimestamp()});
-  alert('Ringkasan disimpan ke Catatan news (tab Jurnal).');
-}
-</script>
-<script>
 /* ---------- lapisan navigasi: seksi, tab, pane ---------- */
 function v21MarkTabs(){['beranda','sekolah','bahasa','trading','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)})}
 function home(){
@@ -2362,8 +2222,8 @@ function homeBase(){
   if(S.sec==='beranda'){S.tab='beranda';$('app').innerHTML='<div id="pane"></div>';return pane()}
   if(S.sec==='trading'){
     S.mapel='Trading';
-    if(['xau','tutor','jurnal'].indexOf(S.tab)<0)S.tab='xau';
-    const T=[['xau',' News Analisis'],['tutor',' Tutor'],['jurnal',' Jurnal']];
+    if(['xau','signal','tutor','jurnal'].indexOf(S.tab)<0)S.tab='xau';
+    const T=[['xau',' News Analisis'],['signal',' Signal Entry'],['tutor',' Tutor'],['jurnal',' Jurnal']];
     $('app').innerHTML='<div class="stabs">'+T.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" onclick="S.tab=\''+k+'\';home()">'+l+'</button>').join('')+'</div><div id="pane"></div>';
     return pane();
   }
@@ -2374,7 +2234,7 @@ function homeBase(){
   pane();
 }
 function pane(){
-  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,papan:pPapan}[S.tab];
+  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,signal:pSignalEntry,papan:pPapan}[S.tab];
   if(f)return f();
   S.tab='latihan';return pLatihan();
 }
@@ -2734,9 +2594,8 @@ input,select,textarea{background:var(--field)}
 <script src="rb-content.js"></script>
 <script src="rb-ui.js"></script>
 <script src="rb-alch.js"></script>
-<script src="rb-signal.js"></script>
 <script src="rb-v33.js"></script>
-<script src="rb-trade.js"></script>
+<script src="rb-xau.js"></script>
 <script src="rb-admin.js"></script>
 </body>
 </html>
