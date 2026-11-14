@@ -769,6 +769,37 @@ function alTermChart(i) {
 }
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') alTermChartClose(); });
 
+/* ---------- peta timeframe & konfirmasi M5 ---------- */
+function alTfMapHtml() {
+  const rows = [
+    ['D1', 'Bias & likuiditas', 'Tren, draw on liquidity, PDH/PDL, weekly open', 'Menentukan hanya BUY atau SELL'],
+    ['H4', 'Struktur besar', 'BOS/CHoCH, order block H4, premium/discount', 'Zona POI utama swing'],
+    ['H1', 'Konteks sesi', 'Range Asia, Judas, session high/low', 'Arah intraday & target sesi'],
+    ['M15', 'Setup', 'BOS, sweep, FVG, OB, SND, EQH/EQL, OTE', 'Zona entry dan invalidasi'],
+    ['M5', 'Trigger', 'CHoCH M5, reclaim FVG, candle displacement', 'Konfirmasi sebelum entry'],
+    ['M1', 'Eksekusi', 'Sweep mikro, spread, reaksi di POI', 'Timing entry & stop rapat']
+  ];
+  return alCard(' Peta timeframe Alchemist', '<div class="rb-note">ATURAN: satu arah final per sesi. Timeframe kecil hanya mempertajam entry, tidak boleh melawan bias D1/H4. Bila M5 melawan, tunggu — jangan buka trade kedua arah.</div>'
+    + '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--mut)"><th style="padding:7px">TF</th><th style="padding:7px">Fungsi</th><th style="padding:7px">Yang ditandai</th><th style="padding:7px">Keputusan</th></tr></thead><tbody>'
+    + rows.map(r => '<tr style="border-top:1px solid var(--line)"><td style="padding:7px"><b>' + r[0] + '</b></td><td style="padding:7px">' + r[1] + '</td><td style="padding:7px;color:var(--mut)">' + r[2] + '</td><td style="padding:7px">' + r[3] + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + alList(['Konfluensi minimal 3: struktur + POI + likuiditas searah.', 'Jika H4 dan M15 bertabrakan, kurangi ukuran atau tunggu.', 'Target pertama selalu likuiditas terdekat, bukan angka bulat.'])
+    + '<div class="small mut" style="margin-top:8px">Chart TradingView real-time ada di tab Signal Entry; peta ini panduan membaca, bukan sinyal.</div>');
+}
+function alM5Html() {
+  return alCard(' Konfirmasi M5 sebelum entry', '<div class="rb-note">M15 menentukan zona; M5 menentukan izin masuk. Tanpa konfirmasi M5, entry LIMIT di POI masih boleh, tetapi risikonya lebih besar.</div>'
+    + alSteps([
+      ['1. Zona M15 valid', 'Harga menyentuh FVG/OB/SND yang searah bias D1–H4.'],
+      ['2. Sweep likuiditas', 'Ada sapuan high/low kecil lalu harga kembali masuk zona (tanda gagal breakout).'],
+      ['3. CHoCH/BOS M5', 'Struktur M5 berbalik searah bias; candle close di atas/bawah swing terakhir.'],
+      ['4. Displacement + FVG', 'Candle impuls meninggalkan FVG M5 yang belum terisi — area entry presisi.'],
+      ['5. Entry & SL', 'Entry di retest FVG/OB M5; SL 30 pip dari entry, bukan dari zona.'],
+      ['6. Target', 'TP1 100 pip, TP2 200 pip, sisanya trailing ke likuiditas berikutnya.']
+    ])
+    + '<div class="rb-callout warn" style="margin-top:10px"><b>Batal entry:</b> M5 close kembali melewati zona, muncul sweep berlawanan, atau rilis USD high-impact dalam 30 menit.</div>'
+    + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 5 menit.</div>');
+}
+
 /* ---------- kerangka halaman ---------- */
 function alGroup(g) {
   const G = ALCH_GROUPS.filter(function (x) { return x.id === g; })[0];

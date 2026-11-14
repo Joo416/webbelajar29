@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function mail() {
+      return request.auth.token.email.lower();
+    }
+    function isAdmin() {
+      return signedIn() && mail() in ['amoraarik6@gmail.com'];
+    }
+    function userPath() {
+      return /databases/$(database)/documents/pengguna/$(mail());
+    }
+    function isActive() {
+      return signedIn()
+        && exists(userPath())
+        && get(userPath()).data.status == 'aktif';
+    }
+    function hasTrading() {
+      return isAdmin() || (isActive()
+        && exists(/databases/$(database)/documents/izin_trading/$(mail()))
+        && get(/databases/$(database)/documents/izin_trading/$(mail())).data.status == 'disetujui');
+    }
+
+    match /pengguna/{id} {
+      allow get: if isAdmin() || (signedIn() && id == mail());
+      allow list: if isAdmin();
+      allow create: if signedIn() && id == mail()
+                    && request.resource.data.email == mail()
+                    && request.resource.data.status == 'menunggu'
+                    && !request.resource.data.keys().hasAny(['admin','trading']);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /izin_trading/{id} {
+      allow get: if isAdmin() || (signedIn() && id == mail());
+      allow list: if isAdmin();
+      allow create: if signedIn() && id == mail()
+                    && request.resource.data.email == mail()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'menunggu'
+                    && request.resource.data.keys().hasOnly(['email','uid','status','pesan','dibuat']);
+      allow update: if isAdmin() || (signedIn() && id == mail()
+                    && resource.data.status in ['ditolak','dicabut']
+                    && request.resource.data.status == 'menunggu'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','pesan','diminta']));
+      allow delete: if isAdmin();
+    }
+
+    // V21: papan peringkat. Dibaca semua pengguna aktif, ditulis hanya oleh pemiliknya.
+    // Field yang divalidasi sama dengan yang ditulis index.html (v21WriteBoard).
+    match /papan/{uid} {
+      allow get, list: if isActive();
+      allow create, update: if isActive()
+        && uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nama is string
+        && request.resource.data.foto is string
+        && request.resource.data.xp is int && request.resource.data.xp >= 0
+        && request.resource.data.streak is int && request.resource.data.streak >= 0
+        && request.resource.data.today is int && request.resource.data.today >= 0
+        && request.resource.data.target is int && request.resource.data.target > 0
+        && request.resource.data.minggu is int && request.resource.data.minggu >= 0
+        && (!request.resource.data.keys().hasAny(['sBenar']) || (request.resource.data.sBenar is int && request.resource.data.sBenar >= 0))
+        && (!request.resource.data.keys().hasAny(['sSalah']) || (request.resource.data.sSalah is int && request.resource.data.sSalah >= 0))
+        && (!request.resource.data.keys().hasAny(['sTotal']) || (request.resource.data.sTotal is int && request.resource.data.sTotal >= 0))
+        && (!request.resource.data.keys().hasAny(['tBenar']) || (request.resource.data.tBenar is int && request.resource.data.tBenar >= 0))
+        && (!request.resource.data.keys().hasAny(['tSalah']) || (request.resource.data.tSalah is int && request.resource.data.tSalah >= 0))
+        && (!request.resource.data.keys().hasAny(['tTotal']) || (request.resource.data.tTotal is int && request.resource.data.tTotal >= 0))
+        && (!request.resource.data.keys().hasAny(['uBenar']) || (request.resource.data.uBenar is int && request.resource.data.uBenar >= 0))
+        && (!request.resource.data.keys().hasAny(['uSalah']) || (request.resource.data.uSalah is int && request.resource.data.uSalah >= 0))
+        && (!request.resource.data.keys().hasAny(['uTotal']) || (request.resource.data.uTotal is int && request.resource.data.uTotal >= 0))
+        && request.resource.data.keys().hasOnly(['uid','nama','foto','xp','streak','today','target','minggu','updated','sBenar','sSalah','sTotal','tBenar','tSalah','tTotal','uBenar','uSalah','uTotal']);
+      allow delete: if isAdmin();
+    }
+
+    match /{col}/{docId} {
+      allow read, update, delete: if col in ['soal','hasil','chat','catatan','kata']
+                                  && isActive() && resource.data.uid == request.auth.uid;
+      allow create: if col in ['soal','hasil','chat','catatan','kata']
+                    && isActive() && request.resource.data.uid == request.auth.uid;
+
+      allow read, update, delete: if col == 'jurnal'
+                                  && hasTrading() && resource.data.uid == request.auth.uid;
+      allow create: if col == 'jurnal'
+                    && hasTrading() && request.resource.data.uid == request.auth.uid;
+    }
+  }
+}

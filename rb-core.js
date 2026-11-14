@@ -343,7 +343,9 @@ function pane() {
     beranda: pBeranda, papan: pPapan, kalender: pKalender,
     latihan: pLatihan, tryout: pTryout, tutor: pTutor,
     soal: (typeof pSoal === 'function' ? pSoal : pLatihan),
-    buat: pBuat, bank: pBank, jurnal: pJurnal, xau: pXauNews,
+    buat: pBuat, bank: pBank,
+    jurnal: (typeof pJurnal === 'function' ? pJurnal : pLatihan),
+    xau: (typeof pXauNews === 'function' ? pXauNews : pLatihan),
     signal: (typeof pSignalEntry === 'function' ? pSignalEntry : pXauNews),
     alchemist: (typeof pAlchemist === 'function' ? pAlchemist : pXauNews)
   };

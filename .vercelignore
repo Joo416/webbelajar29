@@ -1,0 +1,7 @@
+vercel.token
+.env
+.env.*
+.vercel/
+preview-*.png
+.freebuff/
+.aicheck

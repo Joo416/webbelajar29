@@ -20,7 +20,8 @@
   ];
   const NEWS_KEY = 'rb_xau_news_v2_';
   let newsFocus = 'NFP', newsData = null, newsBusy = false;
-  let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0;
+  let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY';
+  const SIG_MODES = [['SCALPING', 'Scalping'], ['DAY', 'Day trading'], ['SWING', 'Swing']];
 
   function toast(m) { if (typeof v21Toast === 'function') v21Toast(m); }
   function loadCache(k) { try { return JSON.parse(localStorage.getItem(NEWS_KEY + k) || 'null'); } catch (e) { return null; } }
@@ -211,12 +212,26 @@
     if (btn) { btn.disabled = false; btn.textContent = '📡 Ambil analisis terbaru'; }
   };
 
+  function modeOf(j, m) {
+    const ss = j.setups || [];
+    return ss.find(s => s.style === m) || (m === sigMode ? j.plan : null) || null;
+  }
+  window.xSetMode = function (m) {
+    sigMode = m;
+    if (sigData) paintSignal(sigData);
+  };
+
   function planCard(j) {
-    const p = j.plan;
+    const p = modeOf(j, sigMode) || j.plan;
     if (!p) return '';
     const buy = p.dir === 'BUY';
+    const modes = SIG_MODES.map(([k, l]) => {
+      const s = (j.setups || []).find(x => x.style === k);
+      return `<button class="btn ${k === sigMode ? '' : 'alt'}" style="flex:1;min-width:96px;min-height:38px;font-size:12px;padding:7px 8px" onclick="xSetMode('${k}')">${l}<div class="small" style="opacity:.85">${s ? XE(s.status) : 'tidak ada'}</div></button>`;
+    }).join('');
     return `<div class="card" style="border-left:5px solid ${buy ? 'var(--ok)' : 'var(--no)'}">
       <div class="rb-card-head"><h3>🎯 Rencana entry</h3><span class="rb-pill ${p.status === 'SIAP' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
+      <div class="rb-pill-row" style="margin-top:8px">${modes}</div>
       <div class="rb-lv-grid" style="margin-top:8px">
         <div class="rb-lv"><span>Entry</span><b>${num(p.entry)}</b></div>
         <div class="rb-lv"><span>SL · 30 pip</span><b style="color:var(--no)">${num(p.sl)}</b></div>
@@ -241,8 +256,10 @@
   function tfCard(j) {
     const t = j.tfMatrix || [];
     if (!t.length) return '';
-    return `<div class="card"><div class="rb-card-head"><h3>🧭 Matriks timeframe</h3><span class="rb-pill">TradingView · 6 TF</span></div>
-      ${t.map(x => `<div class="item"><span><b>${XE(x.tf)}</b> <span class="small mut">RSI ${num(x.rsi)}</span></span><span style="color:${x.value > 0.05 ? 'var(--ok)' : x.value < -0.05 ? 'var(--no)' : 'var(--mut)'}">${XE(x.rec)} · ${XE(x.strength)}%</span></div>`).join('')}</div>`;
+    const dir = j.direction;
+    return `<div class="card"><div class="rb-card-head"><h3>🧭 Matriks timeframe</h3><span class="rb-pill">final ${XE(dir)}</span></div>
+      <div class="small mut" style="margin-bottom:6px">Konteks, bukan sinyal kedua. TF yang melawan arah final hanya pullback timing — tetap satu arah entry.</div>
+      ${t.map(x => { const opp = (x.value > 0.05 && dir === 'SELL') || (x.value < -0.05 && dir === 'BUY'); return `<div class="item"><span><b>${XE(x.tf)}</b> <span class="small mut">RSI ${num(x.rsi)}</span></span><span style="color:${x.value > 0.05 ? 'var(--ok)' : x.value < -0.05 ? 'var(--no)' : 'var(--mut)'}">${XE(x.rec)} · ${XE(x.strength)}%${opp ? ' <span class="mut">(pullback)</span>' : ''}</span></div>`; }).join('')}</div>`;
   }
 
   function chartCard(j) {
@@ -272,7 +289,7 @@
     const a = j.ai || {};
     return `<div class="card"><div class="rb-card-head"><h3>🧠 Anotasi AI</h3><span class="rb-pill">${a.ok ? XE(a.model || a.provider || 'AI') : 'AI tidak tersedia'}</span></div>
       ${a.ok ? `<div class="exp" style="color:var(--tx);line-height:1.55">${XE(a.summary)}</div>
-        ${a.bias ? `<div class="small" style="margin-top:6px">Bias AI: <b style="color:${a.bias === j.direction ? 'var(--ok)' : 'var(--warn)'}">${XE(a.bias)}</b>${a.bias !== j.direction ? ' · berbeda dari mesin (level tetap mesin)' : ' · searah mesin'}</div>` : ''}
+        <div class="small" style="margin-top:6px">Arah final tetap <b>${XE(j.direction)}</b>${a.dissent ? ` · AI menandai risiko bias berlawanan (${XE(a.dissent)}) tetapi tidak dipakai sebagai sinyal` : ' · AI sejalan dengan mesin'}</div>
         ${a.note ? `<div class="small" style="color:var(--warn);margin-top:4px">${XE(a.note)}</div>` : ''}
         ${(a.confluence || []).length ? `<div style="margin-top:6px">${a.confluence.map(c => `<div class="small">• ${XE(c)}</div>`).join('')}</div>` : ''}
         ${a.invalidation ? `<div class="small mut" style="margin-top:6px">Batal jika: ${XE(a.invalidation)}</div>` : ''}`
@@ -302,40 +319,19 @@
     const host = X$('xTvHost');
     if (!host || host.dataset.on) return;
     host.dataset.on = '1';
-    host.innerHTML = '<div id="tvNote" class="small mut" style="padding:10px">Memuat chart TradingView…</div>';
-    const box = document.createElement('div');
-    box.className = 'tradingview-widget-container'; box.style.height = '100%';
-    const inner = document.createElement('div');
-    inner.className = 'tradingview-widget-container__widget'; inner.style.height = '100%';
-    box.appendChild(inner);
-    const sc = document.createElement('script');
-    sc.type = 'text/javascript'; sc.async = true;
-    sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    sc.innerHTML = JSON.stringify({
-      autosize: true, symbol: 'OANDA:XAUUSD', interval: '15', timezone: 'Asia/Jakarta',
-      theme: 'dark', style: '1', locale: 'id', hide_side_toolbar: false,
-      allow_symbol_change: true, details: true, studies: [], support_host: 'https://www.tradingview.com'
-    });
-    sc.onerror = function () {
-      host.innerHTML = '<div class="warn">Chart TradingView tidak bisa dimuat (jaringan diblokir). Chart tanda di bawah tetap memakai harga TradingView live.</div>';
-    };
-    box.appendChild(sc);
-    host.appendChild(box);
-    let tries = 0;
-    const watch = setInterval(function () {
-      if (!document.getElementById('xTvHost')) { clearInterval(watch); return; }
-      if (host.querySelector('iframe')) {
-        const note = document.getElementById('tvNote');
-        if (note) note.remove();
-        clearInterval(watch); return;
-      }
-      tries += 1;
-      if (tries >= 20) {
-        clearInterval(watch);
-        const note = document.getElementById('tvNote');
-        if (note) note.textContent = 'Chart TradingView tidak termuat di jaringan ini (iframe diblokir). Chart tanda di bawah tetap memakai harga TradingView live.';
-      }
-    }, 800);
+    host.innerHTML = '<div id="tvNote" class="small mut" style="padding:10px">Memuat chart TradingView real-time…</div>';
+    const f = document.createElement('iframe');
+    f.src = 'https://s.tradingview.com/widgetembed/?symbol=OANDA%3AXAUUSD&interval=15&theme=dark&style=1&timezone=Asia%2FJakarta&locale=id&hidesidetoolbar=0&symboledit=1&saveimage=0&withdateranges=1&studies=%5B%5D';
+    f.title = 'Chart TradingView XAUUSD M15 real-time';
+    f.style.cssText = 'width:100%;height:100%;border:0;display:block';
+    f.setAttribute('allowtransparency', 'true');
+    f.setAttribute('scrolling', 'no');
+    f.onload = function () { const n = document.getElementById('tvNote'); if (n) n.remove(); };
+    host.appendChild(f);
+    setTimeout(function () {
+      const n = document.getElementById('tvNote');
+      if (n) n.textContent = 'Chart TradingView belum termuat di jaringan ini (iframe diblokir). Chart tanda di bawah tetap memakai harga TradingView live.';
+    }, 9000);
   };
 
   function drawChart(j) {
@@ -389,13 +385,67 @@
       if (m.price == null) return;
       mark(m.price, colors[m.type] || '#94a3b8', m.type + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' 🧠' : ''), m.type === 'FVG' || m.type === 'OB');
     });
-    if (j.plan) {
-      mark(j.plan.entry, '#e2e8f0', 'Entry ' + Number(j.plan.entry).toFixed(2), false);
-      mark(j.plan.sl, '#ef4444', 'SL ' + Number(j.plan.sl).toFixed(2), false);
-      mark(j.plan.tp1, '#22c55e', 'TP1 ' + Number(j.plan.tp1).toFixed(2), true);
-      mark(j.plan.tp2, '#22c55e', 'TP2 ' + Number(j.plan.tp2).toFixed(2), true);
+    const ap = modeOf(j, sigMode) || j.plan;
+    if (ap) {
+      mark(ap.entry, '#e2e8f0', 'Entry ' + Number(ap.entry).toFixed(2) + ' · ' + ap.style, false);
+      mark(ap.sl, '#ef4444', 'SL ' + Number(ap.sl).toFixed(2), false);
+      mark(ap.tp1, '#22c55e', 'TP1 ' + Number(ap.tp1).toFixed(2), true);
+      mark(ap.tp2, '#22c55e', 'TP2 ' + Number(ap.tp2).toFixed(2), true);
     }
   }
+
+  /* ---------- Jurnal trading + kalkulator lot (menggantikan pJurnal yang hilang) ---------- */
+  window.pJurnal = function () {
+    X$('pane').innerHTML = `
+      <div class="card"><div class="rb-card-head"><h3>📒 Jurnal trading & kalkulator lot</h3><span class="rb-pill">XAUUSD · 1 lot = 100 oz</span></div>
+        <div class="rb-note">Catat setiap trade (bukan hanya hasil) supaya evaluasi berbasis data. Kalkulator memakai nilai pip XAUUSD $10 per lot; sesuaikan dengan spesifikasi broker bila berbeda.</div></div>
+      <div class="card"><h3>🧮 Kalkulator ukuran posisi</h3>
+        <div class="rb-lv-grid" style="margin-top:8px">
+          <label>Balance (USD)<input id="jBal" type="number" min="1" step="1" value="1000" oninput="xJCalc()"></label>
+          <label>Risiko (%)<input id="jRisk" type="number" min="0.1" max="10" step="0.1" value="1" oninput="xJCalc()"></label>
+          <label>SL (pip)<input id="jSl" type="number" min="1" step="1" value="30" oninput="xJCalc()"></label>
+        </div>
+        <div id="jCalcOut" class="exp" style="margin-top:8px;color:var(--tx)"></div></div>
+      <div class="card"><h3>➕ Tambah trade</h3>
+        <div class="rb-lv-grid" style="margin-top:8px">
+          <label>Pair<input id="jPair" value="XAUUSD" autocomplete="off"></label>
+          <label>Arah<select id="jDir"><option>BUY</option><option>SELL</option></select></label>
+          <label>Setup<input id="jSetup" placeholder="FVG / OB / SND" autocomplete="off"></label>
+          <label>Hasil (R)<input id="jR" type="number" step="0.1" placeholder="contoh 1.5 atau -1" ></label>
+        </div>
+        <textarea id="jNote" placeholder="Alasan entry, kondisi pasar, kesalahan..." maxlength="400" style="width:100%;margin-top:8px"></textarea>
+        <button class="btn full" style="margin-top:8px" onclick="xJSave()">💾 Simpan trade</button>
+        <div id="jMsg" class="small mut" style="margin-top:6px"></div></div>
+      <div class="card"><h3>📊 Riwayat</h3><div id="jlist" class="mut small">Memuat…</div></div>`;
+    xJCalc();
+    try { loadJ(); } catch (e) { const el = X$('jlist'); if (el) el.textContent = 'Gagal memuat jurnal: ' + e.message; }
+  };
+  window.xJCalc = function () {
+    const bal = +(X$('jBal') && X$('jBal').value) || 0;
+    const risk = +(X$('jRisk') && X$('jRisk').value) || 0;
+    const sl = +(X$('jSl') && X$('jSl').value) || 0;
+    const out = X$('jCalcOut'); if (!out) return;
+    if (bal <= 0 || risk <= 0 || sl <= 0) { out.textContent = 'Isi balance, risiko, dan SL dengan angka lebih dari 0.'; return; }
+    const usd = bal * risk / 100, lot = Math.max(0.01, Math.round(usd / (sl * 10) * 100) / 100);
+    out.innerHTML = `Risiko <b>$${usd.toFixed(2)}</b> · SL <b>${sl} pip</b> · ukuran posisi <b>${lot.toFixed(2)} lot</b><div class="small mut">Perkiraan: $10 per pip per lot. Stop 30 pip dengan risiko $${usd.toFixed(2)} → ${lot.toFixed(2)} lot.</div>`;
+  };
+  window.xJSave = async function () {
+    const msg = X$('jMsg');
+    try {
+      if (typeof db === 'undefined' || !user) throw new Error('Belum login');
+      const pair = String((X$('jPair') || {}).value || 'XAUUSD').trim().toUpperCase().slice(0, 12) || 'XAUUSD';
+      const arah = String((X$('jDir') || {}).value || 'BUY');
+      const setup = String((X$('jSetup') || {}).value || '').trim().slice(0, 40);
+      const rRaw = String((X$('jR') || {}).value || '').trim();
+      const r = rRaw === '' ? null : Number(rRaw);
+      if (r != null && (!isFinite(r) || Math.abs(r) > 100)) throw new Error('Hasil R harus angka wajar (contoh 1.5 atau -1).');
+      const catatan = String((X$('jNote') || {}).value || '').trim().slice(0, 400);
+      await db.collection('jurnal').add({ uid: user.uid, pair, arah, setup, r, catatan, waktu: firebase.firestore.FieldValue.serverTimestamp() });
+      if (msg) msg.textContent = '✅ Trade tersimpan.';
+      if (X$('jNote')) X$('jNote').value = ''; if (X$('jR')) X$('jR').value = '';
+      loadJ();
+    } catch (e) { if (msg) msg.textContent = '⚠️ ' + (e.message || e); }
+  };
 
   /* pastikan tab signal bisa dibuka walau nama fungsi berbeda */
   window.xauFocusGet = function () { return newsFocus; };

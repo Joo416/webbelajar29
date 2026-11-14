@@ -748,11 +748,12 @@ async function gate(u){
   if(!em)return deniedView('error','Akun Google ini tidak memiliki email.');
   try{
     const ref=db.collection('pengguna').doc(em),base={email:em,nama:u.displayName||'',foto:u.photoURL||'',uid:u.uid};
-    let admin=false;try{await db.collection('pengguna').limit(1).get();admin=true}catch(e){}
-    if(admin){await ref.set({...base,status:'aktif',admin:true,terakhir:tsNow()},{merge:true});S.admin=true;return enter()}
     let d=await ref.get();
     if(!d.exists){await ref.set({...base,status:'menunggu',dibuat:tsNow()});d=await ref.get()}
-    const st=(d.data()||{}).status;
+    const data=d.data()||{},st=data.status;
+    // Admin hanya dari email resmi / flag dokumen — bukan dari izin baca koleksi.
+    const admin=em==='amoraarik6@gmail.com'||data.admin===true;
+    if(admin){await ref.set({...base,status:'aktif',admin:true,terakhir:tsNow()},{merge:true});S.admin=true;return enter()}
     if(st==='aktif')return enter();
     deniedView(st==='diblokir'?'diblokir':'menunggu')
   }catch(e){deniedView('error',e.message)}
@@ -1857,7 +1858,7 @@ function homeBase(){
     <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
   pane();
 }
-function pane(){({latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,signal:pSignalEntry})[S.tab]()}
+function pane(){const f={latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:(typeof pJurnal==='function'?pJurnal:pLatihan),xau:(typeof pXauNews==='function'?pXauNews:pLatihan),signal:(typeof pSignalEntry==='function'?pSignalEntry:pXauNews)}[S.tab];if(f)return f()}
 // Tab Catatan lama sudah dihapus; catatan trade & news kini berada di tab Jurnal.
 Object.assign(STARTERS18,{'Trading':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Bagaimana arah USD dan pair utama berdasarkan data terbaru?','Jelaskan order block dan fair value gap dengan contoh','Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip']});
 /* ---------- kamus: definisi dibantu sumber kamus global ---------- */
@@ -2234,7 +2235,7 @@ function homeBase(){
   pane();
 }
 function pane(){
-  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:pJurnal,xau:pXauNews,signal:pSignalEntry,papan:pPapan}[S.tab];
+  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:(typeof pJurnal==='function'?pJurnal:pLatihan),xau:(typeof pXauNews==='function'?pXauNews:pLatihan),signal:(typeof pSignalEntry==='function'?pSignalEntry:pXauNews),papan:pPapan}[S.tab];
   if(f)return f();
   S.tab='latihan';return pLatihan();
 }
@@ -2582,20 +2583,20 @@ input,select,textarea{background:var(--field)}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="rb-modern.css">
-<link rel="stylesheet" href="rb-v33.css">
-<link rel="stylesheet" href="rb-v34.css">
-<script src="bahasa-en-data.js"></script>
-<script src="bahasa-jp-data.js"></script>
-<script src="bahasa-jp-data2.js"></script>
-<script src="bahasa-jp-grammar.js"></script>
-<script src="bahasa.js"></script>
-<script src="rb-core.js"></script>
-<script src="rb-content.js"></script>
-<script src="rb-ui.js"></script>
-<script src="rb-alch.js"></script>
-<script src="rb-v33.js"></script>
-<script src="rb-xau.js"></script>
-<script src="rb-admin.js"></script>
+<link rel="stylesheet" href="rb-modern.css?v=20261114c">
+<link rel="stylesheet" href="rb-v33.css?v=20261114c">
+<link rel="stylesheet" href="rb-v34.css?v=20261114c">
+<script src="bahasa-en-data.js?v=20261114c"></script>
+<script src="bahasa-jp-data.js?v=20261114c"></script>
+<script src="bahasa-jp-data2.js?v=20261114c"></script>
+<script src="bahasa-jp-grammar.js?v=20261114c"></script>
+<script src="bahasa.js?v=20261114c"></script>
+<script src="rb-core.js?v=20261114c"></script>
+<script src="rb-content.js?v=20261114c"></script>
+<script src="rb-ui.js?v=20261114c"></script>
+<script src="rb-alch.js?v=20261114c"></script>
+<script src="rb-v33.js?v=20261114c"></script>
+<script src="rb-xau.js?v=20261114c"></script>
+<script src="rb-admin.js?v=20261114c"></script>
 </body>
 </html>
