@@ -1,0 +1,9 @@
+{
+  "name": "ruang-belajar",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Ruang Belajar + News/Signal XAUUSD",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

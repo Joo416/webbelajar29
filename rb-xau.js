@@ -21,7 +21,7 @@
   const NEWS_KEY = 'rb_xau_news_v2_';
   let newsFocus = 'NFP', newsData = null, newsBusy = false;
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY';
-  const SIG_MODES = [['SCALPING', 'Scalping'], ['DAY', 'Day trading'], ['SWING', 'Swing']];
+  const SIG_MODES = [['SCALPING', 'Scalping M5'], ['DAY', 'Day M5'], ['SWING', 'Swing M5']];
 
   function toast(m) { if (typeof v21Toast === 'function') v21Toast(m); }
   function loadCache(k) { try { return JSON.parse(localStorage.getItem(NEWS_KEY + k) || 'null'); } catch (e) { return null; } }
@@ -171,8 +171,8 @@
     X$('pane').innerHTML = `
       <div class="card">
         <div class="rb-card-head"><h3>⚡ Signal Entry — XAUUSD</h3><span class="rb-pill">Alchemist · TradingView real-time</span></div>
-        <div class="rb-note">Teknikal Alchemist lengkap (struktur, BOS/CHoCH, sweep, SND, FVG, order block, mitigation, EQH/EQL, Judas swing, OTE, premium/discount, open harian/mingguan, ADR, SMT, sesi) dari candle live + harga & rekomendasi TradingView. Semua tanda dihitung ulang setiap refresh dan diberi catatan AI. SL tepat 30 pip, TP1 ≥100, TP2 ≥200, TPmax konfluensi.</div>
-        <div class="rb-pill-row"><span class="rb-pill y">SL 30 pip</span><span class="rb-pill">TP1 100</span><span class="rb-pill">TP2 200</span><span class="rb-pill">TPmax struktur</span><span class="rb-pill">Auto 5 menit</span></div>
+        <div class="rb-note">Entry M5 ala Alchemist: bias D1/H4/H1, POI M15, trigger candle M5 yang sudah close (BOS/CHoCH, sweep, FVG, order block, EQH/EQL), lalu SL tetap 30 pip dan TP bertingkat ke likuiditas nyata (swing, PDH/PDL, sesi, ADR). Semua tanda dihitung ulang setiap refresh dan diberi catatan AI; tidak ada arah kedua.</div>
+        <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP likuiditas</span><span class="rb-pill">Day/Swing/Scalp</span><span class="rb-pill">Auto 5 menit</span></div>
         <button class="btn full" id="sigBtn" style="margin-top:10px" onclick="pSigRun()">🔄 Perbarui tanda sekarang</button>
         <div id="sigMsg" class="mut small" style="margin-top:8px"></div>
       </div>
@@ -229,28 +229,40 @@
       const s = (j.setups || []).find(x => x.style === k);
       return `<button class="btn ${k === sigMode ? '' : 'alt'}" style="flex:1;min-width:96px;min-height:38px;font-size:12px;padding:7px 8px" onclick="xSetMode('${k}')">${l}<div class="small" style="opacity:.85">${s ? XE(s.status) : 'tidak ada'}</div></button>`;
     }).join('');
+    const tg = (p.targets || []).map((t, i) => `<div class="item"><span><b>TP${i + 1}</b> ${num(t.price)} <span class="small mut">${XE(t.pips)} pip · ${XE(t.src)}</span></span><span class="small" style="color:var(--ok)">${t.strength > 1 ? 'konfluensi ' + t.strength : 'likuiditas'}</span></div>`).join('');
     return `<div class="card" style="border-left:5px solid ${buy ? 'var(--ok)' : 'var(--no)'}">
-      <div class="rb-card-head"><h3>🎯 Rencana entry</h3><span class="rb-pill ${p.status === 'SIAP' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
+      <div class="rb-card-head"><h3>🎯 Rencana entry M5</h3><span class="rb-pill ${p.status === 'SIAP' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
       <div class="rb-pill-row" style="margin-top:8px">${modes}</div>
+      <div class="rb-pill-row" style="margin-top:6px"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">RR 1:${XE(p.rr)}</span><span class="rb-pill">${XE(p.type)}</span></div>
       <div class="rb-lv-grid" style="margin-top:8px">
         <div class="rb-lv"><span>Entry</span><b>${num(p.entry)}</b></div>
         <div class="rb-lv"><span>SL · 30 pip</span><b style="color:var(--no)">${num(p.sl)}</b></div>
-        <div class="rb-lv"><span>TP1 · 100</span><b style="color:var(--ok)">${num(p.tp1)}</b></div>
-        <div class="rb-lv"><span>TP2 · 200</span><b style="color:var(--ok)">${num(p.tp2)}</b></div>
-        <div class="rb-lv"><span>TPmax</span><b style="color:var(--ok)">${num(p.tpMax)}</b></div>
-        <div class="rb-lv"><span>TPmax pip</span><b>${XE(p.tpMaxPips)}</b></div>
+        <div class="rb-lv"><span>TP1 · ${XE(p.tpPips)} pip</span><b style="color:var(--ok)">${num(p.tp1)}</b></div>
+        <div class="rb-lv"><span>TP2 · ${XE(p.tp2Pips)} pip</span><b style="color:var(--ok)">${num(p.tp2)}</b></div>
+        <div class="rb-lv"><span>TPmax · ${XE(p.tpMaxPips)} pip</span><b style="color:var(--ok)">${num(p.tpMax)}</b></div>
+        <div class="rb-lv"><span>Arah</span><b style="color:${buy ? 'var(--ok)' : 'var(--no)'}">${XE(p.dir)}</b></div>
       </div>
-      <div class="small mut" style="margin-top:8px">${XE(p.why)} · ${XE(p.type)} · RR 1:2,5 · arah ${XE(p.dir)}</div></div>`;
+      ${tg ? `<div style="margin-top:8px"><div class="small mut" style="margin-bottom:2px">Tangga TP dari likuiditas nyata:</div>${tg}</div>` : ''}
+      <div class="small mut" style="margin-top:8px">${XE(p.why)}</div>
+      ${p.invalidation ? `<div class="small" style="color:var(--warn);margin-top:4px">Batal: ${XE(p.invalidation)}</div>` : ''}</div>`;
   }
 
   function signalVerdict(j) {
     const buy = j.direction === 'BUY';
     return `<div class="card"><div class="rb-card-head"><h3>📊 Arah tunggal</h3><span class="rb-dir ${buy ? 'buy' : 'sell'}">${XE(j.direction)}</span></div>
       <div class="small mut">Kekuatan ${XE(j.directionStrength)}% · harga ${num(j.price)} · ${XE(j.priceSource)} · ${XE(j.markers ? j.markers.length : 0)} tanda chart</div>
-      <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill">ATR ${num(j.atr)}</span><span class="rb-pill">RSI ${num(j.rsi)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
+      <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? '<span class="rb-pill y">Candle TradingView real-time</span>' : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
+      ${j.freshness ? `<div class="small mut" style="margin-top:6px">Harga ${j.freshness.priceAt ? new Date(j.freshness.priceAt).toLocaleTimeString('id-ID') : '—'} · candle M5 ${j.freshness.candleAgeMin != null ? (j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') : '—'} lalu · ${XE(j.freshness.candleSource)}</div>` : ''}
+      ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda. Semua setup berstatus TUNGGU sampai candle M5 baru muncul — bukan sinyal untuk entry sekarang.</div>` : ''}
       ${j.eventRisk && j.eventRisk.level !== 'RENDAH' ? `<div class="warn" style="margin-top:8px">⚠️ ${XE(j.eventRisk.note)}</div>` : ''}
       ${j.adr ? `<div class="small mut" style="margin-top:6px">ADR ${XE(j.adr.avgPips)} pip · hari ini ${XE(j.adr.todayPips)} pip · sisa rata-rata ${XE(j.adr.remainingPips)} pip</div>` : ''}
     </div>`;
+  }
+
+  function checklistCard(j) {
+    if (!j.checklist || !j.checklist.length) return '';
+    return `<div class="card"><div class="rb-card-head"><h3>✅ Checklist Alchemist M5</h3><span class="rb-pill ${j.checkScore >= 80 ? 'y' : ''}">${XE(j.checkScore)}%</span></div>
+      ${j.checklist.map(x => `<div class="item"><span>${x.ok ? '✅' : '⚠️'} ${XE(x.k)}</span><span class="small mut" style="text-align:right">${XE(x.d)}</span></div>`).join('')}</div>`;
   }
 
   function tfCard(j) {
@@ -265,10 +277,10 @@
   function chartCard(j) {
     const types = {};
     (j.markers || []).forEach(m => { types[m.type] = (types[m.type] || 0) + 1; });
-    return `<div class="card"><div class="rb-card-head"><h3>🏷️ Chart tanda Alchemist</h3><span class="rb-pill" id="sigStamp">${j.generatedAt ? new Date(j.generatedAt).toLocaleTimeString('id-ID') : '—'}</span></div>
+    return `<div class="card"><div class="rb-card-head"><h3>🏷️ Chart tanda M5 + konteks M15</h3><span class="rb-pill" id="sigStamp">${j.generatedAt ? new Date(j.generatedAt).toLocaleTimeString('id-ID') : '—'}</span></div>
       <canvas id="xSigChart" style="width:100%;height:320px;display:block;margin-top:6px"></canvas>
       <div class="rb-pill-row" style="margin-top:8px">${Object.keys(types).map(t => `<span class="rb-pill">${XE(t)} · ${types[t]}</span>`).join('')}</div>
-      <div class="small mut" style="margin-top:6px">Tanda dihitung ulang dari candle terbaru setiap refresh, lalu di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). TradingView tidak menyediakan API untuk menulis gambar ke akun pengguna, jadi tanda tampil di chart aplikasi ini.</div></div>`;
+      <div class="small mut" style="margin-top:6px">Candle M5 dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; zona M15/D1 dipakai sebagai POI. Semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). TradingView tidak menyediakan API untuk menulis gambar ke akun pengguna.</div></div>`;
   }
 
   function marksCard(j) {
@@ -304,7 +316,7 @@
     if (!j || j.error) { out.innerHTML = `<div class="card"><div class="warn">${XE((j && j.error) || 'Tidak ada data')}</div></div>`; return; }
     const chip = X$('tvPrice');
     if (chip) chip.textContent = 'harga ' + num(j.price) + ' · ' + new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID');
-    out.innerHTML = signalVerdict(j) + planCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j);
+    out.innerHTML = signalVerdict(j) + planCard(j) + checklistCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j);
     drawChart(j);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
@@ -337,8 +349,14 @@
   function drawChart(j) {
     const cv = X$('xSigChart');
     if (!cv || !j.chart) return;
-    const rows = (j.chart.rows || []).slice(-90);
+    const rows = ((j.chart.m5 && j.chart.m5.length ? j.chart.m5 : j.chart.rows) || []).slice(-100);
     if (rows.length < 5) return;
+    const ap = modeOf(j, sigMode) || j.plan;
+    const lastC = rows[rows.length - 1].c;
+    const refs = []
+      .concat((j.markers || []).map(m => m.price))
+      .concat(ap ? [ap.entry, ap.sl, ap.tp1, ap.tp2, ap.tpMax] : [])
+      .filter(p => p != null && isFinite(p) && Math.abs(p - lastC) <= 30);
     const dpr = window.devicePixelRatio || 1;
     const W = cv.clientWidth || 720, H = 320;
     if (W < 80) return;
@@ -346,7 +364,7 @@
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const padR = 62, padL = 8, padT = 14, padB = 18;
-    const hi = Math.max(...rows.map(r => r.h)), lo = Math.min(...rows.map(r => r.l));
+    const hi = Math.max(...rows.map(r => r.h), ...refs), lo = Math.min(...rows.map(r => r.l), ...refs);
     const y = (p) => padT + (hi - p) / (hi - lo || 1) * (H - padT - padB);
     const x = (i) => padL + i * (W - padL - padR) / rows.length;
     const bw = Math.max(2, (W - padL - padR) / rows.length * 0.62);
@@ -383,14 +401,14 @@
     });
     (j.markers || []).forEach(m => {
       if (m.price == null) return;
-      mark(m.price, colors[m.type] || '#94a3b8', m.type + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' 🧠' : ''), m.type === 'FVG' || m.type === 'OB');
+      mark(m.price, colors[m.type] || '#94a3b8', (m.tf ? m.tf + ' ' : '') + m.type + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' 🧠' : ''), m.type === 'FVG' || m.type === 'OB');
     });
-    const ap = modeOf(j, sigMode) || j.plan;
     if (ap) {
       mark(ap.entry, '#e2e8f0', 'Entry ' + Number(ap.entry).toFixed(2) + ' · ' + ap.style, false);
       mark(ap.sl, '#ef4444', 'SL ' + Number(ap.sl).toFixed(2), false);
       mark(ap.tp1, '#22c55e', 'TP1 ' + Number(ap.tp1).toFixed(2), true);
       mark(ap.tp2, '#22c55e', 'TP2 ' + Number(ap.tp2).toFixed(2), true);
+      if (ap.tpMax && ap.tpMax !== ap.tp2) mark(ap.tpMax, '#86efac', 'TPmax ' + Number(ap.tpMax).toFixed(2), true);
     }
   }
 
