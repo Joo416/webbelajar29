@@ -19,7 +19,7 @@
     { k: 'FOMC', t: 'FOMC', s: 'suku bunga' }
   ];
   const NEWS_KEY = 'rb_xau_news_v2_';
-  let newsFocus = 'NFP', newsData = null, newsBusy = false;
+  let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false;
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY';
   const SIG_MODES = [['SCALPING', 'Scalping M5'], ['DAY', 'Day M5'], ['SWING', 'Swing M5']];
 
@@ -28,14 +28,40 @@
   function saveCache(k, v) { try { localStorage.setItem(NEWS_KEY + k, JSON.stringify(v)); } catch (e) { } }
   function focusNow() { try { const v = localStorage.getItem('rb_xau_focus_v2'); return FOCUS.some(f => f.k === v) ? v : 'NFP'; } catch (e) { return 'NFP'; } }
 
+  function startNewsClock(iso) {
+    if (newsClock) { clearInterval(newsClock); newsClock = null; }
+    if (!iso) return;
+    const ts = Date.parse(iso);
+    if (!isFinite(ts)) return;
+    const tick = function () {
+      const el = X$('xCd');
+      if (!el) { clearInterval(newsClock); newsClock = null; return; }
+      const d = ts - Date.now();
+      if (d <= 0) { el.textContent = 'Rilis sudah dimulai'; return; }
+      const m = Math.floor(d / 60000), s = Math.floor((d % 60000) / 1000);
+      el.textContent = d >= 86400000
+        ? 'Hitung mundur: ' + Math.floor(d / 86400000) + ' hari ' + Math.floor((d % 86400000) / 3600000) + ' jam'
+        : 'Hitung mundur: ' + m + ' menit ' + String(s).padStart(2, '0') + ' detik';
+      /* Sekali saja: ambil analisis saat tersisa ~3,5 menit agar hasil panel
+         sudah siap 2-3 menit sebelum rilis. */
+      if (!newsAutoT3 && d <= 210000 && !newsBusy) {
+        newsAutoT3 = true;
+        window.pXauRun();
+      }
+    };
+    tick();
+    newsClock = setInterval(tick, 1000);
+  }
+
   /* ---------------- NEWS ---------------- */
   window.pXauNews = function () {
+    if (newsClock) { clearInterval(newsClock); newsClock = null; }
     newsFocus = focusNow();
     newsData = loadCache(newsFocus);
     X$('pane').innerHTML = `
       <div class="card">
         <div class="rb-card-head"><h3>📰 News Analisis XAUUSD</h3><span class="rb-pill">4 rilis inti + rilis bersamaan</span></div>
-        <div class="rb-note">Pilih satu rilis. Seluruh AI mencari data rilis itu saja (tanpa bercampur rilis lain), dari TradingView, FRED/BLS, kalender ekonomi, media AS terpercaya, dan YouTube. Arah <b>BUY/SELL</b> dan status <b>spike</b> dihitung dari data — bukan tebakan AI. Rilis lain yang muncul bersamaan tetap ditampilkan sebagai efek gabungan.</div>
+        <div class="rb-note">Pilih satu rilis. <b>Panel beberapa AI independen</b> hanya membaca rilis itu — tanpa bercampur rilis lain — memakai data TradingView, FRED/BLS/BEA/Treasury, kalender ekonomi, media finansial global, dan YouTube. Arah <b>BUY/SELL</b>, status <b>spike</b>, dan prakiraan <b>T-3 menit</b> dihitung dari data; AI menjelaskan mengapa data itu valid dan di mana keterbatasannya. Rilis bersamaan hanya ditampilkan sebagai risiko gabungan.</div>
         <div class="rb-pill-row" id="xTabRow" style="margin-top:10px">${FOCUS.map(f => `<button class="rb-pill${f.k === newsFocus ? ' y' : ''}" data-k="${f.k}" onclick="pXauFocus('${f.k}')">${f.t} · ${f.s}</button>`).join('')}</div>
         <button class="btn full" id="xNewsBtn" style="margin-top:10px" onclick="pXauRun()">📡 Ambil data & analisis ${newsFocus}</button>
         <div id="xNewsMsg" class="mut small" style="margin-top:8px"></div>
@@ -44,6 +70,7 @@
     if (newsData) paintNews(newsData, true);
   };
   window.pXauFocus = function (k) {
+    newsAutoT3 = false;
     newsFocus = FOCUS.some(f => f.k === k) ? k : 'NFP';
     try { localStorage.setItem('rb_xau_focus_v2', newsFocus); } catch (e) { }
     window.pXauNews();
@@ -67,6 +94,45 @@
     newsBusy = false;
     if (btn) { btn.disabled = false; btn.textContent = '📡 Ambil data & analisis ' + newsFocus; }
   };
+
+  function timingCard(j) {
+    const t = j.timing;
+    if (!t) return '';
+    const hot = t.preWindow;
+    const col = t.dir === 'BUY' ? 'var(--ok)' : 'var(--no)';
+    return `<div class="card" style="border-left:5px solid ${hot ? 'var(--warn)' : 'var(--line)'}">
+      <div class="rb-card-head"><h3>⏱️ Timing & prakiraan pra-rilis</h3><span class="rb-pill ${hot ? 'y' : ''}">${XE(t.status)}</span></div>
+      ${j.event && j.event.when ? `<div class="small" style="font-weight:700;margin-top:6px" id="xCd">Hitung mundur…</div>` : `<div class="small mut" style="margin-top:6px">Tidak ada jadwal rilis mendatang — memakai data terakhir.</div>`}
+      <div class="exp" style="color:var(--tx);margin-top:8px"><b>Prakiraan pra-rilis: <span style="color:${col}">${XE(t.dir)}</span></b> · keyakinan ${XE(t.confidence)}% · skor ${XE(t.score)}
+        <div class="small mut">${XE(t.caveat)}</div></div>
+      ${(t.reasons || []).length ? `<div style="margin-top:8px"><b class="small">Bukti pra-rilis</b>${t.reasons.map(x => `<div class="item"><span>${XE(x.why)}</span><b style="color:${x.w >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.w > 0 ? '+' : ''}${XE(x.w)}</b></div>`).join('')}</div>` : ''}
+      ${t.nowcast ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Nowcast NFP:</b> ${XE(t.nowcast.note)} <span class="small" style="color:${t.nowcast.hot ? 'var(--no)' : 'var(--ok)'}">${t.nowcast.hot ? 'cenderung panas' : 'cenderung dingin'}</span></div>` : ''}
+      <div style="margin-top:10px"><b class="small">Playbook 2–3 menit sebelum rilis</b>${(t.playbook || []).map(x => `<div class="small" style="margin-top:4px">• ${XE(x)}</div>`).join('')}</div>
+    </div>`;
+  }
+
+  function panelCard(j) {
+    const p = j.aiPanel;
+    if (!p || !p.ok) return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">tidak tersedia</span></div><div class="warn">${XE((p && p.error) || 'Panel AI tidak memberi jawaban valid. Arah mesin tetap dipakai.')}</div></div>`;
+    return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel ${XE(p.total)} AI independen</h3><span class="rb-pill y">${p.consensus === 'SPLIT' ? 'terbelah' : 'mayoritas ' + XE(p.consensus)} · ${XE(p.agreement)}%</span></div>
+      <div class="small mut">${XE(p.note)} ${p.distinctProviders ? '· ' + p.distinctProviders + ' penyedia berbeda' : ''}${p.avgConfidence != null ? ' · rata-rata keyakinan ' + p.avgConfidence + '%' : ''}</div>
+      <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill" style="color:var(--ok)">BUY ${p.votes.BUY}</span><span class="rb-pill" style="color:var(--no)">SELL ${p.votes.SELL}</span></div>
+      ${p.total < 3 ? `<div class="small mut" style="margin-top:4px">${p.total} dari 3 panelis menjawab; sisanya tidak tersedia saat ini. Panel tetap menampilkan suara yang valid.</div>` : ''}
+      ${p.items.map(x => `<div class="exp" style="margin-top:8px;color:var(--tx)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(x.id)} · <span style="color:${x.direction === 'BUY' ? 'var(--ok)' : 'var(--no)'}">${XE(x.direction)}</span></b><span class="small mut">${XE(x.model || x.provider)} · ${XE(x.confidence)}%</span></div>
+        <div class="small" style="margin-top:3px">${XE(x.focus_read)}</div>
+        ${(x.reasons || []).map(r => `<div class="small" style="margin-top:2px">• ${XE(r)}</div>`).join('')}
+        ${x.why_valid ? `<div class="small mut" style="margin-top:3px">Validitas: ${XE(x.why_valid)}</div>` : ''}
+        ${x.pre_event_plan ? `<div class="small" style="color:var(--warn);margin-top:2px">Rencana: ${XE(x.pre_event_plan)}</div>` : ''}</div>`).join('')}
+    </div>`;
+  }
+
+  function macroCard(j) {
+    const m = j.macroBoard;
+    if (!m || !m.items || !m.items.length) return '';
+    return `<div class="card"><div class="rb-card-head"><h3>🌐 Papan makro global (FRED)</h3><span class="rb-pill">${m.items.length} seri resmi</span></div>
+      ${m.items.map(x => `<div class="item"><span>${XE(x.label)} <span class="small mut">${XE(x.date)} · ${XE(x.source)}</span></span><span><b>${XE(x.value)}${XE(x.unit)}</b> <span class="small" style="color:${x.chg == null ? 'var(--mut)' : x.chg >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.chg == null ? '' : (x.chg > 0 ? '+' : '') + x.chg + XE(x.unit)}</span></span></div>`).join('')}
+      <div class="small mut" style="margin-top:6px">${XE(m.note)}</div></div>`;
+  }
 
   function verdictCard(j) {
     const buy = j.direction === 'BUY';
@@ -107,6 +173,11 @@
       <div class="exp" style="color:var(--tx);line-height:1.6">${XE(d.summary || '')}</div>
       ${d.focus_what ? `<div style="margin-top:8px"><b class="small">Apa yang diukur</b><div class="small" style="line-height:1.55">${XE(d.focus_what)}</div></div>` : ''}
       ${d.why_gold ? `<div style="margin-top:6px"><b class="small">Mengapa penting untuk emas</b><div class="small" style="line-height:1.55">${XE(d.why_gold)}</div></div>` : ''}
+      ${d.prediction_2_3m ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⏱️ Prakiraan 2–3 menit sebelum rilis</b><div class="small" style="line-height:1.55">${XE(d.prediction_2_3m)}</div></div>` : ''}
+      ${d.why_valid ? `<div style="margin-top:8px"><b class="small">Mengapa data ini valid</b><div class="small" style="line-height:1.55">${XE(d.why_valid)}</div></div>` : ''}
+      ${d.fact_vs_inference ? `<div class="small mut" style="margin-top:5px">Fakta vs inferensi: ${XE(d.fact_vs_inference)}</div>` : ''}
+      ${(d.data_chain || []).length ? `<div style="margin-top:8px"><b class="small">Rantai data → arah</b>${d.data_chain.map(x => `<div class="item"><span><b>${XE(x.source)}</b> <span class="small mut">${XE(x.weight)}</span><div class="small">${XE(x.fact)}</div></span></div>`).join('')}</div>` : ''}
+      ${d.youtube_read ? `<div class="small" style="margin-top:6px">📺 YouTube: ${XE(d.youtube_read)}</div>` : ''}
       <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
         ${d.bull_case ? `<div class="exp" style="color:var(--tx)"><b>🟢 Skenario naik:</b> ${XE(d.bull_case)}</div>` : ''}
         ${d.bear_case ? `<div class="exp" style="color:var(--tx)"><b>🔴 Skenario turun:</b> ${XE(d.bear_case)}</div>` : ''}
@@ -134,7 +205,9 @@
     return `<div class="card"><div class="rb-card-head"><h3>📺 YouTube & media AS</h3><span class="rb-pill">${y.length} video · ${u.length} berita</span></div>
       <div class="rb-note">YouTube: judul + kanal + umur (kanal resmi ditandai). Media AS: Google News RSS (Reuters, AP, Bloomberg, CNBC, WSJ, FT, MarketWatch, Fox Business). Hanya konteks — angka tetap dari kalender & FRED.</div>
       ${u.length ? `<div style="margin-top:8px"><b class="small">📰 Media AS</b>${u.map(x => `<div class="item"><span><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.title)}</a><div class="small mut">${XE(x.source || '')}${x.ageH != null ? ' · ' + x.ageH + ' jam lalu' : ''}</div></span></div>`).join('')}</div>` : ''}
-      ${y.length ? `<div style="margin-top:8px"><b class="small">▶️ YouTube</b>${y.map(x => `<div class="item"><span><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.title)}</a><div class="small mut">${x.trusted ? '✅ ' + XE(x.trusted) : '👤 komunitas'} · ${XE(x.channel || '')}${x.ageH != null ? ' · ' + x.ageH + ' jam lalu' : ''}</div></span></div>`).join('')}</div>` : ''}
+      ${y.length ? `<div style="margin-top:8px"><b class="small">▶️ YouTube</b>${yt.tally ? `<span class="small mut"> · ${XE(yt.tally.bullish)} bullish / ${XE(yt.tally.bearish)} bearish / ${XE(yt.tally.netral)} netral (dari judul)</span>` : ''}${y.map(x => `<div class="item"><span><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.title)}</a><div class="small mut">${x.trusted ? (String(x.trusted).toLowerCase() === String(x.channel || '').toLowerCase() ? '✅ ' : '✅ ' + XE(x.trusted) + ' · ') : '👤 komunitas · '}${XE(x.channel || '')}${x.ageH != null ? ' · ' + x.ageH + ' jam lalu' : ''}${x.views ? ' · ' + XE(x.views) : ''}${x.stance ? ' · ' + XE(x.stance) : ''}</div></span></div>`).join('')}</div>` : ''}
+      ${((yt.transcripts && yt.transcripts.items) || []).length ? `<div style="margin-top:8px"><b class="small">📝 Transkrip resmi Bloomberg/Reuters/CNBC</b>${yt.transcripts.items.map(t => `<details class="exp" style="margin-top:6px;color:var(--tx)"><summary><b>${XE(t.title)}</b> <span class="small mut">${XE(t.channel)} · ${XE(t.durationLabel)} · ${XE(t.auto ? 'caption otomatis' : 'caption')} · ${XE(t.chars)} karakter</span></summary><div class="small" style="margin-top:6px;line-height:1.55">${XE(String(t.text || '').slice(0, 600))}${t.text && t.text.length > 600 ? '…' : ''}</div><div class="small mut">Kutipan caption mentah — bukan angka acuan; bisa salah kata.</div></details>`).join('')}</div>` : `<div class="small mut" style="margin-top:6px">${XE((yt.transcripts && yt.transcripts.note) || 'Transkrip resmi tidak tersedia.')}</div>`}
+      ${yt.videoRead && yt.videoRead.ok ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>🎬 Isi video resmi: ${XE(yt.videoRead.title)}</b><div class="small mut">${XE(yt.videoRead.channel)} · ${XE(yt.videoRead.durationLabel)} · dibaca ${XE(yt.videoRead.model)} · kecenderungan ${XE(yt.videoRead.kecenderungan)}</div>${yt.videoRead.topik ? `<div class="small" style="margin-top:4px"><b>Topik:</b> ${XE(yt.videoRead.topik)}</div>` : ''}${(yt.videoRead.poin || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}${yt.videoRead.catatan ? `<div class="small mut" style="margin-top:4px">${XE(yt.videoRead.catatan)}</div>` : ''}<div class="small mut">${XE(yt.videoRead.note)}</div></div>` : ''}
       ${((j.officialNews && j.officialNews.items) || []).length ? `<div style="margin-top:8px"><b class="small">🏛 Rilis pers resmi (Fed/BLS)</b>${j.officialNews.items.map(x => `<div class="item"><span><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.title)}</a><div class="small mut">${XE(x.source)}${x.ageH != null ? ' · ' + x.ageH + ' jam lalu' : ''}</div></span></div>`).join('')}</div>` : ''}
       ${(j.concurrent || []).length ? `<div style="margin-top:10px"><b class="small">⏱ Rilis lain di waktu bersamaan</b>${j.concurrent.map(c => `<div class="item"><span>${XE(c.title)}${c.tag ? ' · <b>' + XE(c.tag) + '</b>' : ''}<div class="small mut">${XE(when(c.when))} · ${XE(c.impact)} · konsensus ${XE(c.forecast || '—')}</div></span><span class="small mut">${XE(c.actual || 'belum terbit')}</span></div>`).join('')}</div>` : ''}
     </div>`;
@@ -142,8 +215,10 @@
 
   function dataCard(j) {
     const src = j.sources || [], val = j.official;
-    return `<div class="card"><h3>✅ Validitas & sumber</h3>
-      <div class="rb-note">Setiap angka punya sumber dan periode. Data resmi (FRED/BLS) dipisahkan dari kalender agregator.</div>
+    const q = j.dataQuality;
+    return `<div class="card"><div class="rb-card-head"><h3>✅ Validitas & sumber</h3>${q ? `<span class="rb-pill ${q.score >= 80 ? 'y' : ''}">${XE(q.score)}% sumber siap</span>` : ''}</div>
+      <div class="rb-note">Setiap angka punya sumber dan periode. Data resmi (FRED/BLS/BEA/Treasury) dipisahkan dari kalender agregator.</div>
+      ${q ? `<div style="margin-top:6px">${q.checks.map(c => `<div class="item"><span>${c.ok ? '✅' : '⚠️'} ${XE(c.k)}</span></div>`).join('')}</div>` : ''}
       ${val && val.ok ? `<div class="exp" style="color:var(--tx);margin-top:6px"><b>${XE(val.label)}</b> · nilai <b>${XE(val.value)}</b>${val.prev != null ? ' · sebelumnya ' + XE(val.prev) : ''} · periode ${XE(val.period)} <div class="small mut">${XE(val.source)}</div>${(val.extra || []).map(x => `<div class="small mut">${XE(x.metric)}: ${XE(x.latest)}${x.previous != null ? ' (sebelumnya ' + XE(x.previous) + ')' : ''}</div>`).join('')}</div>` : `<div class="warn" style="margin-top:6px">Angka resmi FRED belum terbaca: ${XE((val && val.error) || '—')}</div>`}
       <div style="margin-top:8px">${src.map(s => `<div class="item"><span>${s.ok ? '✅' : '⚠️'} ${XE(s.name)}</span></div>`).join('')}</div>
       <div class="small mut" style="margin-top:6px">Diambil ${XE(when(j.generatedAt))}${j.cached ? ' · cache server' : ''}${j.ai ? ' · AI: ' + XE((j.ai.model || j.ai.provider || '—')) : ''}</div>
@@ -163,7 +238,8 @@
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
     if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><button class="btn full" style="margin-top:8px" onclick="pXauRun()">Coba lagi</button></div>`; return; }
-    out.innerHTML = verdictCard(j) + eventCard(j) + evidenceCard(j) + docCard(j) + marketCard(j) + sourcesCard(j) + dataCard(j) + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan di perangkat — tekan ambil data untuk memperbarui.</div>' : '');
+    out.innerHTML = verdictCard(j) + timingCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + macroCard(j) + marketCard(j) + sourcesCard(j) + dataCard(j) + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan di perangkat — tekan ambil data untuk memperbarui.</div>' : '');
+    startNewsClock(j.event && j.event.when);
   }
 
   /* ---------------- SIGNAL ---------------- */
