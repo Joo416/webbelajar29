@@ -168,6 +168,18 @@ let db=null,auth=null,user=null;
 try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();auth=firebase.auth()}catch(e){console.error(e);document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase gagal dimuat.</div>'}
 
 const S={sec:'sekolah',mapel:'Bahasa Indonesia',tab:'latihan',qs:[],i:0,score:0,done:false,chat:{},gen:[],bank:[]};
+/* Simpan posisi layar utama agar refresh tidak melempar pengguna ke awal. */
+const RB_UI_KEY='rb_ui_state_v1';
+function rbSaveUi(){try{localStorage.setItem(RB_UI_KEY,JSON.stringify({sec:S.sec,tab:S.tab,mapel:S.mapel}))}catch(e){}}
+function rbRestoreUi(){
+  try{
+    const x=JSON.parse(localStorage.getItem(RB_UI_KEY)||'null');if(!x||typeof x!=='object')return;
+    if(['beranda','sekolah','bahasa','trading','admin'].includes(x.sec))S.sec=x.sec;
+    if(typeof x.tab==='string'&&x.tab)S.tab=x.tab;
+    if(typeof x.mapel==='string'&&x.mapel)S.mapel=x.mapel;
+    if(S.sec==='admin'&&!S.admin)S.sec='beranda';
+  }catch(e){}
+}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\[\[(.+?)\|(https?:[^\]\s]+)\]\]/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--b)">$1</a>').replace(/\n/g,'<br>');
@@ -1393,7 +1405,7 @@ async function enter(){
   tabsShow(true);const tb=document.querySelector('.tabs');
   if(S.admin&&!$('t-admin'))tb.insertAdjacentHTML('beforeend','<button id="t-admin" onclick="setSec(\'admin\')">🛡️ Admin</button>');
   if(!S.admin&&$('t-admin'))$('t-admin').remove();
-  tabLabel16();home();if(S.admin)adminBadge();
+  rbRestoreUi();tabLabel16();home();if(S.admin)adminBadge();
 }
 function home(){if(S.sec==='trading'&&!S.admin&&!S.trading)return tradingLockView();return homeBase()}
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi tradingLockView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -2212,9 +2224,12 @@ const xauTitle=t=>XNAME[t]||t;
 function v21MarkTabs(){['beranda','sekolah','bahasa','trading','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)})}
 function home(){
   v21MarkTabs();
-  if(S.sec==='bahasa'){S.tab='bahasa';return langHome();}
-  if(S.sec==='trading'&&!S.admin&&!S.trading)return tradingLockView();
-  return homeBase();
+  let out;
+  if(S.sec==='bahasa'){S.tab='bahasa';out=langHome();}
+  else if(S.sec==='trading'&&!S.admin&&!S.trading)out=tradingLockView();
+  else out=homeBase();
+  rbSaveUi();
+  return out;
 }
 function homeBase(){
   if(S.sec==='admin')return adminView();
@@ -2583,20 +2598,20 @@ input,select,textarea{background:var(--field)}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="rb-modern.css?v=20261116i">
-<link rel="stylesheet" href="rb-v33.css?v=20261116i">
-<link rel="stylesheet" href="rb-v34.css?v=20261116i">
-<script src="bahasa-en-data.js?v=20261116i"></script>
-<script src="bahasa-jp-data.js?v=20261116i"></script>
-<script src="bahasa-jp-data2.js?v=20261116i"></script>
-<script src="bahasa-jp-grammar.js?v=20261116i"></script>
-<script src="bahasa.js?v=20261116i"></script>
-<script src="rb-core.js?v=20261116i"></script>
-<script src="rb-content.js?v=20261116i"></script>
-<script src="rb-ui.js?v=20261116i"></script>
-<script src="rb-alch.js?v=20261116i"></script>
-<script src="rb-v33.js?v=20261116i"></script>
-<script src="rb-xau.js?v=20261116i"></script>
-<script src="rb-admin.js?v=20261116i"></script>
+<link rel="stylesheet" href="rb-modern.css?v=20261116t">
+<link rel="stylesheet" href="rb-v33.css?v=20261116t">
+<link rel="stylesheet" href="rb-v34.css?v=20261116t">
+<script src="bahasa-en-data.js?v=20261116t"></script>
+<script src="bahasa-jp-data.js?v=20261116t"></script>
+<script src="bahasa-jp-data2.js?v=20261116t"></script>
+<script src="bahasa-jp-grammar.js?v=20261116t"></script>
+<script src="bahasa.js?v=20261116t"></script>
+<script src="rb-core.js?v=20261116t"></script>
+<script src="rb-content.js?v=20261116t"></script>
+<script src="rb-ui.js?v=20261116t"></script>
+<script src="rb-alch.js?v=20261116t"></script>
+<script src="rb-v33.js?v=20261116t"></script>
+<script src="rb-xau.js?v=20261116t"></script>
+<script src="rb-admin.js?v=20261116t"></script>
 </body>
 </html>

@@ -797,7 +797,7 @@ function alM5Html() {
       ['6. Target', 'TP1 100 pip, TP2 200 pip, sisanya trailing ke likuiditas berikutnya.']
     ])
     + '<div class="rb-callout warn" style="margin-top:10px"><b>Batal entry:</b> M5 close kembali melewati zona, muncul sweep berlawanan, atau rilis USD high-impact dalam 30 menit.</div>'
-    + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 15 menit tanpa tombol.</div>');
+    + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 20 menit tanpa tombol.</div>');
 }
 
 /* ---------- kerangka halaman ---------- */
