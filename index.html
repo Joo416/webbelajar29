@@ -264,8 +264,8 @@ async function usdIdr(){
 }
 // ✏️ [TEKS BISA DIUBAH] 📒 Trading → Jurnal & Catatan — fungsi loadJ(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function loadJ(){
-  try{const s=await db.collection('jurnal').where('uid','==',user.uid).limit(200).get();
-    const a=s.docs.map(d=>({id:d.id,...d.data()})).sort((x,y)=>(y.waktu?.seconds||0)-(x.waktu?.seconds||0));
+  try{const s=await db.collection('jurnal').where('uid','==',user.uid).limit(400).get();
+    const a=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.jenis!=='signal_history').sort((x,y)=>(y.waktu?.seconds||0)-(x.waktu?.seconds||0));
     const rs=a.filter(x=>x.r!=null),tot=rs.reduce((p,x)=>p+x.r,0),win=rs.filter(x=>x.r>0).length;
     if(!$('jlist'))return;
     ($('jlist')||{}).innerHTML=a.length?`<div class="small" style="margin-bottom:8px;color:var(--tx)">${a.length} trade • Win rate ${rs.length?Math.round(win/rs.length*100):0}% • Total <b>${tot.toFixed(2)}R</b> • Rata-rata ${rs.length?(tot/rs.length).toFixed(2):0}R</div>`+a.slice(0,15).map(x=>`<div class="gi"><div><b>${esc(x.pair)} ${esc(x.arah)}</b> ${x.setup?'• '+esc(x.setup):''}<div class="mut small">${x.r!=null?(x.r>0?'✅ +':'❌ ')+x.r+'R':'—'}${x.catatan?' • '+esc(x.catatan):''}</div></div><button class="x" onclick="delJ('${x.id}')">Hapus</button></div>`).join(''):'Belum ada trade.';
@@ -2583,20 +2583,20 @@ input,select,textarea{background:var(--field)}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="rb-modern.css?v=20261115k">
-<link rel="stylesheet" href="rb-v33.css?v=20261115k">
-<link rel="stylesheet" href="rb-v34.css?v=20261115k">
-<script src="bahasa-en-data.js?v=20261115k"></script>
-<script src="bahasa-jp-data.js?v=20261115k"></script>
-<script src="bahasa-jp-data2.js?v=20261115k"></script>
-<script src="bahasa-jp-grammar.js?v=20261115k"></script>
-<script src="bahasa.js?v=20261115k"></script>
-<script src="rb-core.js?v=20261115k"></script>
-<script src="rb-content.js?v=20261115k"></script>
-<script src="rb-ui.js?v=20261115k"></script>
-<script src="rb-alch.js?v=20261115k"></script>
-<script src="rb-v33.js?v=20261115k"></script>
-<script src="rb-xau.js?v=20261115k"></script>
-<script src="rb-admin.js?v=20261115k"></script>
+<link rel="stylesheet" href="rb-modern.css?v=20261116i">
+<link rel="stylesheet" href="rb-v33.css?v=20261116i">
+<link rel="stylesheet" href="rb-v34.css?v=20261116i">
+<script src="bahasa-en-data.js?v=20261116i"></script>
+<script src="bahasa-jp-data.js?v=20261116i"></script>
+<script src="bahasa-jp-data2.js?v=20261116i"></script>
+<script src="bahasa-jp-grammar.js?v=20261116i"></script>
+<script src="bahasa.js?v=20261116i"></script>
+<script src="rb-core.js?v=20261116i"></script>
+<script src="rb-content.js?v=20261116i"></script>
+<script src="rb-ui.js?v=20261116i"></script>
+<script src="rb-alch.js?v=20261116i"></script>
+<script src="rb-v33.js?v=20261116i"></script>
+<script src="rb-xau.js?v=20261116i"></script>
+<script src="rb-admin.js?v=20261116i"></script>
 </body>
 </html>
