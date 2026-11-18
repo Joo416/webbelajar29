@@ -8,6 +8,7 @@
 const XCORE = require('../lib/xau-core.js');
 const XNEWS = require('../lib/news.js');
 const XSIG = require('../lib/signal.js');
+const XRADAR = require('../lib/radar.js');
 const keysOf = p => {
   const raw = [process.env[p + '_API_KEYS'] || '', process.env[p + '_API_KEY'] || '',
     ...[1, 2, 3, 4, 5].map(i => process.env[p + '_API_KEY_' + i] || '')].join(',');
@@ -2174,13 +2175,14 @@ module.exports = async (req, res) => {
   const au = await authorize(req);
   if (!au.ok) return res.status(au.status).json({ error: au.error });
   const bd0 = req.body || {};
-  if ((bd0.action === 'news' || bd0.action === 'pro' || bd0.action === 'xau' || bd0.action === 'xauSignal' || bd0.cat === 'trading' || (bd0.action === 'tutor' && TRADING_MAPEL.includes(bd0.mapel))) && !(await tradingAllowed(au)))
+  if ((bd0.action === 'news' || bd0.action === 'pro' || bd0.action === 'xau' || bd0.action === 'xauSignal' || bd0.action === 'xauRadar' || bd0.cat === 'trading' || (bd0.action === 'tutor' && TRADING_MAPEL.includes(bd0.mapel))) && !(await tradingAllowed(au)))
     return res.status(403).json({ error: 'Fitur Trading khusus admin. Ajukan izin ke admin lewat tab Trading.', code: 'trading_locked' });
   if (bd0.action === 'ai_status') { if (!au.admin) return res.status(403).json({ error: 'Khusus admin' }); return aiStatusHandler(req, res); }
   if (req.body && req.body.action === 'news') return newsHandler(req, res);
   if (req.body && req.body.action === 'pro') return proHandler(req, res);
   if (req.body && req.body.action === 'xau') return XNEWS.newsHandler(req, res);
   if (req.body && req.body.action === 'xauSignal') return XSIG.signalHandler(req, res);
+  if (req.body && req.body.action === 'xauRadar') return XRADAR.radarHandler(req, res);
   if (req.body && req.body.action === 'tutor') return tutorHandler(req, res);
   if (req.body && req.body.action === 'kurikulum') return kurikulumHandler(req, res);
   if (req.body && req.body.action === 'world') return worldHandler(req, res);
