@@ -20,9 +20,11 @@
     { k: 'FOMC', t: 'FOMC', s: 'suku bunga' }
   ];
   const NEWS_KEY = 'rb_xau_news_v4_';
-  let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false;
-  const NEWS_REFRESH_MS = 15 * 60000;
-  const SIG_REFRESH_MS = 10 * 60000;
+  let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false, newsGen = 0;
+  /* Analisis News/Signal di-refresh tiap 20 menit. State hasilnya disimpan
+     per akun (UID) di cache lokal + dokumen state Firestore yang sama. */
+  const NEWS_REFRESH_MS = 20 * 60000;
+  const SIG_REFRESH_MS = 20 * 60000;
   let newsTimer = null, newsAt = 0, newsCd = null;
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY', sigChartBars = 100, sigHistAt = 0;
   let sigRetryAt = 0, sigWake = false;
@@ -319,6 +321,20 @@
     if (local && lAt > rAt + 1500) statePut('news', focus, local).catch(() => { });
     return null;
   }
+  async function radarStatePull() {
+    const d = await stateGet('radar');
+    if (!d || !d.data || d.data.ok === false || d.data.error) return false;
+    const rAt = cacheAt(d.data) || Number(d.at) || 0;
+    if (!rAt) return false;
+    if (rAt > (radarAt || 0) + 1500) {
+      radarData = d.data; radarAt = rAt; radarSavedAt = rAt; radarCacheSave(d.data);
+      return true;
+    }
+    if (radarData && radarAt > rAt + 1500) {
+      statePut('radar', null, radarData).then(ok => { if (ok) radarSavedAt = radarAt; }).catch(() => { });
+    }
+    return false;
+  }
   /* Konteks yang disimpan saat entry. Ini bukti yang dipakai untuk
      menjelaskan TP/SL dan untuk pembelajaran pola, bukan narasi karangan. */
   function histCtx(j, s) {
@@ -353,6 +369,14 @@
         against: (j.methods.against || []).slice(0, 4)
       } : null,
       learn: setup.learning ? { blocked: !!setup.learning.blocked, reasons: (setup.learning.reasons || []).slice(0, 3) } : null,
+      smc: setup.smc ? {
+        grade: setup.smc.grade || '', score: setup.smc.score,
+        phase: setup.smc.phase || '', kill: !!(setup.smc.killzone && setup.smc.killzone.active),
+        pd: setup.smc.pd && setup.smc.pd.zone || '',
+        sweep: setup.smc.sweep && setup.smc.sweep.pool || '',
+        fib: !!(setup.smc.fib && setup.smc.fib.ok),
+        refined: setup.smc.refined ? setup.smc.refined.src : ''
+      } : null,
       ai,
       sources: (j && j.sources ? j.sources : []).slice(0, 6).map(x => x.name + (x.ok === false ? ' (gagal)' : ''))
     };
@@ -381,6 +405,7 @@
     if (/sweep|sapuan/i.test(t)) return 'SWEEP';
     if (/FVG/i.test(t)) return 'FVG';
     if (/\bOB\b|order block/i.test(t)) return 'OB';
+    if (/engulf/i.test(t)) return 'ENGULF';
     return 'TRIGGER';
   }
   function histPatternKeys(h) {
@@ -393,7 +418,13 @@
     const macro = histMacroSide(ctx, dir);
     const risk = String(ctx.risk && ctx.risk.level || '?');
     const htf = histTfSide(ctx, dir);
+    const smc = ctx.smc || {};
+    const grade = String(smc.grade || '?').toUpperCase();
+    const phase = String(smc.phase || '?').toUpperCase();
+    const kill = smc.kill ? 'YA' : 'TIDAK';
+    const pd = String(smc.pd || '?').toUpperCase();
     return [...new Set([
+      [style, dir, poi, trig, sess, macro, risk, htf, grade, phase, kill, pd].join('|'),
       [style, dir, poi, trig, sess, macro, risk, htf].join('|'),
       [style, dir, poi, trig, macro, risk].join('|'),
       [style, dir, risk].join('|'),
@@ -435,6 +466,9 @@
     if (ctx.learn && Array.isArray(ctx.learn.reasons) && ctx.learn.reasons.length) out.push('Pelajaran saat entry: ' + ctx.learn.reasons.join('; ') + '.');
     if (ctx.risk && ctx.risk.level === 'TINGGI') out.push('Risiko rilis tinggi: ' + (ctx.risk.note || 'spread/volatilitas dapat melebarkan SL.'));
     if (ctx.adr && Number(ctx.adr.remainingPips) < 60) out.push('Sisa ruang ADR hanya ' + ctx.adr.remainingPips + ' pip saat entry.');
+    if (ctx.smc && ctx.smc.kill === false) out.push('Entry diambil di luar kill zone London/New York.');
+    if (ctx.smc && ctx.smc.pd && ((h.dir === 'SELL' && ctx.smc.pd === 'discount') || (h.dir === 'BUY' && ctx.smc.pd === 'premium'))) out.push('Arah ' + h.dir + ' diambil di zona ' + ctx.smc.pd + ' (melawan aturan premium/discount 50%).');
+    if (ctx.smc && ctx.smc.grade === 'D') out.push('SMC saat entry grade D: syarat wajib belum lengkap.');
     if (ctx.poi) out.push('POI ' + ctx.poi + ' tidak bertahan; harga menembus SL 30 pip.');
     if (!out.length) out.push('Tidak ada faktor global yang tersimpan sebagai penyebab tunggal; SL ini murni invalidasi teknikal 30 pip.');
     return out;
@@ -448,6 +482,7 @@
     const tgt = (ctx.targets || []).filter(t => Number(t.pips) >= 200).slice(-1)[0];
     if (tgt) out.push('TP diambil dari likuiditas/proyeksi: ' + (tgt.src || (tgt.pips + ' pip')) + '.');
     if (ctx.rr != null) out.push('RR ' + ctx.rr + ':1 dengan SL 30 pip.');
+    if (ctx.smc && (ctx.smc.grade === 'A+' || ctx.smc.grade === 'A')) out.push('SMC ' + ctx.smc.grade + ' · PD ' + (ctx.smc.pd || '—') + ' · fase AMD ' + (ctx.smc.phase || '—') + (ctx.smc.refined ? ' · refine ' + ctx.smc.refined : '') + '.');
     if (ctx.ai && ctx.ai.confluence && ctx.ai.confluence.length) out.push('Konfluensi: ' + ctx.ai.confluence.join('; ') + '.');
     if (!out.length) out.push('TP tercapai dari level yang tercatat saat entry; tidak ada klaim sebab tambahan tanpa data.');
     return out;
@@ -489,6 +524,10 @@
           macro: histMacroSide(ctx, h.dir),
           risk: (ctx.risk && ctx.risk.level) || '',
           htf: histTfSide(ctx, h.dir),
+          smc: (ctx.smc && ctx.smc.grade) || '',
+          phase: (ctx.smc && ctx.smc.phase) || '',
+          kill: ctx.smc && ctx.smc.kill ? 'ya' : 'tidak',
+          pd: (ctx.smc && ctx.smc.pd) || '',
           method: isFinite(ma) ? (ma >= 70 ? 'tinggi' : ma >= 50 ? 'sedang' : 'rendah') : '',
           conf: isFinite(conf) ? conf : null,
           at: Date.parse(h.closedAt || '') || Number(h.updatedAt) || 0
@@ -571,7 +610,12 @@
       x.eAt = now;
     });
     const dir = String(j.direction || '').toUpperCase();
-    if ((dir === 'BUY' || dir === 'SELL') && Number(j.confidence) >= 55 && j.generatedAt && !arr.some(x => x.gen === j.generatedAt)) {
+    /* Satu sampel radar per 10 menit. Refresh 60 detik tetap berjalan untuk
+       tampilan, tetapi prakiraan yang tumpang tindih tidak dicatat berulang. */
+    const lastRadarRec = arr.reduce((m, x) => Math.max(m, Number(x.at) || 0), 0);
+    if ((dir === 'BUY' || dir === 'SELL') && Number(j.confidence) >= 55 && j.generatedAt
+      && (!lastRadarRec || now - lastRadarRec >= 10 * 60000)
+      && !arr.some(x => x.gen === j.generatedAt)) {
       arr.unshift({ dir, c: Number(j.confidence), ag: Number(j.agreement) || null, price: px, at: now, due: now + 10 * 60000, gen: j.generatedAt, ok: null });
     }
     const next = arr.filter(x => {
@@ -1055,8 +1099,11 @@
   /* ---------------- NEWS ---------------- */
   window.pXauNews = function () {
     if (newsClock) { clearInterval(newsClock); newsClock = null; }
-    if (newsTimer) { clearInterval(newsTimer); newsTimer = null; }
+    if (newsTimer) { clearTimeout(newsTimer); newsTimer = null; }
     if (newsCd) { clearInterval(newsCd); newsCd = null; }
+    /* Generasi mencegah loop lama menghidupkan timer baru setelah tab/ganti
+       rilis. Ini yang membuat auto-refresh tidak berjalan dobel. */
+    const gen = ++newsGen;
     const focus = newsFocus = focusNow();
     newsData = loadCache(focus);
     newsAt = cacheAt(newsData);
@@ -1073,7 +1120,7 @@
       const m0 = X$('xNewsMsg'); if (m0) m0.textContent = 'Menyinkronkan state akun & data tersimpan…';
       let remote = null;
       try { remote = await newsStatePull(focus); } catch (e) { }
-      if (focus !== newsFocus || !X$('xNewsOut')) return;
+      if (gen !== newsGen || focus !== newsFocus || !X$('xNewsOut')) return;
       if (remote) { newsData = remote.data; newsAt = remote.at; }
       if (newsData) { paintNews(newsData, true); try { newsLearnSync(newsData); } catch (e) { } }
       const tick = function () {
@@ -1086,17 +1133,23 @@
       };
       tick();
       newsCd = setInterval(tick, 1000);
-      if (!newsData || Date.now() - newsAt > NEWS_REFRESH_MS) window.pXauRun(true);
       const loop = function () {
+        if (gen !== newsGen || !X$('xNewsOut')) return;
+        if (newsBusy) { newsTimer = setTimeout(loop, 5000); return; }
         const wait = Math.max(1000, NEWS_REFRESH_MS - (Date.now() - (newsAt || Date.now())));
         newsTimer = setTimeout(async function () {
-          if (!X$('xNewsOut')) return;
+          if (gen !== newsGen || !X$('xNewsOut')) return;
           if (newsBusy) { newsTimer = setTimeout(loop, 5000); return; }
           await window.pXauRun(true);
-          loop();
+          if (gen === newsGen) loop();
         }, wait);
       };
-      loop();
+      /* Jangan menjadwalkan loop sebelum run awal selesai; jika tidak, timer
+         pertama langsung habis dan memicu run kedua yang tidak perlu. */
+      (async function () {
+        if (!newsData || Date.now() - newsAt > NEWS_REFRESH_MS) await window.pXauRun(true);
+        if (gen === newsGen) loop();
+      })();
     })();
     boot.catch(function (e) { const m0 = X$('xNewsMsg'); if (m0) m0.textContent = '⚠️ ' + e.message; });
   };
@@ -1109,13 +1162,14 @@
   window.pXauRun = async function (silent) {
     if (newsBusy) return;
     newsBusy = true;
+    const gen = newsGen;
     const focus = newsFocus;
     const msg = X$('xNewsMsg');
     if (msg) msg.textContent = 'Mengambil kalender, angka resmi FRED/BLS, TradingView, media AS, YouTube, lalu panel AI…';
     try {
       await Promise.all([learnPullSafe('news'), learnPullSafe('source')]);
       const j = await tcall({ action: 'xau', focus, fresh: true, learn: learnForNews() });
-      if (focus !== newsFocus || !X$('xNewsOut')) {
+      if (gen !== newsGen || focus !== newsFocus || !X$('xNewsOut')) {
         if (j && j.ok && !j.error) saveCache(focus, j);
         newsBusy = false; return;
       }
@@ -1132,7 +1186,7 @@
       paintNews(j, false);
       if (msg) msg.textContent = j.ok ? '✅ Selesai — arah ' + j.direction + ' · spike ' + (j.spike && j.spike.measured ? 'terukur' : j.spike && j.spike.likely ? 'diperkirakan' : 'tidak ada') + ' · ' + new Date().toLocaleTimeString('id-ID') : '⚠️ ' + (j.error || 'gagal');
     } catch (e) {
-      if (focus === newsFocus) { newsAt = Date.now(); paintNews({ ok: false, error: e.message }, false); }
+      if (gen === newsGen && focus === newsFocus && X$('xNewsOut')) { newsAt = Date.now(); paintNews({ ok: false, error: e.message }, false); }
       if (msg) msg.textContent = '⚠️ ' + e.message;
     }
     newsBusy = false;
@@ -1140,7 +1194,7 @@
 
   /* ---------------- RADAR 10M ---------------- */
   const RADAR_CACHE_KEY = 'rb_xau_radar_v1';
-  let radarData = null, radarAt = 0, radarBusy = false, radarTimer = null, radarCd = null;
+  let radarData = null, radarAt = 0, radarBusy = false, radarTimer = null, radarCd = null, radarGen = 0, radarSavedAt = 0;
   function radarCacheKey() { const u = histUid(); return RADAR_CACHE_KEY + (u ? '_' + u : ''); }
   function radarCacheLoad() { try { const c = JSON.parse(localStorage.getItem(radarCacheKey()) || 'null'); return c && c.data ? c : null; } catch (e) { return null; } }
   function radarCacheSave(j) { try { localStorage.setItem(radarCacheKey(), JSON.stringify({ at: Date.now(), data: j })); } catch (e) { } }
@@ -1158,6 +1212,7 @@
       </div>
       <div class="radar-kpis"><div><span>Harga</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>Spot pembanding</span><b>${j.spot == null ? '—' : num(j.spot)}</b><small>${j.priceDifferencePips == null ? 'tidak tersedia' : j.priceDifferencePips + ' pip dari TV'}</small></div><div><span>Rentang 10m</span><b>${j.expectedRangePips == null ? '—' : j.expectedRangePips + ' pip'}</b><small>dari ATR live</small></div><div><span>Risiko rilis</span><b style="color:${j.risk && j.risk.level === 'TINGGI' ? 'var(--no)' : j.risk && j.risk.level === 'SEDANG' ? 'var(--warn)' : 'var(--ok)'}">${XE((j.risk && j.risk.level) || '—')}</b><small>${XE((j.risk && j.risk.note) || '')}</small></div></div>
       <div class="small mut" style="margin-top:8px">${XE(j.method || '')}</div>
+      ${j.smc && j.smc.ok ? `<div class="small" style="margin-top:6px"><b>SMC/AMD:</b> ${XE(j.smc.note)}${j.smcPdConflict ? ' · <span style="color:var(--warn)">arah radar melawan premium/discount 50%; keyakinan diturunkan.</span>' : ''}</div>` : ''}
       ${(j.factors || []).length ? `<div class="radar-factors">${j.factors.map(f => `<div class="radar-factor ${f.score >= 0 ? 'up' : 'down'}"><b>${XE(f.name)}</b><span>${f.score > 0 ? '+' : ''}${XE(f.score)}</span><div class="small mut">${XE(f.why)}<br><span>${XE(f.source || '')}${f.at ? ' · ' + new Date(f.at).toLocaleTimeString('id-ID') : ''}</span></div></div>`).join('')}</div>` : ''}
       <div class="small" style="margin-top:10px;color:var(--warn)">${XE(j.limitation || '')}</div>
       <div class="small mut" style="margin-top:4px">${XE(j.brokerNote || '')}</div>
@@ -1170,32 +1225,52 @@
   window.pRadar = function () {
     if (radarTimer) { clearInterval(radarTimer); radarTimer = null; }
     if (radarCd) { clearInterval(radarCd); radarCd = null; }
+    const gen = ++radarGen;
     const c = radarCacheLoad();
     if (c) { radarData = c.data; radarAt = c.at; }
     X$('pane').innerHTML = `<div class="card radar-intro"><div class="rb-card-head"><h3>🛰️ Radar 10M — arah XAUUSD</h3><span class="rb-pill y">real-time · auto 60 detik</span></div><div class="rb-note">Radar deterministik untuk horizon <b>10 menit</b>: gabungan rekomendasi TradingView multi-timeframe, struktur candle M5/M15, momentum 10 menit, EMA/RSI, DXY/yield 15 menit, dan risiko rilis. Tidak ada angka karangan; setiap faktor menampilkan sumber dan waktu ambil.</div><div id="radarMsg" class="small mut" style="margin-top:8px"></div><div id="radarOut" style="margin-top:10px">${radarData ? radarCard(radarData) : ''}</div></div>`;
     const tick = function () {
       const el = X$('radarCountdown');
-      if (!el) { clearInterval(radarCd); radarCd = null; return; }
+      if (!el) {
+        /* Saat data pertama belum ada, elemen countdown belum dibuat; jangan
+           matikan interval. Baru matikan bila halaman radar sudah ditinggalkan. */
+        if (!X$('radarOut')) { clearInterval(radarCd); radarCd = null; }
+        return;
+      }
       const left = Math.max(0, (Number(el.dataset.until) || Date.now()) - Date.now());
       el.textContent = left ? 'Berlaku ' + Math.ceil(left / 60000) + ' menit lagi · auto-refresh 60 detik' : 'Horizon 10 menit habis — menghitung ulang…';
     };
     tick(); radarCd = setInterval(tick, 1000);
-    if (!radarData || Date.now() - (radarAt || 0) > 60000) radarRun(true);
+    /* Ambil state akun dulu; jangan langsung menembak feed baru bila perangkat
+       lain sudah punya hasil radar yang lebih baru. */
+    (async function () {
+      try { await radarStatePull(); } catch (e) { }
+      if (gen !== radarGen || !X$('radarOut')) return;
+      if (radarData) { const out = X$('radarOut'); if (out) out.innerHTML = radarCard(radarData); }
+      if (!radarData || Date.now() - (radarAt || 0) > 60000) radarRun(true);
+    })();
     radarTimer = setInterval(function () { if (X$('radarOut')) radarRun(true); else { clearInterval(radarTimer); radarTimer = null; } }, 60000);
     if (!window.__radarVis) { window.__radarVis = 1; document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && X$('radarOut') && Date.now() - (radarAt || 0) > 60000) radarRun(true); }); }
   };
   async function radarRun(silent) {
     if (radarBusy) return;
     radarBusy = true;
+    const gen = radarGen;
     const msg = X$('radarMsg'); if (msg) msg.textContent = 'Mengambil TradingView, candle live, DXY/yield, spot, dan kalender…';
     try {
       await Promise.all([learnPullSafe('radar'), learnPullSafe('source')]);
       const j = await tcall({ action: 'xauRadar', fresh: true, learn: learnForRadar() });
+      if (gen !== radarGen) { radarBusy = false; return; }
       if (j && j.ok !== false && !j.error) {
         radarData = j; radarAt = Date.now();
         try { radarLearnSync(j); } catch (e) { }
         try { sourceLearnSync(j); } catch (e) { }
         radarCacheSave(j);
+        /* Simpan state akun maksimal sekali per 20 menit; radar tetap
+           dihitung lokal tiap 60 detik untuk horizon 10 menitnya. */
+        if (!radarSavedAt || Date.now() - radarSavedAt >= 20 * 60000) {
+          statePut('radar', null, j).then(ok => { if (ok) radarSavedAt = Date.now(); }).catch(() => { });
+        }
       }
       const out = X$('radarOut'); if (out) out.innerHTML = radarCard(j);
       if (msg) msg.textContent = j && j.ok !== false && !j.error ? '✅ Radar diperbarui ' + new Date().toLocaleTimeString('id-ID') + ' · data tidak dijamin bebas SL.' : '⚠️ ' + ((j && j.error) || 'gagal');
@@ -1209,13 +1284,16 @@
     const hot = t.preWindow;
     const col = t.dir === 'BUY' ? 'var(--ok)' : 'var(--no)';
     return `<div class="card" style="border-left:5px solid ${hot ? 'var(--warn)' : 'var(--line)'}">
-      <div class="rb-card-head"><h3>⏱️ Timing & prakiraan pra-rilis</h3><span class="rb-pill ${hot ? 'y' : ''}">${XE(t.status)}</span></div>
+      <div class="rb-card-head"><h3>⏱️ Timing & arah rilis</h3><span class="rb-pill ${hot ? 'y' : ''}">${XE(t.status)}</span></div>
       ${j.event && j.event.when ? `<div class="small" style="font-weight:700;margin-top:6px" id="xCd">Hitung mundur…</div>` : `<div class="small mut" style="margin-top:6px">Tidak ada jadwal rilis mendatang — memakai data terakhir.</div>`}
-      <div class="exp" style="color:var(--tx);margin-top:8px"><b>Prakiraan pra-rilis: <span style="color:${col}">${XE(t.dir)}</span></b> · keyakinan ${XE(t.confidence)}% · skor ${XE(t.score)}
+      <div class="exp" style="color:var(--tx);margin-top:8px"><b>${t.phase === 'pasca-rilis' ? 'Arah pasca-rilis' : 'Prakiraan pra-rilis'}: <span style="color:${col}">${XE(t.dir)}</span></b> · keyakinan ${XE(t.confidence)}% · skor ${XE(t.score)}
         <div class="small mut">${XE(t.caveat)}</div></div>
-      ${(t.reasons || []).length ? `<div style="margin-top:8px"><b class="small">Bukti pra-rilis</b>${t.reasons.map(x => `<div class="item"><span>${XE(x.why)}</span><b style="color:${x.w >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.w > 0 ? '+' : ''}${XE(x.w)}</b></div>`).join('')}</div>` : ''}
+      ${t.dataBias ? `<div class="small" style="margin-top:3px">Bias data aktual: <b style="color:${t.dataBias === 'BUY' ? 'var(--ok)' : 'var(--no)'}">${XE(t.dataBias)}</b>${j.reaction ? ' · reaksi nyata <b>' + XE(j.reaction.dir) + '</b> (' + XE(j.reaction.netPips) + ' pip)' : ''}. Arah mesin mengikuti reaksi terukur bila ≥30 pip.</div>` : ''}
+      ${(t.reasons || []).length ? `<div style="margin-top:8px"><b class="small">Bukti arah</b>${t.reasons.map(x => `<div class="item"><span>${XE(x.why)}</span><b style="color:${x.w >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.w > 0 ? '+' : ''}${XE(x.w)}</b></div>`).join('')}</div>` : ''}
+      ${t.technical ? `<div class="small mut" style="margin-top:6px"><b>Teknikal SMC:</b> ${XE(t.technical)}</div>` : ''}
+      ${j.technicalConflict ? `<div class="small" style="margin-top:4px;color:var(--warn)">Arah data bertentangan dengan struktur SMC live; keyakinan diturunkan, arah tidak diubah. Entry tetap menunggu konfirmasi M5.</div>` : ''}
       ${t.nowcast ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Nowcast NFP:</b> ${XE(t.nowcast.note)} <span class="small" style="color:${t.nowcast.hot ? 'var(--no)' : 'var(--ok)'}">${t.nowcast.hot ? 'cenderung panas' : 'cenderung dingin'}</span></div>` : ''}
-      <div style="margin-top:10px"><b class="small">Playbook 2–3 menit sebelum rilis</b>${(t.playbook || []).map(x => `<div class="small" style="margin-top:4px">• ${XE(x)}</div>`).join('')}</div>
+      <div style="margin-top:10px"><b class="small">${t.phase === 'pasca-rilis' ? 'Playbook setelah rilis' : 'Playbook 2–3 menit sebelum rilis'}</b>${(t.playbook || []).map(x => `<div class="small" style="margin-top:4px">• ${XE(x)}</div>`).join('')}</div>
       ${j.learning ? `<div class="small" style="margin-top:8px;color:${j.learning.delta < 0 ? 'var(--warn)' : 'var(--mut)'}"><b>Pembelajaran berita:</b> ${XE(j.learning.note)}</div>` : ''}
       ${knowledgeNote(j.knowledge, 'Bukti global terpercaya')}
     </div>`;
@@ -1332,6 +1410,8 @@
       ${d.focus_what ? `<div style="margin-top:8px"><b class="small">Apa yang diukur</b><div class="small" style="line-height:1.55">${XE(d.focus_what)}</div></div>` : ''}
       ${d.why_gold ? `<div style="margin-top:6px"><b class="small">Mengapa penting untuk emas</b><div class="small" style="line-height:1.55">${XE(d.why_gold)}</div></div>` : ''}
       ${d.prediction_2_3m ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>⏱️ Prakiraan 2–3 menit sebelum rilis</b><div class="small" style="line-height:1.55">${XE(d.prediction_2_3m)}</div></div>` : ''}
+      ${d.technical_read ? `<div style="margin-top:8px"><b class="small">🧭 Bacaan teknikal SMC</b><div class="small" style="line-height:1.55">${XE(d.technical_read)}</div></div>` : ''}
+      ${d.entry_plan ? `<div class="exp" style="margin-top:6px;color:var(--tx)"><b>Cara entry (mengikuti mesin):</b><div class="small" style="line-height:1.55">${XE(d.entry_plan)}</div></div>` : ''}
       ${d.why_valid ? `<div style="margin-top:8px"><b class="small">Mengapa data ini valid</b><div class="small" style="line-height:1.55">${XE(d.why_valid)}</div></div>` : ''}
       ${d.fact_vs_inference ? `<div class="small mut" style="margin-top:5px">Fakta vs inferensi: ${XE(d.fact_vs_inference)}</div>` : ''}
       ${(d.data_chain || []).length ? `<div style="margin-top:8px"><b class="small">Rantai data → arah</b>${d.data_chain.map(x => `<div class="item"><span><b>${XE(x.source)}</b> <span class="small mut">${XE(x.weight)}</span><div class="small">${XE(x.fact)}</div></span></div>`).join('')}</div>` : ''}
@@ -1404,8 +1484,8 @@
     const out = X$('xNewsOut');
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
-    if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Akan dicoba ulang otomatis pada siklus 15 menit berikutnya.</div></div>`; return; }
-    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + macroCard(j) + marketCard(j) + sourcesCard(j) + dataCard(j) + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan di perangkat — refresh otomatis berjalan tiap 15 menit.</div>' : '');
+    if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Akan dicoba ulang otomatis pada siklus 20 menit berikutnya.</div></div>`; return; }
+    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + macroCard(j) + marketCard(j) + sourcesCard(j) + dataCard(j) + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
     startNewsClock(j.event && j.event.when);
   }
 
@@ -1417,7 +1497,7 @@
       <div class="card">
         <div class="rb-card-head"><h3>⚡ Signal Entry — XAUUSD</h3><span class="rb-pill">Alchemist · TradingView real-time</span></div>
         <div class="rb-note">Entry M5 ala Alchemist: bias top-down (D1/H4/H1 sesuai mode), POI per mode, trigger candle M5 yang sudah close (BOS/CHoCH, sweep, FVG, order block, EQH/EQL), lalu SL 30 pip dan TP bertingkat ke likuiditas nyata (swing H1/H4, PDH/PDL, sesi, ADR). Scalping memakai POI M5/M15, Day memakai M15/H1, Swing memakai H4/H1 — bukan satu setup yang dipakai untuk semua mode.</div>
-        <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP minimum 200 pip</span><span class="rb-pill">Scalp / Day / Swing terpisah</span><span class="rb-pill y">Auto-refresh 10 menit</span><span class="rb-pill">Belajar dari SL</span><span class="rb-pill">State per akun</span></div>
+        <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP minimum 200 pip</span><span class="rb-pill">Scalp / Day / Swing terpisah</span><span class="rb-pill y">Auto-refresh 20 menit</span><span class="rb-pill">Belajar dari SL</span><span class="rb-pill">State per akun</span></div>
         <div id="sigMsg" class="mut small" style="margin-top:8px"></div>
         <div id="sigNext" class="small" style="margin-top:4px;color:var(--warn)"></div>
       </div>
@@ -1437,7 +1517,7 @@
       if (sigData) {
         await histSync(sigData);
         const msg = X$('sigMsg');
-        if (msg) msg.textContent = '💾 Hasil akun dibuka kembali · diperbarui ' + new Date(sigAt || Date.now()).toLocaleString('id-ID') + ' · refresh otomatis 10 menit.';
+        if (msg) msg.textContent = '💾 Hasil akun dibuka kembali · diperbarui ' + new Date(sigAt || Date.now()).toLocaleString('id-ID') + ' · refresh otomatis 20 menit.';
       }
       const tick = function () {
         const el = X$('sigNext');
@@ -1596,10 +1676,11 @@
     const buy = j.direction === 'BUY';
     return `<div class="card"><div class="rb-card-head"><h3>📊 Arah tunggal</h3><span class="rb-dir ${buy ? 'buy' : 'sell'}">${XE(j.direction)}</span></div>
       <div class="small mut">Kekuatan ${XE(j.directionStrength)}% · harga ${num(j.price)} · ${XE(j.priceSource)} · ${XE(j.markers ? j.markers.length : 0)} tanda chart</div>
-      <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? '<span class="rb-pill y">Candle TradingView real-time</span>' : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
+      <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? `<span class="rb-pill ${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin <= 10 ? 'y' : ''}">${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin > 10 ? 'Candle tertunda ' + XE(j.freshness.candleAgeMin) + ' mnt' : 'Candle TradingView real-time'}</span>` : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
       ${j.freshness ? `<div class="small mut" style="margin-top:6px">Harga ${j.freshness.priceAt ? new Date(j.freshness.priceAt).toLocaleTimeString('id-ID') : '—'} · candle M5 ${j.freshness.candleAgeMin != null ? (j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') : '—'} lalu · ${XE(j.freshness.candleSource)}</div>` : ''}
       ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Skor HTF dan trigger M5 berbeda. Arah final dipaksa mengikuti trigger M5 (${XE(j.m5TriggerDir || '—')}); setup yang melawan trigger tidak diaktifkan. Ini mencegah entry SELL saat candle M5 baru BOS BUY.</div>` : ''}
       ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda. Semua setup berstatus TUNGGU sampai candle M5 baru muncul — bukan sinyal untuk entry sekarang.</div>` : ''}
+      ${j.smcGate ? `<div class="${j.smcGate.ok ? 'small' : 'warn'}" style="margin-top:8px">${j.smcGate.ok ? '✅' : '⛔'} <b>SMC:</b> ${XE(j.smcGate.note)}${j.smcGate.ok && !j.smcGate.executable ? ' Entry belum aktif sampai syarat eksekusi terpenuhi.' : ''}</div>` : ''}
       ${j.eventRisk && j.eventRisk.level !== 'RENDAH' ? `<div class="warn" style="margin-top:8px">⚠️ ${XE(j.eventRisk.note)}</div>` : ''}
       ${j.adr ? `<div class="small mut" style="margin-top:6px">ADR ${XE(j.adr.avgPips)} pip · hari ini ${XE(j.adr.todayPips)} pip · sisa rata-rata ${XE(j.adr.remainingPips)} pip</div>` : ''}
     </div>`;
@@ -1823,8 +1904,35 @@
       ${ss.map(s => `<div class="exp" style="color:var(--tx);margin-top:6px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(s.style)} · ${XE(s.dir)}</b><span class="small" style="color:${s.status === 'SIAP' ? 'var(--ok)' : 'var(--mut)'}">${XE(s.status)}</span></div>
         <div class="small">Entry ${XE(s.entryTf || 'M5')} ${num(s.entry)} (${XE(s.type)}) · POI ${XE(s.poiTf || '—')} · SL ${num(s.sl)} · TP2 ${num(s.tp2)} · TPmax ${num(s.tpMax)} (${XE(s.tpMaxPips)} pip)</div>
         ${s.statusWhy ? `<div class="small" style="color:${s.tooClose ? 'var(--warn)' : 'var(--mut)'}">${XE(s.statusWhy)}</div>` : ''}
+        ${s.smc ? `<div class="small" style="color:${s.smc.grade === 'A+' || s.smc.grade === 'A' ? 'var(--ok)' : s.smc.grade === 'D' ? 'var(--warn)' : 'var(--mut)'}"><b>SMC ${XE(s.smc.grade)}</b> · fase ${XE(s.smc.phase || '—')} · ${s.smc.killzone && s.smc.killzone.active ? 'kill zone aktif' : 'di luar kill zone'} · PD ${XE(s.smc.pd && s.smc.pd.zone || '—')} · sweep ${XE(s.smc.sweep && s.smc.sweep.pool || '—')} · fib ${s.smc.fib && s.smc.fib.ok ? 'siap' : 'belum'} · ${XE(s.smc.optional || 0)}/${XE(s.smc.optionalTotal || 0)} konfirmasi</div>` : ''}
+        ${(s.entrySteps || []).length ? `<div class="small" style="margin-top:4px;color:var(--tx)"><b>Cara entry:</b>${s.entrySteps.map(x => `<div style="margin-top:2px">${XE(x)}</div>`).join('')}</div>` : ''}
         ${s.learning ? `<div class="small" style="color:${s.learning.blocked ? 'var(--no)' : 'var(--warn)'}"><b>${s.learning.blocked ? '⛔ Pembelajaran menahan entry' : '⚠️ Pola berisiko'}:</b> ${XE(s.learning.label)} · ${XE(s.learning.losses)} SL / ${XE(s.learning.wins)} TP${(s.learning.reasons || []).length ? ' · ' + XE((s.learning.reasons || []).join('; ')) : ''}</div>` : ''}
         <div class="small mut">${XE(s.why)}</div></div>`).join('') || '<div class="warn">Belum ada setup yang lolos filter. Bias HTF, POI, atau trigger M5 belum searah; jangan paksa entry di luar rencana.</div>'}</div>`;
+  }
+
+  function smcCard(j) {
+    const s = j.smc;
+    if (!s || s.ok === false) return `<div class="card"><div class="rb-card-head"><h3>🧭 Mesin SMC / AMD</h3><span class="rb-pill">tidak tersedia</span></div><div class="warn">${XE((s && s.note) || 'Mesin SMC tidak tersedia.')}</div></div>`;
+    const k = s.killzone || {}, pd = s.pd || {}, amd = s.amd || {}, htf = s.htf || {}, flow = s.flow || {};
+    const rows = [
+      ['Bias HTF', htf.note || '—'],
+      ['Struktur M5', flow.m5 ? flow.m5.note : '—'],
+      ['Struktur M15', flow.m15 ? flow.m15.note : '—'],
+      ['Likuiditas', (s.sweep ? s.sweep.note : 'Belum ada sweep valid') + (s.eq && (s.eq.highs.length || s.eq.lows.length) ? ' · EQH ' + s.eq.highs.length + ' / EQL ' + s.eq.lows.length : '')],
+      ['Premium/Discount', pd.note || '—'],
+      ['AMD', amd.note || '—'],
+      ['Engulfing M15', s.engulf && s.engulf.m15 ? s.engulf.m15.note : 'belum ada'],
+      ['IDM', s.idm ? s.idm.note : 'belum terbaca'],
+      ['Kill zone', k.note || '—']
+    ];
+    const z = (arr) => (arr || []).slice(-2).map(x => (x.src || '') + ' ' + x.lo + '–' + x.hi).join(' · ') || '—';
+    return `<div class="card"><div class="rb-card-head"><h3>🧭 Mesin SMC / AMD</h3><span class="rb-pill ${k.active ? 'y' : ''}">${XE(k.active ? k.name : 'di luar kill zone')}</span></div>
+      <div class="small" style="margin-top:6px;font-weight:700">${XE(s.note || '')}</div>
+      ${rows.map(x => `<div class="item"><span>${XE(x[0])}</span><span class="small mut" style="text-align:right">${XE(x[1])}</span></div>`).join('')}
+      <div class="small" style="margin-top:8px"><b>POI M5 unmitigated:</b> ${XE(z(s.fvg && s.fvg.m5))}${s.ob && s.ob.m5 && s.ob.m5.length ? ' · OB ' + XE(z(s.ob.m5)) : ''}</div>
+      ${s.fib ? `<div style="margin-top:8px"><b class="small">Fib golden ratio + candle momentum (${XE(s.fib.tf)} ${XE(s.fib.dir)})</b>${(s.fib.steps || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>` : ''}
+      <div class="small mut" style="margin-top:6px">Level dihitung dari candle nyata; tidak ada angka karangan. Entry hanya valid bila bias HTF, PD 50%, POI, CHoCH/BOS + displacement/engulfing, sweep, fib OTE, kill zone, dan SL 30 pip terpenuhi.</div>
+    </div>`;
   }
 
   function aiCard(j) {
@@ -1867,7 +1975,7 @@
     const chip = X$('tvPrice');
     if (chip) chip.textContent = 'harga ' + num(j.price) + ' · ' + new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID');
     learnApply(j);
-    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
+    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + smcCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
     drawChart(j);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
