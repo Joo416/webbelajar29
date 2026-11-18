@@ -83,10 +83,26 @@ service cloud.firestore {
       allow create: if col in ['soal','hasil','chat','catatan','kata']
                     && isActive() && request.resource.data.uid == request.auth.uid;
 
-      allow read, update, delete: if col == 'jurnal'
-                                  && hasTrading() && resource.data.uid == request.auth.uid;
+      // Riwayat signal, state, dan tombstone memakai koleksi jurnal.
+      // resource == null hanya untuk get dokumen yang belum ada agar
+      // transaksi create (tx.get -> tx.set) tidak ditolak; tidak membuka
+      // dokumen pengguna lain karena query/read dokumen yang ada tetap
+      // wajib uid == auth.uid.
+      allow get: if col == 'jurnal' && hasTrading()
+                  && ((resource != null && resource.data.uid == request.auth.uid)
+                      || (resource == null && docId.matches(request.auth.uid + '_.*')));
+      allow list: if col == 'jurnal' && hasTrading()
+                  && resource.data.uid == request.auth.uid;
       allow create: if col == 'jurnal'
-                    && hasTrading() && request.resource.data.uid == request.auth.uid;
+                    && hasTrading()
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if col == 'jurnal'
+                    && hasTrading()
+                    && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if col == 'jurnal'
+                    && hasTrading()
+                    && resource.data.uid == request.auth.uid;
     }
   }
 }

@@ -193,7 +193,8 @@ var RB_GUIDE = [
   ['trading', ' Trading & Alchemist',
     '<h3>Tab Trading</h3><ul>'
     + '<li><b>News</b> — kalender dan analisis berita; ringkasan bisa disalin.</li>'
-    + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time dengan entry M5 dan SL 30 pip. Bias top-down D1/H4/H1; scalping memakai POI M5/M15, day memakai M15/H1, swing memakai H4/H1, dengan TP dari likuiditas nyata. Chart TradingView feed broker, tanda chart, AI, dan riwayat SL/TP otomatis. Refresh tiap 20 menit tanpa tombol; hasil tersimpan dan timer mengikuti jadwal saat halaman di-refresh.</li>'
+    + '<li><b>Radar 10M</b> — arah XAUUSD untuk 10 menit ke depan dari rekomendasi TradingView multi-TF, candle M5/M15, momentum, EMA/RSI, DXY/yield, dan risiko rilis. Setiap faktor menampilkan sumber dan waktu; bukan jaminan bebas SL.</li>'
+    + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time dengan entry M5 dan SL 30 pip. Arah wajib mengikuti trigger M5 yang sudah close; bias HTF hanya menyaring. TP yang ditampilkan adalah TP2 minimal 200 pip dan TPmax. Chart TradingView, tanda chart, AI, dan riwayat SL/TP otomatis. Refresh tiap 10 menit tanpa tombol; timer tetap berjalan saat tab kembali aktif.</li>'
     + '<li><b>Alchemist</b> — kurikulum lengkap dari pemula sampai mahir.</li>'
     + '<li><b>Tutor</b> — tanya konsep, model entry, atau manajemen risiko.</li>'
     + '<li><b>Jurnal</b> — catatan trade dan kalkulator lot.</li></ul>'

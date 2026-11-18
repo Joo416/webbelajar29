@@ -86,7 +86,7 @@ ALCH_TERMS.push(
   ['COT report', 'Posisi spekulan', 'Laporan CFTC posisi managed money pada emas.', 'Konteks mingguan, bukan sinyal timing.', 'W1'],
   ['News blackout', 'Zona larangan berita', 'Tidak entry 30 menit sebelum/sesudah rilis High impact.', 'Melindungi dari spread melebar dan slippage.', 'Kalender (semua TF)'],
   ['Risk of ruin', 'Risiko bangkrut', 'Peluang kehilangan modal karena risiko per trade terlalu besar.', 'Dasar batas risiko 0,5–1% per trade.', 'Manajemen (semua TF)'],
-  ['TP ladder', 'TP berjenjang', 'TP1/TP2/TPmax dengan partial dan runner.', 'Mengunci profit tanpa memotong tren.', 'Eksekusi (semua TF)'],
+  ['TP ladder', 'TP berjenjang', 'TP2/TPmax dengan runner.', 'Mengunci profit tanpa memotong tren.', 'Eksekusi (semua TF)'],
   ['Backtest sample', 'Sampel uji', 'Minimal 100 trade satu model agar statistik valid.', 'Membuktikan edge sebelum uang riil.', 'Manajemen (semua TF)'],
   ['Session liquidity', 'Likuiditas sesi', 'Volume berbeda tiap sesi: Asia tipis, London/New York tebal.', 'Menentukan besar target yang realistis.', 'M15 · M5 (jam)'],
   ['Multi-timeframe alignment', 'Konfluensi TF', 'Semua timeframe menunjuk arah dan zona yang sama.', 'Filter agar hanya mengambil setup A+.', 'D1 · H4 · H1 · M15 · M5']
@@ -148,7 +148,7 @@ ALCH_MODELS.push({
   cond: ['Level H4/H1 sudah ditandai dan storyline searah.', 'Sapuan high/low jelas di M5 dengan close kembali ke dalam range.', 'MSS/CHoCH M5 terkonfirmasi dan ada displacement (body di atas ATR M5).', 'FVG/OB dari impuls konfirmasi belum terisi.'],
   entry: 'Limit di 50% FVG atau tepi OB setelah candle konfirmasi close. Market hanya bila harga sudah menyentuh zona dan ditolak.',
   sl: 'Di luar swing pelindung atau ekstrem sapuan ditambah buffer ATR; minimal 30 pip pada XAUUSD.',
-  tp: 'TP1 minimal 100 pip (partial), TP2 minimal 200 pip, TPmax ke sisi berlawanan range atau high/low 20 hari.',
+  tp: 'TP2 minimal 200 pip (target utama), TPmax ke sisi berlawanan range atau high/low 20 hari.',
   inval: 'FVG ditembus close, MSS gagal, atau harga membuat ekstrem baru searah sapuan.'
 });
 
@@ -568,7 +568,7 @@ const ALCH_CHART_CASES = {
     tf: 'M5', title: 'Sapuan likuiditas → MSS → FVG 50%',
     entry: 'Limit di 50% FVG (consequent encroachment) yang lahir dari displacement setelah MSS. Jangan entry di titik sweep.',
     sl: 'Di luar ekstrem sweep ditambah buffer ATR M5; minimal 30 pip dari entry pada XAUUSD.',
-    tp: 'TP1 100 pip (partial), TP2 200 pip, TPmax ke sisi berlawanan range atau high/low 20 hari.',
+    tp: 'TP2 200 pip (target utama), TPmax ke sisi berlawanan range atau high/low 20 hari.',
     why: 'Sweep mengambil stop, MSS membuktikan struktur berubah, dan displacement meninggalkan FVG. Entry di retest FVG memberi invalidasi jelas dan RR besar.',
     invalid: 'Close melewati tepi FVG, MSS gagal, atau harga membuat ekstrem baru searah sweep.'
   },
@@ -616,7 +616,7 @@ const ALCH_CHART_CASES = {
     tf: 'M5', title: 'Silver bullet 10–11 / 14–15 UTC',
     entry: 'Entry di FVG M5 pertama setelah sapuan kecil dan displacement pada jendela waktu Silver Bullet.',
     sl: 'Di luar swing kecil + buffer ATR M5.',
-    tp: 'Likuiditas terdekat; TP1 100 pip, sisanya trailing struktur.',
+    tp: 'Likuiditas terdekat; TP2 minimal 200 pip, sisanya trailing struktur.',
     why: 'Jendela waktu ini sering menghasilkan satu impuls bersih; entry di FVG mengikuti alur institusional tanpa menebak.',
     invalid: 'FVG terisi penuh tanpa reaksi atau jendela waktu berakhir tanpa displacement.'
   },
@@ -688,7 +688,7 @@ const ALCH_CHART_CASES = {
     tf: 'M15', title: 'Penerapan risiko pada chart live',
     entry: 'Chart ini bukan pola entry. Entry tetap di POI model; yang dihitung di sini adalah ukuran lot dari jarak SL.',
     sl: 'SL logis di luar struktur, bukan angka yang dipaksakan agar lot terlihat besar.',
-    tp: 'TP1 minimal 2R; TP2/TPmax mengikuti likuiditas, bukan harapan.',
+    tp: 'TP2 minimal 2R; TPmax mengikuti likuiditas, bukan harapan.',
     why: 'Risiko 0,5–1% per trade membuat satu kesalahan tidak menghapus banyak profit. Lot dihitung dari SL, bukan dari target.',
     invalid: 'Jika risiko aktual melebihi batas harian, setup dibatalkan walau arah terlihat bagus.'
   },
@@ -794,10 +794,10 @@ function alM5Html() {
       ['3. CHoCH/BOS M5', 'Struktur M5 berbalik searah bias; candle close di atas/bawah swing terakhir.'],
       ['4. Displacement + FVG', 'Candle impuls meninggalkan FVG M5 yang belum terisi — area entry presisi.'],
       ['5. Entry & SL', 'Entry di retest FVG/OB M5; SL 30 pip dari entry, bukan dari zona.'],
-      ['6. Target', 'TP1 100 pip, TP2 200 pip, sisanya trailing ke likuiditas berikutnya.']
+      ['6. Target', 'TP2 minimal 200 pip, TPmax/trailing ke likuiditas berikutnya.']
     ])
     + '<div class="rb-callout warn" style="margin-top:10px"><b>Batal entry:</b> M5 close kembali melewati zona, muncul sweep berlawanan, atau rilis USD high-impact dalam 30 menit.</div>'
-    + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 20 menit tanpa tombol.</div>');
+    + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 10 menit tanpa tombol, termasuk setelah tab kembali aktif.</div>');
 }
 
 /* ---------- kerangka halaman ---------- */
