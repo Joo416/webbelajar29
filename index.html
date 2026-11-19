@@ -217,7 +217,7 @@ async function seed(){
 function loginView(){
   document.querySelector('.tabs').style.display='none';$('userbar').innerHTML='';
   const mb=document.getElementById('rbMenuBtn');if(mb)mb.hidden=true;
-  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div class="hero-ico">🎓</div><h3 style="font-size:1.24rem;justify-content:center;margin:0 0 8px;letter-spacing:-.02em">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:20px;line-height:1.65;max-width:34ch;margin-left:auto;margin-right:auto">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri.</div><button class="btn full" onclick="login()">🔑 Masuk dengan Google</button><div class="hint"> Akses dibatasi. Setelah masuk, akunmu <b>menunggu persetujuan admin</b>. Bila sudah disetujui tetapi masih tertahan, tekan <b>Cek lagi</b> atau hubungi admin.</div><div id="lerr" class="small" style="margin-top:12px;overflow-wrap:anywhere"></div></div>`;
+  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div class="hero-ico">🎓</div><h3 style="font-size:1.24rem;justify-content:center;margin:0 0 8px;letter-spacing:-.02em">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:20px;line-height:1.65;max-width:34ch;margin-left:auto;margin-right:auto">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri.</div><button class="btn full" onclick="login()">🔑 Masuk dengan Google</button><div class="hint"> Akses dibatasi. Setelah masuk, akunmu <b>menunggu persetujuan admin</b>. Bila sudah disetujui tetapi masih tertahan, tekan <b>Cek lagi</b> atau hubungi admin.</div><a class="btn alt full" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:10px" href="https://www.instagram.com/kyenth29?lqvp=MXI2cmk3NDl4Y3o0Yw==" target="_blank" rel="noopener noreferrer">📩 Hubungi admin via Instagram</a><div id="lerr" class="small" style="margin-top:12px;overflow-wrap:anywhere"></div></div>`;
 }
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi login(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){$('lerr').textContent='Gagal masuk: '+e.message}}
@@ -2599,21 +2599,21 @@ input,select,textarea{background:var(--field)}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="rb-modern.css?v=20261119e">
-<link rel="stylesheet" href="rb-v33.css?v=20261119e">
-<link rel="stylesheet" href="rb-v34.css?v=20261119e">
-<script src="bahasa-en-data.js?v=20261119e"></script>
-<script src="bahasa-jp-data.js?v=20261119e"></script>
-<script src="bahasa-jp-data2.js?v=20261119e"></script>
-<script src="bahasa-jp-grammar.js?v=20261119e"></script>
-<script src="bahasa.js?v=20261119e"></script>
-<script src="rb-core.js?v=20261119e"></script>
-<script src="rb-content.js?v=20261119e"></script>
-<script src="rb-ui.js?v=20261119e"></script>
-<script src="rb-alch.js?v=20261119e"></script>
-<script src="rb-v33.js?v=20261119e"></script>
-<script src="rb-xau.js?v=20261119e"></script>
-<script src="rb-admin.js?v=20261119e"></script>
-<link rel="stylesheet" href="rb-v35.css?v=20261119e">
+<link rel="stylesheet" href="rb-modern.css?v=20261119h">
+<link rel="stylesheet" href="rb-v33.css?v=20261119h">
+<link rel="stylesheet" href="rb-v34.css?v=20261119h">
+<script src="bahasa-en-data.js?v=20261119h"></script>
+<script src="bahasa-jp-data.js?v=20261119h"></script>
+<script src="bahasa-jp-data2.js?v=20261119h"></script>
+<script src="bahasa-jp-grammar.js?v=20261119h"></script>
+<script src="bahasa.js?v=20261119h"></script>
+<script src="rb-core.js?v=20261119h"></script>
+<script src="rb-content.js?v=20261119h"></script>
+<script src="rb-ui.js?v=20261119h"></script>
+<script src="rb-alch.js?v=20261119h"></script>
+<script src="rb-v33.js?v=20261119h"></script>
+<script src="rb-xau.js?v=20261119h"></script>
+<script src="rb-admin.js?v=20261119h"></script>
+<link rel="stylesheet" href="rb-v35.css?v=20261119h">
 </body>
 </html>

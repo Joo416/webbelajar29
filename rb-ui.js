@@ -192,9 +192,9 @@ var RB_GUIDE = [
     + '<div class="rb-gtip"> Progres bahasa disimpan di perangkat ini, bukan di server. Reset lewat pengaturan di halaman progres.</div>'],
   ['trading', ' Trading & Alchemist',
     '<h3>Tab Trading</h3><ul>'
-    + '<li><b>News</b> — kalender dan analisis berita; ringkasan bisa disalin.</li>'
-    + '<li><b>Radar 10M</b> — arah XAUUSD untuk 10 menit ke depan dari rekomendasi TradingView multi-TF, candle M5/M15, momentum, EMA/RSI, DXY/yield, dan risiko rilis. Setiap faktor menampilkan sumber dan waktu; bukan jaminan bebas SL.</li>'
-    + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time dengan entry M5 dan SL 30 pip. Arah wajib mengikuti trigger M5 yang sudah close; bias HTF hanya menyaring. TP yang ditampilkan adalah TP2 minimal 200 pip dan TPmax. Chart TradingView, tanda chart, AI, dan riwayat SL/TP otomatis. Refresh tiap 20 menit tanpa tombol; timer tetap berjalan saat tab kembali aktif dan state disimpan per akun.</li>'
+    + '<li><b>News</b> — kalender dan analisis berita NFP/CPI/PPI/FOMC dengan data rilis resmi, reaksi harga nyata, wire emas/USD, FRED, dan panel AI; ringkasan bisa disalin.</li>'
+    + '<li><b>Radar 1H</b> — arah XAUUSD untuk 60 menit ke depan, fokus fundamental global XAUUSD (wire emas/dolar, DXY, yield nominal & riil, dolar broad, breakeven inflasi, kalender USD) yang dikonfirmasi TradingView multi-TF, candle H1/M15/M5, momentum, EMA/RSI, dan SMC/AMD. Berlaku 30 menit dan refresh otomatis 30 menit; bukan jaminan bebas SL.</li>'
+    + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time dengan entry M5 dan SL 30 pip. Arah wajib mengikuti trigger M5 yang sudah close; bias HTF hanya menyaring. TP yang ditampilkan adalah TP2 minimal 200 pip dan TPmax. Chart TradingView, tanda chart, AI, dan riwayat SL/TP otomatis. Refresh otomatis tiap 15 menit selama tab aktif; hasil disimpan per akun sehingga saat browser dibuka lagi tidak dihitung dari nol.</li>'
     + '<li><b>Alchemist</b> — kurikulum lengkap dari pemula sampai mahir.</li>'
     + '<li><b>Tutor</b> — tanya konsep, model entry, atau manajemen risiko.</li>'
     + '<li><b>Jurnal</b> — catatan trade dan kalkulator lot.</li></ul>'

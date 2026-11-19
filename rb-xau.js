@@ -19,19 +19,21 @@
     { k: 'PPI', t: 'PPI', s: 'harga produsen' },
     { k: 'FOMC', t: 'FOMC', s: 'suku bunga' }
   ];
-  const NEWS_KEY = 'rb_xau_news_v4_';
+  const NEWS_KEY = 'rb_xau_news_v5_';
   let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false, newsGen = 0;
-  /* Analisis News/Signal di-refresh tiap 20 menit. State hasilnya disimpan
-     per akun (UID) di cache lokal + dokumen state Firestore yang sama. */
+  /* News di-refresh tiap 20 menit; Signal tiap 15 menit selama halaman
+     terbuka. State hasilnya disimpan per akun (UID) di cache lokal + dokumen
+     state Firestore yang sama, jadi saat browser ditutup lalu dibuka lagi
+     hasil akun langsung dipakai dan tidak dihitung dari nol. */
   const NEWS_REFRESH_MS = 20 * 60000;
-  const SIG_REFRESH_MS = 20 * 60000;
+  const SIG_REFRESH_MS = 15 * 60000;
   let newsTimer = null, newsAt = 0, newsCd = null, newsRetryAt = 0;
   function newsTransient(e) {
     const s = Number(e && e.status) || 0;
     return s === 429 || s === 503 || s === 502 || s === 500 || s === 504 || /429|firestore|izin akses|timeout|terlalu lama/i.test(String(e && e.message || ''));
   }
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY', sigChartBars = 100, sigHistAt = 0;
-  let sigRetryAt = 0, sigWake = false;
+  let sigRetryAt = 0, sigWake = false, sigBootGen = 0;
   let chartLabelAll = false, chartTF = 'ALL';
   try { chartLabelAll = localStorage.getItem('rb_xau_chart_labels') === 'all'; } catch (e) { }
   try { const tf = localStorage.getItem('rb_xau_chart_tf'); if (['ALL', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf)) chartTF = tf; } catch (e) { }
@@ -39,7 +41,7 @@
   const SIG_MODES = [['SCALPING', 'Scalping M5'], ['DAY', 'Day M5'], ['SWING', 'Swing M5']];
   const SIG_HIST_KEY = 'rb_xau_sig_hist_v2'; // cache lama tanpa akun (dimigrasi ke key per akun)
   const SIG_DEL_KEY = 'rb_xau_sig_del_v1';
-  const SIG_CACHE_KEY = 'rb_xau_signal_v3';
+  const SIG_CACHE_KEY = 'rb_xau_signal_v4';
   const SIG_MODE_KEY = 'rb_xau_sig_mode_v2';
   function sigCacheKey() { const u = histUid(); return SIG_CACHE_KEY + (u ? '_' + u : ''); }
   function sigCacheLoad() {
@@ -56,8 +58,12 @@
     } catch (e) { }
   }
   (function restoreSignalState() {
-    const c = sigCacheLoad();
-    if (c) { sigData = c.data; sigAt = Number(c.at) || Date.parse(c.data.generatedAt) || 0; }
+    /* Cache sinyal hanya boleh dibaca setelah UID akun diketahui. Membaca
+       key tanpa UID saat modul dimuat bisa menampilkan sinyal akun lain. */
+    if (histUid()) {
+      const c = sigCacheLoad();
+      if (c) { sigData = c.data; sigAt = Number(c.at) || Date.parse(c.data.generatedAt) || 0; }
+    }
     try {
       const m = localStorage.getItem(SIG_MODE_KEY);
       if (SIG_MODES.some(x => x[0] === m)) sigMode = m;
@@ -322,8 +328,12 @@
   function histKey(s, j) { const day = String(j.generatedAt || new Date().toISOString()).slice(0, 10); return [day, s.style, s.dir, Math.round(s.entry / 0.1), Math.round(s.sl / 0.1)].join('|'); }
   function cacheAt(j) { return j && j.generatedAt ? (Date.parse(j.generatedAt) || 0) : 0; }
   async function sigStatePull() {
+    const uid = histUid();
     const d = await stateGet('signal');
-    if (!d || !d.data || d.data.ok === false || d.data.error) return false;
+    /* Akun bisa berganti saat dokumen state masih dibaca. Jangan pernah
+       menempelkan state akun lama ke layar akun baru. */
+    if (uid !== histUid()) return false;
+    if (!d || !d.data || d.data.ok === false || d.data.error || Number(d.data.schema) < 2) return false;
     const rAt = cacheAt(d.data) || Number(d.at) || 0;
     if (!rAt) return false;
     if (rAt > (sigAt || 0) + 1500) {
@@ -335,7 +345,7 @@
   }
   async function newsStatePull(focus) {
     const d = await stateGet('news', focus);
-    if (!d || !d.data || d.data.ok !== true) return null;
+    if (!d || !d.data || d.data.ok !== true || Number(d.data.schema) < 2) return null;
     const rAt = cacheAt(d.data) || Number(d.at) || 0;
     const local = loadCache(focus), lAt = cacheAt(local);
     if (rAt > lAt + 1500) {
@@ -347,7 +357,7 @@
   }
   async function radarStatePull() {
     const d = await stateGet('radar');
-    if (!d || !d.data || d.data.ok === false || d.data.error) return false;
+    if (!d || !d.data || d.data.ok === false || d.data.error || Number(d.data.schema) < 2) return false;
     const rAt = cacheAt(d.data) || Number(d.at) || 0;
     if (!rAt) return false;
     if (rAt > (radarAt || 0) + 1500) {
@@ -637,26 +647,26 @@
     arr.forEach(x => {
       if (!x || x.ok != null || !x.due || now < x.due) return;
       /* Jangan menilai prakiraan yang sudah lewat jauh dari horizon: harga
-         saat itu bukan harga 10 menit, jadi hasilnya bisa keliru. */
-      if (now > x.due + 15 * 60000) return;
+         saat itu bukan harga 1 jam, jadi hasilnya bisa keliru. */
+      if (now > x.due + 30 * 60000) return;
       if (!(px > 0) || !(Number(x.price) > 0)) return;
       x.actual = px > x.price ? 'BUY' : px < x.price ? 'SELL' : 'FLAT';
       x.ok = x.actual === x.dir;
       x.eAt = now;
     });
     const dir = String(j.direction || '').toUpperCase();
-    /* Satu sampel radar per 10 menit. Refresh 60 detik tetap berjalan untuk
-       tampilan, tetapi prakiraan yang tumpang tindih tidak dicatat berulang. */
+    /* Satu sampel radar per 30 menit. Refresh tampilan boleh lebih sering,
+       tetapi prakiraan yang tumpang tindih tidak dicatat berulang. */
     const lastRadarRec = arr.reduce((m, x) => Math.max(m, Number(x.at) || 0), 0);
     if ((dir === 'BUY' || dir === 'SELL') && Number(j.confidence) >= 55 && j.generatedAt
-      && (!lastRadarRec || now - lastRadarRec >= 10 * 60000)
+      && (!lastRadarRec || now - lastRadarRec >= 30 * 60000)
       && !arr.some(x => x.gen === j.generatedAt)) {
-      arr.unshift({ dir, c: Number(j.confidence), ag: Number(j.agreement) || null, price: px, at: now, due: now + 10 * 60000, gen: j.generatedAt, ok: null });
+      arr.unshift({ dir, c: Number(j.confidence), ag: Number(j.agreement) || null, price: px, at: now, due: now + 60 * 60000, gen: j.generatedAt, ok: null });
     }
     const next = arr.filter(x => {
       if (!x || !(Number(x.at) > now - 30 * 86400000)) return false;
       /* Buang yang tidak sempat dievaluasi tepat waktu, jangan diklaim. */
-      if (x.ok == null && x.due && now > x.due + 15 * 60000) return false;
+      if (x.ok == null && x.due && now > x.due + 30 * 60000) return false;
       return true;
     });
     radarLearnSave(next);
@@ -894,6 +904,12 @@
       if (!(tp2Pips >= 200)) return;
       const key = histKey(s, j) + (shadow ? '|S' : '');
       if (deleted.has(key)) return;
+      /* Refresh 15 menit bisa menggeser entry beberapa pip. Jangan mencatat
+         setup yang secara praktis sama sebagai sinyal baru: satu style+arah
+         dengan entry dalam 30 pip dan belum selesai dianggap sinyal yang sama. */
+      const nearDup = arr.find(h => h && h.style === s.style && h.dir === s.dir && !h.shadow && !h.closedAt
+        && h.status !== 'SL' && h.status !== 'TPMAX' && Math.abs(Number(h.entry) - Number(s.entry)) <= 3.0);
+      if (nearDup) return;
       const existing = arr.find(h => h.key === key);
       if (existing) {
         /* Observasi yang sudah ditahan bisa dipromosikan menjadi entry nyata
@@ -927,9 +943,10 @@
     const arr = histRecord(j);
     const deleted = histDeletedSet();
     const before = new Map(arr.map(h => [h.key, JSON.stringify(h)]));
-    /* Riwayat hanya dievaluasi dari candle M5. Jangan memakai M15 sebagai
-       pengganti karena SL/TP entry M5 bisa terbaca salah. */
-    const rows = ((j.chart && j.chart.m5) || []).slice().sort((a, b) => a.t - b.t);
+    /* Riwayat hanya dievaluasi dari candle M5 yang SUDAH CLOSE. Bar berjalan
+       bisa menyentuh SL/TP sementara lalu berbalik; memakainya membuat status
+       SL/TP premature dan pembelajaran mencatat hasil yang belum final. */
+    const rows = ((j.chart && j.chart.m5) || []).filter(r => r && isFinite(r.t) && r.t + 300000 <= Date.now()).slice().sort((a, b) => a.t - b.t);
     const chartAt = Date.parse(j.generatedAt) || Date.now();
     let changed = false;
     arr.forEach(h => {
@@ -1288,8 +1305,8 @@
     newsBusy = false;
   };
 
-  /* ---------------- RADAR 10M ---------------- */
-  const RADAR_CACHE_KEY = 'rb_xau_radar_v1';
+  /* ---------------- RADAR 1H ---------------- */
+  const RADAR_CACHE_KEY = 'rb_xau_radar_v2';
   let radarData = null, radarAt = 0, radarBusy = false, radarTimer = null, radarCd = null, radarGen = 0, radarSavedAt = 0;
   function radarCacheKey() { const u = histUid(); return RADAR_CACHE_KEY + (u ? '_' + u : ''); }
   function radarCacheLoad() { try { const c = JSON.parse(localStorage.getItem(radarCacheKey()) || 'null'); return c && c.data ? c : null; } catch (e) { return null; } }
@@ -1299,16 +1316,22 @@
     if (!j || j.ok === false) return `<div class="card"><div class="warn">${XE((j && j.error) || 'Radar belum tersedia.')}</div><div class="small mut" style="margin-top:6px">Data tidak ditampilkan sebagai angka palsu. Coba lagi saat koneksi pasar tersedia.</div></div>`;
     const dir = String(j.direction || 'WAIT').toUpperCase();
     const cls = radarDirClass(dir);
-    const until = j.validUntil ? Date.parse(j.validUntil) : (Date.parse(j.generatedAt) || Date.now()) + 10 * 60000;
+    const until = j.validUntil ? Date.parse(j.validUntil) : (Date.parse(j.generatedAt) || Date.now()) + 30 * 60000;
     return `<div class="card radar-hero">
-      <div class="rb-card-head"><h3>🛰️ Radar arah 10 menit — XAUUSD</h3><span class="rb-pill ${dir === 'WAIT' ? '' : 'y'}">${XE(j.symbol || 'XAUUSD')} · ${new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID')}</span></div>
+      <div class="rb-card-head"><h3>🛰️ Radar arah 1 jam — XAUUSD</h3><span class="rb-pill ${dir === 'WAIT' ? '' : 'y'}">${XE(j.symbol || 'XAUUSD')} · ${new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID')}</span></div>
       <div class="radar-top">
         <div class="radar-big ${cls}">${XE(dir)}</div>
         <div class="radar-meta"><b>Keyakinan ${XE(j.confidence)}%</b><div class="small mut">Skor ${XE(j.score)} · agreement ${XE(j.agreement)}% · horizon ${XE(j.horizonMin)} menit${j.baseConfidence != null ? ' · dasar ' + XE(j.baseConfidence) + '%' : ''}</div>${j.learning ? `<div class="small" style="color:${j.learning.delta < 0 ? 'var(--warn)' : 'var(--mut)'}">${XE(j.learning.note)}</div>` : ''}${knowledgeNote(j.knowledge, 'Bukti global')}<div class="small" id="radarCountdown" data-until="${until}">Berlaku sampai ${new Date(until).toLocaleTimeString('id-ID')}</div></div>
       </div>
-      <div class="radar-kpis"><div><span>Harga</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>Spot pembanding</span><b>${j.spot == null ? '—' : num(j.spot)}</b><small>${j.priceDifferencePips == null ? 'tidak tersedia' : j.priceDifferencePips + ' pip dari TV'}</small></div><div><span>Rentang 10m</span><b>${j.expectedRangePips == null ? '—' : j.expectedRangePips + ' pip'}</b><small>dari ATR live</small></div><div><span>Risiko rilis</span><b style="color:${j.risk && j.risk.level === 'TINGGI' ? 'var(--no)' : j.risk && j.risk.level === 'SEDANG' ? 'var(--warn)' : 'var(--ok)'}">${XE((j.risk && j.risk.level) || '—')}</b><small>${XE((j.risk && j.risk.note) || '')}</small></div></div>
+      <div class="radar-kpis"><div><span>Harga</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>Spot pembanding</span><b>${j.spot == null ? '—' : num(j.spot)}</b><small>${j.priceDifferencePips == null ? 'tidak tersedia' : j.priceDifferencePips + ' pip dari TV'}</small></div><div><span>Rentang 1 jam</span><b>${j.expectedRangePips == null ? '—' : j.expectedRangePips + ' pip'}</b><small>dari ATR H1 live</small></div><div><span>Risiko rilis</span><b style="color:${j.risk && j.risk.level === 'TINGGI' ? 'var(--no)' : j.risk && j.risk.level === 'SEDANG' ? 'var(--warn)' : 'var(--ok)'}">${XE((j.risk && j.risk.level) || '—')}</b><small>${XE((j.risk && j.risk.note) || '')}</small></div></div>
+      ${j.summary ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>${XE(j.summary.headline)}</b><div class="small" style="margin-top:3px">${XE(j.summary.fundamental)}</div><div class="small mut">${XE(j.summary.technical)}</div>${(j.summary.points || []).slice(0, 3).map(p => `<div class="small" style="margin-top:2px">• ${XE(p)}</div>`).join('')}${(j.summary.conflicts || []).length ? `<div class="small" style="color:var(--warn);margin-top:2px">${XE((j.summary.conflicts || []).join(' '))}</div>` : ''}</div>` : ''}
       <div class="small mut" style="margin-top:8px">${XE(j.method || '')}</div>
       ${j.smc && j.smc.ok ? `<div class="small" style="margin-top:6px"><b>SMC/AMD:</b> ${XE(j.smc.note)}${j.smcPdConflict ? ' · <span style="color:var(--warn)">arah radar melawan premium/discount 50%; keyakinan diturunkan.</span>' : ''}</div>` : ''}
+      ${j.fundamental ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Fundamental XAUUSD — horizon 1 jam</b>
+        <div class="small" style="margin-top:3px">${j.fundamental.wire ? `Wire emas/USD: <b style="color:${j.fundamental.wire.goldBias === 'BULLISH' ? 'var(--ok)' : j.fundamental.wire.goldBias === 'BEARISH' ? 'var(--no)' : 'var(--warn)'}">${XE(j.fundamental.wire.goldBias)}</b> · ${XE(j.fundamental.wire.note)}` : 'Wire emas/USD tidak tersedia; fundamental memakai FRED dan pasar.'}</div>
+        <div class="small mut" style="margin-top:2px">DXY 1 jam: ${j.fundamental.fx && j.fundamental.fx.dxy1h != null ? (j.fundamental.fx.dxy1h > 0 ? '+' : '') + XE(j.fundamental.fx.dxy1h) + '%' : '—'} · Yield 10Y 1 jam: ${j.fundamental.fx && j.fundamental.fx.yield10_1h != null ? (j.fundamental.fx.yield10_1h > 0 ? '+' : '') + XE(j.fundamental.fx.yield10_1h) + ' pp' : '—'} · Emas 1 jam: ${j.fundamental.fx && j.fundamental.fx.gold1hPips != null ? (j.fundamental.fx.gold1hPips > 0 ? '+' : '') + XE(j.fundamental.fx.gold1hPips) + ' pip' : '—'}</div>
+        ${(j.fundamental.macro || []).filter(x => /DFII10|DTWEXBGS|T10YIE/.test(String(x.id))).slice(0, 3).map(x => `<div class="small mut" style="margin-top:2px">${XE(x.label)}: <b>${XE(x.value)}${XE(x.unit || '')}</b> · 5 observasi ${x.chg5 > 0 ? '+' : ''}${XE(x.chg5)}${XE(x.unit || '')} · ${XE(x.date)}</div>`).join('')}
+        <div class="small mut" style="margin-top:3px">${XE(j.fundamental.note || '')}</div></div>` : ''}
       ${(j.factors || []).length ? `<div class="radar-factors">${j.factors.map(f => `<div class="radar-factor ${f.score >= 0 ? 'up' : 'down'}"><b>${XE(f.name)}</b><span>${f.score > 0 ? '+' : ''}${XE(f.score)}</span><div class="small mut">${XE(f.why)}<br><span>${XE(f.source || '')}${f.at ? ' · ' + new Date(f.at).toLocaleTimeString('id-ID') : ''}</span></div></div>`).join('')}</div>` : ''}
       <div class="small" style="margin-top:10px;color:var(--warn)">${XE(j.limitation || '')}</div>
       <div class="small mut" style="margin-top:4px">${XE(j.brokerNote || '')}</div>
@@ -1324,7 +1347,7 @@
     const gen = ++radarGen;
     const c = radarCacheLoad();
     if (c) { radarData = c.data; radarAt = c.at; }
-    X$('pane').innerHTML = `<div class="card radar-intro"><div class="rb-card-head"><h3>🛰️ Radar 10M — arah XAUUSD</h3><span class="rb-pill y">real-time · auto 60 detik</span></div><div class="rb-note">Radar deterministik untuk horizon <b>10 menit</b>: gabungan harga/candle TradingView real-time, struktur M5/M15, momentum 10 menit, EMA/RSI, DXY/yield 15 menit, SMC/AMD, dan risiko rilis. Di bawahnya ada bukti terbaru dari situs resmi/industri/media terpercaya, YouTube resmi, serta akademi/komunitas emas—hanya konteks keyakinan, bukan angka harga atau pengubah arah. Tidak ada angka karangan; setiap faktor dan feed menampilkan sumber serta waktu ambil/status.</div><div id="radarMsg" class="small mut" style="margin-top:8px"></div><div id="radarOut" style="margin-top:10px">${radarData ? radarCard(radarData) : ''}</div></div>`;
+    X$('pane').innerHTML = `<div class="card radar-intro"><div class="rb-card-head"><h3>🛰️ Radar 1H — arah XAUUSD</h3><span class="rb-pill y">fundamental + teknikal · refresh 30 menit</span></div><div class="rb-note">Radar deterministik untuk horizon <b>1 jam</b>: fokus pada fundamental global XAUUSD (wire emas/dolar dari banyak situs, DXY & yield 1 jam, yield riil FRED, dolar broad, breakeven inflasi, kalender USD) yang dikonfirmasi struktur candle H1/M15/M5, momentum 1 jam, EMA/RSI, serta mesin SMC/AMD. Hasil berlaku 30 menit dan dihitung ulang otomatis; setiap faktor dan feed menampilkan sumber serta waktu ambil/status. Tidak ada angka karangan dan tidak ada jaminan bebas SL.</div><div id="radarMsg" class="small mut" style="margin-top:8px"></div><div id="radarOut" style="margin-top:10px">${radarData ? radarCard(radarData) : ''}</div></div>`;
     const tick = function () {
       const el = X$('radarCountdown');
       if (!el) {
@@ -1334,7 +1357,7 @@
         return;
       }
       const left = Math.max(0, (Number(el.dataset.until) || Date.now()) - Date.now());
-      el.textContent = left ? 'Berlaku ' + Math.ceil(left / 60000) + ' menit lagi · auto-refresh 60 detik' : 'Horizon 10 menit habis — menghitung ulang…';
+      el.textContent = left ? 'Berlaku ' + Math.ceil(left / 60000) + ' menit lagi · auto-refresh 30 menit' : 'Horizon 1 jam / masa berlaku habis — menghitung ulang…';
     };
     tick(); radarCd = setInterval(tick, 1000);
     /* Ambil state akun dulu; jangan langsung menembak feed baru bila perangkat
@@ -1343,16 +1366,16 @@
       try { await radarStatePull(); } catch (e) { }
       if (gen !== radarGen || !X$('radarOut')) return;
       if (radarData) { const out = X$('radarOut'); if (out) out.innerHTML = radarCard(radarData); }
-      if (!radarData || Date.now() - (radarAt || 0) > 60000) radarRun(true);
+      if (!radarData || Date.now() - (radarAt || 0) > 30 * 60000) radarRun(true);
     })();
-    radarTimer = setInterval(function () { if (X$('radarOut')) radarRun(true); else { clearInterval(radarTimer); radarTimer = null; } }, 60000);
-    if (!window.__radarVis) { window.__radarVis = 1; document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && X$('radarOut') && Date.now() - (radarAt || 0) > 60000) radarRun(true); }); }
+    radarTimer = setInterval(function () { if (X$('radarOut')) radarRun(true); else { clearInterval(radarTimer); radarTimer = null; } }, 30 * 60000);
+    if (!window.__radarVis) { window.__radarVis = 1; document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && X$('radarOut') && Date.now() - (radarAt || 0) > 30 * 60000) radarRun(true); }); }
   };
   async function radarRun(silent) {
     if (radarBusy) return;
     radarBusy = true;
     const gen = radarGen;
-    const msg = X$('radarMsg'); if (msg) msg.textContent = 'Mengambil TradingView, candle live, DXY/yield, spot, kalender, situs resmi, media, YouTube, dan akademi emas…';
+    const msg = X$('radarMsg'); if (msg) msg.textContent = 'Mengambil wire emas/USD, FRED, DXY/yield, TradingView, candle H1/M15/M5, spot, kalender, situs resmi, media, YouTube, dan akademi emas…';
     try {
       await Promise.all([learnPullSafe('radar'), learnPullSafe('source')]);
       const j = await tcall({ action: 'xauRadar', fresh: true, learn: learnForRadar() });
@@ -1362,9 +1385,9 @@
         try { radarLearnSync(j); } catch (e) { }
         try { sourceLearnSync(j); } catch (e) { }
         radarCacheSave(j);
-        /* Simpan state akun maksimal sekali per 20 menit; radar tetap
-           dihitung lokal tiap 60 detik untuk horizon 10 menitnya. */
-        if (!radarSavedAt || Date.now() - radarSavedAt >= 20 * 60000) {
+        /* Simpan state akun maksimal sekali per 30 menit; radar dihitung
+           ulang tiap 30 menit untuk horizon 1 jamnya. */
+        if (!radarSavedAt || Date.now() - radarSavedAt >= 30 * 60000) {
           statePut('radar', null, j).then(ok => { if (ok) radarSavedAt = Date.now(); }).catch(() => { });
         }
       }
@@ -1408,6 +1431,20 @@
         ${x.why_valid ? `<div class="small mut" style="margin-top:3px">Validitas: ${XE(x.why_valid)}</div>` : ''}
         ${x.pre_event_plan ? `<div class="small" style="color:var(--warn);margin-top:2px">Rencana: ${XE(x.pre_event_plan)}</div>` : ''}</div>`).join('')}
     </div>`;
+  }
+
+  function fundamentalCard(j) {
+    const f = j.fundamental;
+    if (!f) return '';
+    const w = f.wire, fx = f.fx || {};
+    const col = w && w.goldBias === 'BULLISH' ? 'var(--ok)' : w && w.goldBias === 'BEARISH' ? 'var(--no)' : 'var(--warn)';
+    const fred = (f.macro || []).filter(x => /DFII10|DTWEXBGS|T10YIE/.test(String(x.id))).slice(0, 3);
+    return `<div class="card"><div class="rb-card-head"><h3>🌍 Fundamental XAUUSD — semua sumber</h3><span class="rb-pill ${f.ok ? 'y' : ''}">${w && w.coverage ? XE(w.coverage.distinctSources) + ' sumber · ' + XE(w.coverage.fresh24h) + ' fresh' : 'FRED + pasar'}</span></div>
+      <div class="small" style="margin-top:4px">${w ? `Wire emas/USD: <b style="color:${col}">${XE(w.goldBias)}</b> · skor ${XE(w.score)} · ${XE(w.note)}` : 'Wire emas/USD tidak tersedia; fundamental memakai FRED dan pasar.'}</div>
+      <div class="small mut" style="margin-top:3px">DXY 1 jam ${fx.dxy1h == null ? '—' : (fx.dxy1h > 0 ? '+' : '') + XE(fx.dxy1h) + '%'} · Yield 10Y 1 jam ${fx.yield10_1h == null ? '—' : (fx.yield10_1h > 0 ? '+' : '') + XE(fx.yield10_1h) + ' pp'} · Emas 1 jam ${fx.gold1hPips == null ? '—' : (fx.gold1hPips > 0 ? '+' : '') + XE(fx.gold1hPips) + ' pip'}</div>
+      ${fred.map(x => `<div class="item"><span>${XE(x.label)} <span class="small mut">${XE(x.date)} · ${XE(x.source)}</span></span><span><b>${XE(x.value)}${XE(x.unit)}</b> <span class="small" style="color:${x.chg5 == null ? 'var(--mut)' : x.chg5 >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.chg5 == null ? '' : '5 obs ' + (x.chg5 > 0 ? '+' : '') + XE(x.chg5) + XE(x.unit)}</span></span></div>`).join('')}
+      ${(f.calendar || []).length ? `<div class="small" style="margin-top:5px;color:var(--warn)"><b>Rilis USD berikutnya:</b> ${f.calendar.slice(0, 2).map(x => XE(x.title) + ' (' + XE(x.minutes) + ' mnt)').join(' · ')}</div>` : ''}
+      <div class="small mut" style="margin-top:5px">${XE(f.note || '')}</div></div>`;
   }
 
   function macroCard(j) {
@@ -1597,7 +1634,7 @@
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
     if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Server mencoba ulang otomatis; data tersimpan per akun tetap dipertahankan bila sudah ada.</div></div>`; return; }
-    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
+    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
     startNewsClock(j.event && j.event.when);
   }
 
@@ -1605,11 +1642,16 @@
   window.pSignalEntry = function () {
     if (sigTimer) { clearInterval(sigTimer); sigTimer = null; }
     if (sigCd) { clearInterval(sigCd); sigCd = null; }
+    if (sigRO) { try { sigRO.disconnect(); } catch (e) { } sigRO = null; }
+    /* Jangan bawa state akun/tab sebelumnya ke layar baru. Cache per UID
+       dimuat ulang di boot di bawah; reset ini menutup celah tampilan akun
+       lama saat akun berganti tanpa reload. */
+    sigData = null; sigAt = 0; sigRetryAt = 0;
     X$('pane').innerHTML = `
       <div class="card">
         <div class="rb-card-head"><h3>⚡ Signal Entry — XAUUSD</h3><span class="rb-pill">Alchemist · TradingView real-time</span></div>
         <div class="rb-note">Entry M5 ala Alchemist: bias top-down (D1/H4/H1 sesuai mode), POI per mode, trigger candle M5 yang sudah close (BOS/CHoCH, sweep, FVG, order block, EQH/EQL), lalu SL 30 pip dan TP bertingkat ke likuiditas nyata (swing H1/H4, PDH/PDL, sesi, ADR). Scalping memakai POI M5/M15, Day memakai M15/H1, Swing memakai H4/H1 — bukan satu setup yang dipakai untuk semua mode.</div>
-        <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP minimum 200 pip</span><span class="rb-pill">Scalp / Day / Swing terpisah</span><span class="rb-pill y">Auto-refresh 20 menit</span><span class="rb-pill">Belajar dari SL</span><span class="rb-pill">State per akun</span></div>
+        <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP minimum 200 pip</span><span class="rb-pill">Scalp / Day / Swing terpisah</span><span class="rb-pill y">Auto-refresh 15 menit (tab aktif)</span><span class="rb-pill">Belajar dari SL</span><span class="rb-pill">State per akun</span></div>
         <div id="sigMsg" class="mut small" style="margin-top:8px"></div>
         <div id="sigNext" class="small" style="margin-top:4px;color:var(--warn)"></div>
       </div>
@@ -1620,16 +1662,18 @@
       </div>
       <div id="sigOut"></div>`;
     xTvMount();
+    const bootGen = ++sigBootGen;
     const boot = (async function () {
       const m0 = X$('sigMsg'); if (m0) m0.textContent = 'Menyinkronkan state akun & hasil tersimpan…';
       /* Cache lokal juga per akun; jangan bawa hasil akun lain ke layar. */
       try { const c = sigCacheLoad(); if (c) { sigData = c.data; sigAt = Number(c.at) || Date.parse(c.data.generatedAt) || 0; } } catch (e) { }
       try { await sigStatePull(); } catch (e) { }
-      if (!X$('sigOut')) return;
+      if (bootGen !== sigBootGen || !X$('sigOut')) return;
       if (sigData) {
         await histSync(sigData);
+        if (bootGen !== sigBootGen || !X$('sigOut')) return;
         const msg = X$('sigMsg');
-        if (msg) msg.textContent = '💾 Hasil akun dibuka kembali · diperbarui ' + new Date(sigAt || Date.now()).toLocaleString('id-ID') + ' · refresh otomatis 20 menit.';
+        if (msg) msg.textContent = '💾 Hasil akun dibuka kembali · diperbarui ' + new Date(sigAt || Date.now()).toLocaleString('id-ID') + ' · refresh otomatis 15 menit saat tab aktif.';
       }
       const tick = function () {
         const el = X$('sigNext');
@@ -1640,7 +1684,7 @@
         const scheduled = Math.max(0, SIG_REFRESH_MS - (now - (sigAt || now)));
         const left = retry || scheduled;
         const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-        el.textContent = (retry ? 'Koneksi gagal · mencoba lagi dalam ' : 'Refresh otomatis dalam ') + m + ':' + String(s).padStart(2, '0') + ' · tanpa tombol';
+        el.textContent = (retry ? 'Koneksi gagal · mencoba lagi dalam ' : 'Refresh otomatis dalam ') + m + ':' + String(s).padStart(2, '0') + ' · selama tab aktif';
       };
       tick();
       sigCd = setInterval(tick, 1000);
@@ -1684,6 +1728,7 @@
   window.pSigRun = async function (silent) {
     if (sigBusy) { sigWake = true; return; }
     if (Date.now() < sigRetryAt) return;
+    const runUid = histUid();
     sigBusy = true; sigWake = false;
     const msg = X$('sigMsg');
     if (msg) msg.textContent = 'Membaca candle live, TradingView, struktur Alchemist, lalu AI menandai chart…';
@@ -1692,6 +1737,13 @@
          belajar yang sama. Gagal sinkron tidak menghalangi sinyal. */
       await Promise.all([learnPullSafe('news'), learnPullSafe('radar'), learnPullSafe('source')]);
       const j = await tcall({ action: 'xauSignal', fresh: true, learn: learnPayload() });
+      /* Akun bisa berganti saat request masih berjalan. Hasil akun lama tidak
+         boleh ditulis ke cache, state, atau layar akun baru. */
+      if (runUid !== histUid()) {
+        sigBusy = false;
+        if (sigWake) { sigWake = false; setTimeout(function () { if (X$('sigOut')) pSigRun(true); }, 0); }
+        return;
+      }
       if (j && j.ok !== false && !j.error) {
         sigData = j;
         sigAt = Date.parse(j.generatedAt) || Date.now();
@@ -1711,9 +1763,11 @@
         if (msg) msg.textContent = '⚠️ ' + ((j && (j.error || 'gagal')) || 'gagal');
       }
     } catch (e) {
-      if (!sigData) sigAt = 0;
-      sigRetryAt = Date.now() + 60000;
-      if (msg) msg.textContent = '⚠️ ' + e.message;
+      if (runUid === histUid()) {
+        if (!sigData) sigAt = 0;
+        sigRetryAt = Date.now() + 60000;
+        if (msg) msg.textContent = '⚠️ ' + e.message;
+      }
     }
     sigBusy = false;
     if (sigWake) {
@@ -1822,6 +1876,23 @@
       ${t.map(x => { const opp = (x.value > 0.05 && dir === 'SELL') || (x.value < -0.05 && dir === 'BUY'); return `<div class="item"><span><b>${XE(x.tf)}</b> <span class="small mut">RSI ${num(x.rsi)}</span></span><span style="color:${x.value > 0.05 ? 'var(--ok)' : x.value < -0.05 ? 'var(--no)' : 'var(--mut)'}">${XE(x.rec)} · ${XE(x.strength)}%${opp ? ' <span class="mut">(pullback)</span>' : ''}</span></div>`; }).join('')}</div>`;
   }
 
+  /* Glosarium istilah chart. Satu istilah = satu nama lengkap, supaya label
+     tidak lagi memakai alias ganda (mis. CHoCH vs CHOCH) atau singkatan yang
+     bisa salah dibaca. */
+  const CHART_TERMS = {
+    BOS: 'Break of Structure / RBS-SBR', CHoCH: 'Change of Character = MSS', CHOCH: 'Change of Character = MSS',
+    SWEEP: 'Liquidity sweep / sapuan SNR', FVG: 'Fair Value Gap (BISI/SIBI)', OB: 'Order Block (candle reversal terakhir)',
+    SNR: 'Support/Resistance & liquidity', SND: 'Supply/Demand zone', MB: 'Mitigation block', OTE: 'Optimal Trade Entry 61.8–78.6%',
+    PDH: 'Previous Day High', PDL: 'Previous Day Low', LIQ: 'Liquidity pool', EQH: 'Equal Highs', EQL: 'Equal Lows',
+    JUDAS: 'Judas swing (manipulasi sesi)', ASIA: 'Asian range', DO: 'Daily open', WO: 'Weekly open', PD: 'Premium/Discount 50%',
+    SMT: 'SMT divergence', POI: 'Point of Interest', WICK: 'Wick entry (pucuk wick M5)', FVG50: 'FVG 50% entry',
+    BPR: 'Balanced Price Range', REJECT: 'Rejection block', IFVG: 'Inversion FVG', ERL: 'External Range Liquidity',
+    DISP: 'Displacement', ENGULF: 'Engulfing', IDM: 'Inducement / IDM', AMD: 'AMD / Power of 3', FIB: 'Fibonacci golden ratio'
+  };
+  function chartTerm(t) { return CHART_TERMS[t] || ''; }
+  /* Cache lama bisa masih membawa alias CHOCH. Tampilkan selalu CHoCH,
+     termasuk saat data lama dibuka sebelum refresh berikutnya. */
+  function chartType(t) { return t === 'CHOCH' ? 'CHoCH' : t; }
   function chartPick(j) {
     const all = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF);
     if (chartLabelAll) return all;
@@ -1829,7 +1900,7 @@
     const out = [], seen = new Set();
     /* Satu label per istilah + TF, supaya semua istilah Alchemist terwakili. */
     sorted.forEach(m => {
-      const k = String(m.type || '') + '|' + String(m.tf || '');
+      const k = String(chartType(m.type) || '') + '|' + String(m.tf || '');
       if (seen.has(k) || out.length >= 32) return;
       seen.add(k); out.push(m);
     });
@@ -1837,177 +1908,23 @@
     return out;
   }
   function chartLabelShown(j) { return chartPick(j).length; }
-  function pineEsc(v) { return String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, ' '); }
-  function pineColor(t) {
-    return ({ BOS: '#f59e0b', CHoCH: '#a78bfa', CHOCH: '#a78bfa', SWEEP: '#38bdf8', FVG: '#34d399', OB: '#fb7185', SNR: '#94a3b8', SND: '#38bdf8', MB: '#c084fc', OTE: '#facc15', PDH: '#f472b6', PDL: '#f472b6', LIQ: '#22d3ee', EQH: '#f97316', EQL: '#f97316', JUDAS: '#e879f9', ASIA: '#64748b', DO: '#e2e8f0', WO: '#e2e8f0', PD: '#fbbf24', SMT: '#f43f5e', POI: '#ffffff', WICK: '#fde047', FVG50: '#fbbf24', BPR: '#22d3ee', REJECT: '#fb7185', IFVG: '#2dd4bf', ERL: '#818cf8', DISP: '#f59e0b', ENGULF: '#c084fc', IDM: '#fbbf24', AMD: '#f59e0b', FIB: '#facc15' }[t] || '#94a3b8');
-  }
-  /* Ekspor statis dari sinyal aktif. TradingView tidak punya API publik untuk
-     menulis drawing ke akun pengguna; Pine Script adalah jalur resmi agar
-     penanda bisa dipasang dan disimpan sendiri di akun TradingView. */
-  function buildPine(j) {
-    if (!j || j.ok === false || j.error) return '';
-    const ap = modeOf(j, sigMode) || j.plan;
-    const plans = (j.setups || []).filter(s => s && s.status === 'SIAP' && s.entry != null);
-    if (!plans.length && ap) plans.push(ap);
-    const markers = (j.markers || []).filter(m => m && m.price != null && isFinite(m.price));
-    const out = [];
-    const add = (s) => out.push(s);
-    add('//@version=5');
-    add('// Alchemist XAUUSD — sinyal aktif ' + pineEsc(j.generatedAt || ''));
-    add('// Setiap label memakai waktu candle asal marker; entry tetap M5.');
-    add('// Chart: ' + pineEsc(j.tvSymbol || 'FOREXCOM:XAUUSD') + ' · arah ' + pineEsc(j.direction || '—') + ' · mode ' + pineEsc(sigMode));
-    add('// Tempel di Pine Editor TradingView, Add to chart, lalu Save agar tersimpan di akun.');
-    add('indicator("Alchemist XAUUSD — signal aktif", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)');
-    add('showLabels = input.bool(true, "Tampilkan label")');
-    add('labelMode = input.string("Ringkas", "Label", options=["Ringkas", "Semua"])');
-    add('extendRight = input.int(8, "Bars ke kanan", minval=0, maxval=100)');
-    add('var bool drawnOnce = false');
-    add('var table sigTable = table.new(position.top_right, 2, 7, bgcolor=color.new(#0f172a, 10), border_color=color.new(#64748b, 60), border_width=1)');
-    add('if barstate.islast and not drawnOnce');
-    add('    drawnOnce := true');
-    add('    table.cell(sigTable, 0, 0, "XAUUSD", text_color=#e2e8f0, text_size=size.small)');
-    add('    table.cell(sigTable, 0, 1, "Arah", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 1, ' + JSON.stringify(String(j.direction || '—')) + ', text_color=' + (j.direction === 'BUY' ? '#22c55e' : '#ef4444') + ', text_size=size.small)');
-    add('    table.cell(sigTable, 0, 2, "Mode", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 2, ' + JSON.stringify(String(sigMode)) + ', text_color=#e2e8f0, text_size=size.tiny)');
-    add('    table.cell(sigTable, 0, 3, "Harga", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 3, ' + JSON.stringify(String(j.price == null ? '—' : Number(j.price).toFixed(2))) + ', text_color=#e2e8f0, text_size=size.tiny)');
-    add('    table.cell(sigTable, 0, 4, "Sumber", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 4, ' + JSON.stringify(String(j.tvSymbol || 'FOREXCOM:XAUUSD')) + ', text_color=#e2e8f0, text_size=size.tiny)');
-    add('    table.cell(sigTable, 0, 5, "Label", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 5, labelMode, text_color=#e2e8f0, text_size=size.tiny)');
-    add('    table.cell(sigTable, 0, 6, "Entry", text_color=#94a3b8, text_size=size.tiny)');
-    add('    table.cell(sigTable, 1, 6, "M5 · LIMIT", text_color=#e2e8f0, text_size=size.tiny)');
-    const rows = ((j.chart && j.chart.m5) || []).slice(-120);
-    const rh = rows.length ? Math.max(...rows.map(r => r.h)) : null;
-    const rl = rows.length ? Math.min(...rows.map(r => r.l)) : null;
-    const span = rh != null && rl != null ? Math.max(2, Math.min(40, rh - rl)) : 8;
-    const items = [];
-    const addItem = (price, text, color, priority, at) => {
-      if (price == null || !isFinite(price)) return;
-      const ts = at ? Date.parse(at) : NaN;
-      items.push({ price: Number(price), text: String(text || ''), color, priority: priority || 1, at: isFinite(ts) ? ts : null });
-    };
-    const lane = (list, maxLabels) => {
-      const arr = list.slice(0, maxLabels).sort((a, b) => a.price - b.price);
-      if (!arr.length) return [];
-      /* Label dari candle/waktu berbeda tidak perlu ditumpuk: taruh dekat
-         harga aslinya. Hanya label pada waktu yang sama yang diberi lane. */
-      const groups = new Map();
-      arr.forEach(it => { const k = it.at || 'last'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); });
-      const out = [];
-      groups.forEach(g => {
-        g.sort((a, b) => a.price - b.price);
-        const gap = Math.max(0.25, Math.min(1.5, span / 30));
-        let last = -Infinity;
-        g.forEach(it => {
-          const labelY = Math.max(it.price + gap * 0.12, last + gap);
-          last = labelY;
-          out.push({ ...it, labelY });
-        });
-      });
-      return out;
-    };
-    const drawLine = (price, text, color, style, priority, at) => {
-      if (!isFinite(price)) return;
-      add('    line.new(x1=bar_index - 120, y1=' + Number(price).toFixed(2) + ', x2=bar_index + extendRight, y2=' + Number(price).toFixed(2) + ', xloc=xloc.bar_index, color=' + color + ', style=' + (style || 'line.style_dashed') + ', width=1)');
-      if (text) addItem(price, text, color, priority || 1, at);
-    };
-    markers.forEach(m => {
-      const price = Number(m.price);
-      addItem(price, String(m.type || '?') + (m.tf ? ' ' + m.tf : '') + ' ' + price.toFixed(1), pineColor(m.type), m.active ? 2 : 1, m.at);
-    });
-    const seenPlan = new Set();
-    plans.forEach(s => {
-      const style = String(s.style || 'PLAN'), sig = [style, s.entry, s.sl].join('|');
-      if (seenPlan.has(sig)) return; seenPlan.add(sig);
-      drawLine(Number(s.entry), style + ' M5 ENTRY ' + Number(s.entry).toFixed(2), '#e2e8f0', 'line.style_solid', 2);
-      drawLine(Number(s.sl), style + ' M5 SL ' + Number(s.sl).toFixed(2), '#ef4444', 'line.style_solid', 2);
-      drawLine(Number(s.tp2), style + ' M5 TP2 ' + Number(s.tp2).toFixed(2), '#22c55e', null, 2);
-      if (s.tpMax && s.tpMax !== s.tp2) drawLine(Number(s.tpMax), style + ' M5 TPMAX ' + Number(s.tpMax).toFixed(2), '#86efac', null, 2);
-    });
-    /* Label tidak lagi semua di satu titik. Mode Ringkas (default) memakai
-       maksimal 12 prioritas; mode Semua memakai lane harga terpisah agar
-       label multi-timeframe tidak bertumpuk. */
-    const anchor = j.price == null ? items.reduce((a, x) => a + x.price, 0) / Math.max(1, items.length) : Number(j.price);
-    const compact = items.slice().sort((a, b) => (b.priority - a.priority) || (Math.abs(a.price - anchor) - Math.abs(b.price - anchor))).slice(0, 12);
-    const labelBlock = (list, mode) => {
-      if (!list.length) return;
-      add('    if labelMode == "' + mode + '" and showLabels');
-      lane(list, mode === 'Ringkas' ? 12 : 200).forEach(it => {
-        const p = Number(it.price).toFixed(2);
-        /* Label TF yang levelnya jauh dari harga M5 tetap ditampilkan di rail
-           atas/bawah chart. Teks tetap memuat harga asli, jadi tidak salah baca. */
-        const rail = Math.max(2, span * .95);
-        const far = it.price > anchor + rail || it.price < anchor - rail;
-        const lyNum = far ? (it.price > anchor ? anchor + rail : anchor - rail) : it.labelY;
-        const ly = Number(lyNum).toFixed(2);
-        const text = String(it.text) + (far ? (it.price > anchor ? ' ↑ ' : ' ↓ ') + 'rail' : '');
-        if (it.at) {
-          add('        line.new(x1=' + it.at + ', y1=' + p + ', x2=' + it.at + ', y2=' + ly + ', xloc=xloc.bar_time, color=' + it.color + ', style=line.style_dotted, width=1)');
-          add('        label.new(x=' + it.at + ', y=' + p + ', text="•", xloc=xloc.bar_time, style=label.style_label_center, color=color.new(#0f172a, 100), textcolor=' + it.color + ', size=size.tiny)');
-          add('        label.new(x=' + it.at + ', y=' + ly + ', text=' + JSON.stringify(text) + ', xloc=xloc.bar_time, style=label.style_label_left, color=color.new(#0f172a, 12), textcolor=' + it.color + ', size=size.tiny)');
-        } else {
-          add('        line.new(x1=bar_index + 2, y1=' + p + ', x2=bar_index + 2, y2=' + ly + ', xloc=xloc.bar_index, color=' + it.color + ', style=line.style_dotted, width=1)');
-          add('        label.new(x=bar_index + 4, y=' + ly + ', text=' + JSON.stringify(text) + ', xloc=xloc.bar_index, style=label.style_label_left, color=color.new(#0f172a, 12), textcolor=' + it.color + ', size=size.tiny)');
-        }
-      });
-    };
-    labelBlock(compact, 'Ringkas');
-    labelBlock(items, 'Semua');
-    return out.join('\n') + '\n';
-  }
-  async function copyText(text) {
-    try { await navigator.clipboard.writeText(text); return true; } catch (e) { }
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
-      document.body.appendChild(ta); ta.select();
-      const ok = document.execCommand('copy'); ta.remove(); return ok;
-    } catch (e) { return false; }
-  }
-  function currentPine() {
-    if (!sigData) { toast('Belum ada sinyal aktif untuk diekspor.'); return ''; }
-    const s = buildPine(sigData);
-    if (!s) { toast('Sinyal aktif belum lengkap; coba refresh sinyal.'); return ''; }
-    return s;
-  }
-  window.pPineCopy = async function () {
-    const s = currentPine(); if (!s) return;
-    const ok = await copyText(s);
-    toast(ok ? '📋 Pine Script disalin. Tempel di TradingView → Pine Editor → Add to chart → Save.' : '⚠️ Clipboard tidak tersedia; gunakan tombol Unduh .pine.');
-  };
-  window.pPineDownload = function () {
-    const s = currentPine(); if (!s) return;
-    try {
-      const blob = new Blob([s], { type: 'text/plain;charset=utf-8' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'alchemist-xau-' + String(sigMode).toLowerCase() + '-' + new Date().toISOString().slice(0, 10) + '.pine';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      toast('⬇️ File .pine diunduh. Pasang di Pine Editor TradingView lalu Save.');
-    } catch (e) { toast('⚠️ Gagal mengunduh: ' + e.message); }
-  };
-
   function chartCard(j) {
     const types = {};
-    (j.markers || []).forEach(m => { types[m.type] = (types[m.type] || 0) + 1; });
+    (j.markers || []).forEach(m => { const t = chartType(m.type); types[t] = (types[t] || 0) + 1; });
     const nAll = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF).length, nShow = chartLabelShown(j);
     return `<div class="card"><div class="rb-card-head"><h3>🏷️ Chart live M5 + layer multi-timeframe</h3><span class="rb-pill" id="sigStamp">${j.generatedAt ? new Date(j.generatedAt).toLocaleTimeString('id-ID') : '—'}</span></div>
       <canvas id="xSigChart" title="Gulir untuk zoom, atau pakai tombol di bawah" style="width:100%;height:380px;display:block;margin-top:6px"></canvas>
       <div class="rb-pill-row" style="margin-top:8px;align-items:center"><button class="x" type="button" onclick="xSigZoom(-1)">🔍 Perbesar</button><span class="rb-pill" id="sigZoomLabel">${sigChartBars} candle</span><button class="x" type="button" onclick="xSigZoom(1)">🔍 Perkecil</button><button class="x" type="button" onclick="xSigZoom(0)">Reset</button><button class="x" type="button" id="sigLabelToggle" onclick="pChartLabels()">${chartLabelAll ? '🙈 Label ringkas' : '🏷️ Semua label'}</button></div>
       <div class="rb-pill-row" style="margin-top:6px;align-items:center"><span class="small mut">Layer TF:</span>${['ALL', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].map(tf => `<button class="x" type="button" onclick="pChartTF('${tf}')" style="${chartTF === tf ? 'border-color:var(--b);color:var(--b)' : ''}">${tf}</button>`).join('')}<a class="x" href="https://www.tradingview.com/chart/?symbol=FOREXCOM%3AXAUUSD&interval=${chartTF === 'M15' ? '15' : chartTF === 'H1' ? '60' : chartTF === 'H4' ? '240' : chartTF === 'D1' ? 'D' : chartTF === 'W1' ? 'W' : '5'}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Buka TradingView</a></div>
       <div class="small mut" id="sigLabelNote" style="margin-top:6px">${chartLabelAll ? 'Semua ' + nAll + ' label ditampilkan; pada chart padat beberapa label bisa berdekatan.' : 'Menampilkan ' + nShow + ' dari ' + nAll + ' label: satu per istilah + TF (maks 32), lalu yang terdekat. Tombol <b>Semua label</b> membuka seluruhnya.'} Label TF lama yang di luar window M5 tampil di tepi kanan sebagai label level, bukan ditempel ke candle palsu.</div>
-      <div class="rb-pill-row" style="margin-top:8px;align-items:center"><button class="x" type="button" onclick="pPineCopy()">📋 Salin Pine Script</button><button class="x" type="button" onclick="pPineDownload()">⬇️ Unduh .pine</button><span class="small mut">Pine: label Ringkas (default) / Semua</span></div>
-      <div class="rb-pill-row" style="margin-top:8px">${Object.keys(types).map(t => `<span class="rb-pill">${XE(t)} · ${types[t]}</span>`).join('')}</div>
-      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle M5 dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). TradingView tidak menyediakan API publik untuk menulis gambar ke akun pengguna; gunakan <b>Pine Script</b> di atas, tempel di Pine Editor, Add to chart, lalu Save agar penanda tersimpan di layout akun TradingView.</div></div>`;
+      <div class="rb-pill-row" style="margin-top:8px">${Object.keys(types).map(t => `<span class="rb-pill" title="${XE(chartTerm(t))}">${XE(t)}${chartTerm(t) ? ' · ' + XE(chartTerm(t)) : ''} · ${types[t]}</span>`).join('')}</div>
+      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle M5 dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). Semua label digambar langsung di chart halaman ini dan mengikuti harga real-time; tidak ada ekspor/download. Istilah memakai glosarium yang sama dengan mesin: BOS/RBS-SBR, CHoCH/MSS, SNR/liquidity, SND/supply-demand, OB, FVG/BISI-SIBI, OTE, PDH/PDL.</div></div>`;
   }
 
   function marksCard(j) {
     const ms = j.markers || [];
     if (!ms.length) return '';
-    return `<div class="card"><h3>🏷️ Tanda chart & catatan AI</h3>${ms.map(m => `<div class="item"><span><b>${XE(m.type)} · ${XE(m.tf || '—')}</b> · ${XE(m.label)} <span class="mut small">${num(m.price)}${m.at ? ' · ' + XE(new Date(m.at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })) : ''}</span><div class="small mut">${XE(m.why)} · entry ${XE(m.entryTf || 'M5')}</div>${m.ai ? `<div class="small" style="color:var(--warn)">🧠 ${XE(m.ai.note)} <span class="mut">(${XE(m.ai.confidence)})</span></div>` : ''}</span></div>`).join('')}</div>`;
+    return `      <div class="card"><h3>🏷️ Tanda chart & catatan AI</h3>${ms.map(m => `<div class="item"><span><b>${XE(chartType(m.type))}${chartTerm(m.type) ? ' — ' + XE(chartTerm(m.type)) : ''} · ${XE(m.tf || '—')}</b> · ${XE(m.label)} <span class="mut small">${num(m.price)}${m.at ? ' · ' + XE(new Date(m.at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })) : ''}</span><div class="small mut">${XE(m.why)} · entry ${XE(m.entryTf || 'M5')}</div>${m.ai ? `<div class="small" style="color:var(--warn)">🧠 ${XE(m.ai.note)} <span class="mut">(${XE(m.ai.confidence)})</span></div>` : ''}</span></div>`).join('')}</div>`;
   }
 
   function setupsCard(j) {
@@ -2225,7 +2142,8 @@
     };
     const markerTag = (m) => {
       if (m.price == null || !isFinite(m.price)) return;
-      const color = colors[m.type] || '#94a3b8';
+      const mt = chartType(m.type);
+      const color = colors[mt] || '#94a3b8';
       const outside = m.price > hi || m.price < lo;
       const idx = outside ? -1 : anchorOf(m);
       const off = idx < 0;
@@ -2233,7 +2151,7 @@
       const py = outside ? (m.price > hi ? padT + 10 : H - padB - 4) : y(m.price);
       const r = off ? null : rows[idx];
       const above = outside ? m.price > hi : m.price >= lastC;
-      const text = String(m.type || '?') + (m.tf ? ' ' + m.tf : '') + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' •' : '') + (outside ? (m.price > hi ? ' ↑' : ' ↓') : '');
+      const text = String(mt || '?') + (m.tf ? ' ' + m.tf : '') + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' •' : '') + (outside ? (m.price > hi ? ' ↑' : ' ↓') : '');
       g.save();
       g.font = '700 9px Manrope, sans-serif'; g.textAlign = 'left';
       const tw = g.measureText(text).width + 4;
@@ -2329,5 +2247,4 @@
   /* pastikan tab signal bisa dibuka walau nama fungsi berbeda */
   window.xauFocusGet = function () { return newsFocus; };
   /* Dipakai oleh skrip validasi lokal; tidak mengubah alur UI. */
-  window.__pineExport = function (data, mode) { if (mode) sigMode = mode; return buildPine(data); };
 })();

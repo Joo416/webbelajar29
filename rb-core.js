@@ -322,7 +322,7 @@ function homeBase() {
   if (S.sec === 'trading') {
     S.mapel = 'Trading';
     if (['xau', 'radar', 'signal', 'alchemist', 'tutor', 'jurnal'].indexOf(S.tab) < 0) S.tab = 'xau';
-    const T = [['xau', ' News Analisis'], ['radar', ' Radar 10M'], ['signal', ' Signal Entry'], ['alchemist', ' Strategi Alchemist'], ['tutor', ' Tutor'], ['jurnal', ' Jurnal']];
+    const T = [['xau', ' News Analisis'], ['radar', ' Radar 1H'], ['signal', ' Signal Entry'], ['alchemist', ' Strategi Alchemist'], ['tutor', ' Tutor'], ['jurnal', ' Jurnal']];
     $('app').innerHTML = '<div class="stabs">' + T.map(function (x) {
       return '<button class="' + (S.tab === x[0] ? 'on' : '') + '" onclick="S.tab=\'' + x[0] + '\';home()">' + x[1] + '</button>';
     }).join('') + '</div><div id="pane"></div>';
