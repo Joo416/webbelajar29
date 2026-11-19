@@ -32,12 +32,18 @@ service cloud.firestore {
                     && request.resource.data.email == mail()
                     && request.resource.data.status == 'menunggu'
                     && !request.resource.data.keys().hasAny(['admin','trading']);
+      // Pemilik boleh memperbarui profilnya sendiri (nama/foto/uid) tanpa bisa
+      // mengubah status, izin, atau menambah field admin/trading.
+      allow update: if signedIn() && id == mail()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama','foto','uid']);
       allow create, update, delete: if isAdmin();
     }
 
     match /izin_trading/{id} {
       allow get: if isAdmin() || (signedIn() && id == mail());
-      allow list: if isAdmin();
+      // Pemilik hanya melihat dokumen izinnya sendiri.
+      allow list: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow create: if signedIn() && id == mail()
                     && request.resource.data.email == mail()
                     && request.resource.data.uid == request.auth.uid

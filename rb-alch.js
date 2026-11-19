@@ -6,13 +6,13 @@
 const ALCH_LABELS = {
   mulai: ' Mulai', dasar: ' Dasar Pasar', roadmap: ' Roadmap', istilah: ' Istilah',
   story: ' Storyline', level: ' Level', topdown: ' Top-down', sesi: ' Sesi',
-  entry: ' Playbook', kasus: ' Studi Kasus', posisi: ' Manajemen Posisi',
+  entry: ' Playbook', combo: ' Combo π (AMD+SMC+Fibo)', kasus: ' Studi Kasus', posisi: ' Manajemen Posisi',
   tfmap: ' Peta Timeframe', m5: ' Konfirmasi M5', risiko: ' Risiko', kalkulator: ' Kalkulator', cek: '✅ Checklist',
   psiko: ' Psikologi', backtest: ' Backtest', rencana: ' Rencana', kuis: ' Kuis'
 };
 const ALCH_GROUPS = [
   { id: 'pemula', label: ' Pemula', tabs: ['mulai', 'dasar', 'roadmap', 'istilah', 'story', 'level'] },
-  { id: 'analisa', label: ' Analisa', tabs: ['topdown', 'sesi', 'entry', 'kasus'] },
+  { id: 'analisa', label: ' Analisa', tabs: ['topdown', 'sesi', 'entry', 'combo', 'kasus'] },
   { id: 'eksekusi', label: ' Eksekusi', tabs: ['tfmap', 'm5', 'posisi', 'risiko', 'kalkulator', 'cek'] },
   { id: 'mahir', label: ' Mahir', tabs: ['psiko', 'backtest', 'rencana'] },
   { id: 'uji', label: ' Uji', tabs: ['kuis'] }
@@ -800,6 +800,46 @@ function alM5Html() {
     + '<div class="small mut" style="margin-top:8px">Tanda M5 dihitung otomatis di tab Signal Entry (BOS/CHoCH M5, sweep, FVG) dan ikut diperbarui tiap 20 menit tanpa tombol, termasuk setelah tab kembali aktif.</div>');
 }
 
+/* ---------- COMBO π: AMD + ICT simple + SMC + Fibonacci momentum ----------
+   Halaman ini merangkum materi combo yang diberikan pengguna apa adanya:
+   urutan AMD, empat bagian ICT simple, SMC versi π, SBR/RBS, lalu resep
+   Fibonacci + candle momentum dengan angka limit 70 / SL 100 / TP -15.
+   Semua contoh angka adalah LEVEL FIBO (skala indikator), bukan harga XAU.
+   ------------------------------------------------------------------------ */
+function alComboHtml() {
+  const box = (t, b) => '<div class="exp" style="color:var(--tx);margin-top:8px"><b>' + t + '</b><div class="small" style="margin-top:3px;line-height:1.6">' + b + '</div></div>';
+  const table = (head, rows) => '<div class="rb-scroll" style="margin-top:8px"><table class="rb-table"><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+  return '<div class="card"><div class="rb-card-head"><h3>🧪 Combo π — satu alur, empat lapis metode</h3><span class="rb-pill y">AMD → ICT → SMC → Fibo</span></div>'
+    + '<div class="rb-note">Materi ini menggabungkan metode yang kamu berikan: <b>AMD (Accumulation–Manipulation–Distribution)</b>, <b>ICT konsep simple</b> (pola ABC, market structure, FVG, likuiditas), <b>SMC versi π</b> (market structure, engulfing, FVG, CHoCH, BOS), dan <b>Fibonacci + candle momentum</b>. Aturannya satu: setiap lapis harus searah. Kalau satu lapis melawan, setup dibatalkan — bukan dipaksa.</div>'
+    + box('1. AMD — siklus institusi (dasar semua entry)',
+      '<b>Accumulation</b>: harga sideways (biasanya range Asia) sambil institusi mengumpulkan posisi. <b>Manipulation</b>: harga menembus batas range (Judas swing / stop hunt) untuk memancing retail dan mengambil stop loss. <b>Distribution</b>: setelah likuiditas diambil, harga bergerak sebenarnya dengan displacement.<br><b>Aturan entry:</b> jangan entry saat akumulasi, jangan entry saat manipulasi. Entry hanya setelah manipulasi selesai (harga close kembali ke dalam range) dan distribusi terlihat (candle impuls + FVG).')
+    + box('2. ICT simple — empat bagian (by Al)',
+      '<b>a. Pola ABC</b>: pasar membentuk Higher High + Higher Low (bullish) atau Lower High + Lower Low (bearish) di dalam kotak SNR. Bullish fokus BUY, bearish fokus SELL — jangan melawan pola.<br><b>b. Market structure</b>: <i>CHoCH</i> = body candle wajib menembus body/wick candle sebelumnya di area terdekat (perubahan karakter). <i>BOS</i> = tetap sah walau hanya body/ekor/wick menembus candle/ekor sebelumnya (tren berlanjut).<br><b>c. Fair Value Gap</b>: celah antara wick candle ke-1 dan wick candle ke-3 karena ketidakseimbangan buyer/seller. Celah adalah utang: harga cenderung kembali menutupnya.<br><b>d. Likuiditas</b>: setelah harga naik/turun signifikan lalu ditarik balik (rejection/pullback) ke arah berlawanan — contoh bullish berubah bearish. Sapuan ini yang menjadi bahan bakar entry.')
+    + box('3. SMC versi π — lima alat, satu bahasa',
+      '<b>Market structure</b>: arah tren. Untuk scalping, H1 sudah cukup melihat arah hari ini.<br><b>Engulfing</b>: candle sebelumnya lebih kecil dari candle sesudahnya yang sekaligus membalik arah. Fokus M15; setelah ketemu, marking zona lalu turun M1/M5 untuk mengambil likuiditas dan pasang limit.<br><b>FVG</b>: dipakai M5 ke atas. Contoh: market menyentuh zona 13–15 lalu membuat FVG baru di 98–00 → marking lagi dan follow sell. <i>Celah adalah hutang, market harus menutupnya.</i><br><b>CHoCH & BOS</b>: CHoCH butuh body menembus area candle terdekat; BOS sah dengan body/ekor/wick.<br><b>SBR / RBS</b>: resistance yang ditembus valid berubah jadi support (dan sebaliknya). Setelah 2–3 sentuhan, berhenti mengejar arah lama; tunggu retest level itu sebagai area entry. Low baru disebut valid jika titik terendah sudah di-break atau break lower high.')
+    + box('4. Resep Fibonacci + candle momentum (khusus swing & scalping)',
+      '<b>Langkah:</b><br>1) Tarik Fibonacci di <b>satu candle terpanjang H1–H4</b> (candle momentum, bukan sembarang candle).<br>2) Ambil <b>golden ratio 61.8–78.6%</b>.<br>3) Perkecil ke M5: ambil <b>SND/OB/FVG terdekat</b> dengan zona golden ratio, beri buffer <b>10–20 pip</b>.<br>4) Tutup garis ke <b>liquidity sweep H1</b> tertinggi/terendah; pasang SL di situ.<br>5) Entry di <b>SNR/SND M5 terdekat dengan SL likuiditas</b> memakai LIMIT, bukan market.<br><b>Cara ingat angka:</b> limit di angka <b>70</b>, SL di angka <b>100</b>, TP di angka <b>−15</b> pada skala Fibonacci. Berlaku untuk scalping <b>80–150–200 pip</b>. HTF hanya untuk mencari bias market structure; entry tetap M1–M5–M15.')
+    + table(['Alat', 'Arti di materi π', 'Fungsi saat entry'], [
+      ['BOS', 'RBS / SBR (break struktur)', 'Konfirmasi tren berlanjut'],
+      ['CHoCH', 'MSS (market structure shift)', 'Sinyal awal pembalikan, butuh displacement'],
+      ['LIQ', 'SNR / liquidity sweep', 'Bahan bakar: stop retail diambil dulu'],
+      ['SND', 'Supply & Demand', 'Zona entry setelah retest'],
+      ['OB', 'Candle berlawanan terakhir sebelum impuls', 'POI utama untuk limit order'],
+      ['FVG', 'Celah 3 candle (BISI/SIBI)', 'Magnet retest; entry di 50% celah'],
+      ['IDM', 'Inducement di depan POI', 'Harus disapu dulu sebelum OB sah'],
+      ['OTE', '61.8–78.6% (sweet 70.5%)', 'Zona limit presisi, SL sempit']
+    ])
+    + box('5. Urutan eksekusi combo (checklist 8 baris)',
+      '1) Tentukan bias HTF (D1/H4/H1): HH+HL = BUY, LH+LL = SELL.<br>2) Tunggu range Asia / akumulasi terbentuk.<br>3) Tunggu manipulasi: sweep BSL/SSL atau Judas swing, lalu close balik ke range.<br>4) Cari POI: OB/FVG unmitigated di discount (<50%) untuk BUY, premium (>50%) untuk SELL.<br>5) Tunggu IDM di depan POI disapu.<br>6) Konfirmasi M5: CHoCH/BOS + displacement/engulfing, searah bias.<br>7) Pasang LIMIT di tepi zona / 50% FVG / golden ratio; SL 30 pip di balik sweep; TP2 minimal 200 pip ke likuiditas berikutnya.<br>8) Batal jika M5 close di luar zona, sweep dilanggar, atau harga sudah lebih dari 3 ATR dari POI.')
+    + box('6. Contoh penerapan (skenario, bukan janji)',
+      'H1 bullish (HH+HL) → range Asia 20 pip → London menyapu low Asia (manipulasi) lalu close balik di atas low → M5 membentuk CHoCH naik + FVG → harga retest 50% FVG di zona discount → LIMIT BUY di tepi atas FVG, SL 30 pip di bawah sweep, TP1 80–150 pip, TP2 ≥200 pip ke EQH/PDH berikutnya. Kalau saat retest harga justru close di bawah sweep, setup batal — tunggu sweep berikutnya.')
+    + box('7. Kesalahan yang paling sering terjadi',
+      '• Entry saat akumulasi karena bosan. • Mengejar candle distribusi tanpa retest. • Menganggap BOS sebagai reversal (BOS = lanjut, CHoCH/MSS = berbalik). • Memakai FVG yang sudah mitigated. • Entry sebelum IDM disapu. • Memakai fibo di candle biasa, bukan candle momentum terpanjang. • Memasang SL lebih lebar dari 30 pip lalu berharap TP 200 pip tanpa hitungan RR. • Melawan bias HTF karena sinyal M1.')
+    + '<div class="card" style="margin-top:10px;background:var(--card2)"><b class="small">🔗 Hubungan ke mesin</b><div class="rb-note" style="margin-top:3px">Semua aturan di halaman ini dihitung otomatis di <b>Signal Entry</b>: AMD per sesi, BOS/CHoCH M5–M15, sweep BSL/SSL, FVG/OB/IDM, breaker/mitigation/IFVG/BPR, rejection block, premium-discount/OTE, fib candle momentum, kill zone, dan SMT. Kartu “Metode gabungan & cara entry” menampilkan skor konfluensi tiap metode, sehingga kamu bisa melihat lapis mana yang belum searah sebelum memasang limit.</div></div>'
+    + '<div class="small mut" style="margin-top:8px">Batas: materi ini edukasi teknikal, bukan jaminan. Tidak ada strategi yang bebas SL; yang membuat konsisten adalah seleksi setup, SL tetap, TP minimal, dan evaluasi hasil.</div>'
+    + '</div>';
+}
+
 /* ---------- kerangka halaman ---------- */
 function alGroup(g) {
   const G = ALCH_GROUPS.filter(function (x) { return x.id === g; })[0];
@@ -824,7 +864,7 @@ function pAlchemist() {
   if (G.tabs.indexOf(ALCH.tab) < 0) ALCH.tab = G.tabs[0];
   const B = {
     mulai: alStartHtml, dasar: alDasarHtml, roadmap: alRoadmapHtml, istilah: function () { return '<div id="alchterms">' + alTermsHtml() + '</div>'; },
-    story: alStoryHtml, level: alLevelHtml, topdown: alTopdownHtml, sesi: alSessionHtml, entry: alEntryHtml,
+    story: alStoryHtml, level: alLevelHtml, topdown: alTopdownHtml, sesi: alSessionHtml, entry: alEntryHtml, combo: alComboHtml,
     kasus: alCaseHtml, posisi: alPosisiHtml, risiko: alRiskHtml, kalkulator: alCalcHtml, cek: alCheckHtml,
     psiko: alPsikoHtml, backtest: alBacktestHtml, rencana: alPlanHtml, kuis: alQuizHtml,
     tfmap: alTfMapHtml, m5: alM5Html

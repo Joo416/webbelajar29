@@ -514,6 +514,7 @@ label { color: var(--tx-soft); font-size: .74rem; font-weight: 650; letter-spaci
 }
 .rb-verdict.buy { border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: linear-gradient(150deg, var(--ok-soft), var(--field) 70%); }
 .rb-verdict.sell { border-color: color-mix(in srgb, var(--no) 45%, transparent); background: linear-gradient(150deg, var(--no-soft), var(--field) 70%); }
+.rb-verdict.neutral { border-color: color-mix(in srgb, var(--warn) 50%, transparent); background: var(--field); }
 .rb-verdict-label { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); font-weight: 650; }
 .rb-verdict-main {
   font-family: var(--font-display);
