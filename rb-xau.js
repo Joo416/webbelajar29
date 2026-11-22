@@ -403,7 +403,7 @@
         agreement: j.methods.agreement, agree: j.methods.agree, total: j.methods.total,
         against: (j.methods.against || []).slice(0, 4)
       } : null,
-      learn: setup.learning ? { blocked: !!setup.learning.blocked, reasons: (setup.learning.reasons || []).slice(0, 3) } : null,
+      learn: setup.learning ? { blocked: false, warn: !!(setup.learning.warn || setup.learning.wouldHold), wouldHold: !!setup.learning.wouldHold, reasons: (setup.learning.reasons || []).slice(0, 3) } : null,
       smc: setup.smc ? {
         grade: setup.smc.grade || '', score: setup.smc.score,
         phase: setup.smc.phase || '', kill: !!(setup.smc.killzone && setup.smc.killzone.active),
@@ -573,8 +573,11 @@
   function histFailure(h) {
     const ctx = h.ctx || {};
     const out = [];
-    if (h.review && h.review.status === 'selesai') {
-      (h.review.causes || []).forEach(x => out.push(x));
+    /* Pelajaran instan: causes/fixes sudah dihitung saat candle SL close.
+       Jangan menunggu status 'selesai' 30 menit untuk menampilkan dan
+       mengirimkannya ke AI. */
+    if (h.review && Array.isArray(h.review.causes) && h.review.causes.length) {
+      h.review.causes.forEach(x => out.push(x));
       if ((h.review.fixes || []).length) out.push('Perbaikan: ' + h.review.fixes.join(' '));
     }
     if (histMacroSide(ctx, h.dir) === 'melawan') out.push('DXY/yield bergerak melawan arah entry saat entry dibuka.');
@@ -615,9 +618,8 @@
       if (!['SL', 'TP1', 'TP2', 'TPMAX'].includes(st)) return;
       const win = st !== 'SL';
       /* Observasi yang belum dieksekusi (paper) dipisah: hasilnya boleh
-         menurunkan keyakinan, tetapi tidak boleh memblokir entry sendirian.
-         Blokir hanya dari trade nyata (SIAP) agar mesin tidak terkunci oleh
-         rencana yang memang belum pernah dieksekusi. */
+         menurunkan keyakinan, tetapi tidak menahan sinyal. Semua hasil tetap
+         dipakai sebagai bukti; tidak ada status yang dikunci oleh satu pola. */
       const paper = !!h.paper;
       (Array.isArray(h.patternKeys) && h.patternKeys.length ? h.patternKeys : histPatternKeys(h)).forEach(k => {
         const o = map.get(k) || { n: 0, w: 0, l: 0, pl: 0, last: 0 };
@@ -659,6 +661,11 @@
           method: isFinite(ma) ? (ma >= 70 ? 'tinggi' : ma >= 50 ? 'sedang' : 'rendah') : '',
           target: ((ctx.targets || []).filter(t => Number(t.pips) >= 200).slice(-1)[0] || {}).src || '',
           conf: isFinite(conf) ? conf : null,
+          /* Pelajaran SL ikut dikirim ke server supaya semua AI menerima
+             penyebab dan perbaikan yang sama, bukan hanya angka statistik. */
+          causes: (Array.isArray(h.review && h.review.causes) && h.review.causes.length ? h.review.causes : histFailure(h)).slice(0, 2).map(x => xcut(x, 140)),
+          fixes: (Array.isArray(h.review && h.review.fixes) ? h.review.fixes : []).slice(0, 2).map(x => xcut(x, 140)),
+          learnedAt: (h.review && h.review.learnedAt) || h.closedAt || null,
           at: Date.parse(h.closedAt || '') || Number(h.updatedAt) || 0
         };
       });
@@ -930,11 +937,11 @@
   function learnApply(j) {
     if (!j || !Array.isArray(j.setups)) return j;
     const profile = learningProfile();
-    let blocked = 0, warned = 0;
+    let warned = 0;
     j.setups.forEach(s => {
       if (!s || s.status === 'LEWAT') return;
       const serverLearn = s.learning || null;
-      const serverBlocked = !!(serverLearn && serverLearn.blocked);
+      const serverWarn = !!(serverLearn && (serverLearn.warn || serverLearn.wouldHold || serverLearn.blocked));
       const ctx = histCtx(j, s);
       const keys = histPatternKeys({ style: s.style, dir: s.dir, poi: s.poiTf, trigger: s.trigger, ctx });
       const exact = profile.get(keys[0]) || null;
@@ -943,34 +950,31 @@
       const recent = (st) => !!st && st.last > 0 && Date.now() - st.last < 7 * 86400000;
       /* Satu SL tidak langsung menahan pola; butuh minimal 2 SL nyata pada pola
          yang sama agar sinyal tidak berhenti muncul karena satu hasil. */
-      const stop = serverBlocked || !!((exact && exact.l >= 2 && exact.w === 0 && recent(exact)) || (best && best.n >= 3 && best.l >= 2 && best.w === 0 && recent(best)) || (best && best.n >= 4 && best.l / best.n >= 0.75 && best.w === 0 && recent(best)));
-      const warn = !!(!stop && best && (best.l > 0 || best.pl > 0));
+      /* KEBIJAKAN TETAP: tidak ada sinyal yang ditahan karena pembelajaran.
+         Riwayat SL hanya menurunkan keyakinan dan menambah syarat konfirmasi;
+         level entry/SL/TP yang valid tetap tampil apa adanya. */
+      const wouldHold = serverWarn || !!((exact && exact.l >= 2 && exact.w === 0 && recent(exact)) || (best && best.n >= 3 && best.l >= 2 && best.w === 0 && recent(best)) || (best && best.n >= 4 && best.l / best.n >= 0.75 && best.w === 0 && recent(best)));
+      const warn = !!(wouldHold || (best && (best.l > 0 || best.pl > 0)));
       const wasReady = s.status === 'SIAP' || s.status === 'PENDING';
-      s.learning = stop || warn ? {
-        blocked: stop, warn,
+      s.learning = warn ? {
+        blocked: false, warn: true, wouldHold, extraConfirm: wouldHold,
         n: best ? best.n : Number(serverLearn && serverLearn.n) || 0,
         wins: best ? best.w : Number(serverLearn && serverLearn.wins) || 0,
         losses: best ? best.l : Number(serverLearn && serverLearn.losses) || 0,
         key: bestKey || keys[0],
-        label: serverBlocked && serverLearn && serverLearn.label ? serverLearn.label : histPatternLabel(bestKey || keys[0]),
+        label: serverWarn && serverLearn && serverLearn.label ? serverLearn.label : histPatternLabel(bestKey || keys[0]),
         reasons: serverLearn && Array.isArray(serverLearn.reasons) ? serverLearn.reasons.slice(0, 3) : [],
-        note: stop ? (serverBlocked && serverLearn.note ? serverLearn.note : 'Pola ini SL dalam 7 hari terakhir; entry ditahan sementara. Evaluasi ulang setelah konteks berubah atau 7 hari.') : 'Pola ini pernah SL; konfirmasi ekstra wajib sebelum entry.'
+        note: wouldHold ? 'Riwayat SL berulang pada sifat ini. Sinyal TIDAK ditahan; keyakinan diturunkan dan konfirmasi tambahan wajib sebelum eksekusi.' : 'Pola ini pernah SL; konfirmasi ekstra dianjurkan.'
       } : null;
-      if (stop) {
-        blocked++;
-        if (wasReady) {
-          s.status = 'TUNGGU';
-          s.conf = Math.max(30, Number(s.conf || 0) - 12);
-          s.statusWhy = '[Pembelajaran otomatis] ' + s.learning.note + (s.statusWhy ? ' ' + s.statusWhy : '');
-        }
-      } else if (warn && wasReady) {
+      if (warn && wasReady) {
         warned++;
-        s.conf = Math.max(30, Number(s.conf || 0) - 4);
+        s.conf = Math.max(30, Number(s.conf || 0) - (wouldHold ? 8 : 4));
+        if (wouldHold) s.statusWhy = '[Pembelajaran] ' + s.learning.note + (s.statusWhy ? ' ' + s.statusWhy : '');
       }
     });
     const deleted = histDeletedSet();
     const serverSummary = j.learning || {};
-    j.learning = { ...serverSummary, total: histLoad().filter(h => !deleted.has(h.key) && ['SL', 'TP1', 'TP2', 'TPMAX'].includes(h.status)).length, blocked: Math.max(blocked, Number(serverSummary.blocked) || 0), warned: Math.max(warned, Number(serverSummary.warned) || 0), patterns: Math.max(Number(serverSummary.patterns) || 0, learningProfile().size) };
+    j.learning = { ...serverSummary, total: histLoad().filter(h => !deleted.has(h.key) && ['SL', 'TP1', 'TP2', 'TPMAX'].includes(h.status)).length, blocked: 0, held: 0, warned: Math.max(warned, Number(serverSummary.warned) || 0), patterns: Math.max(Number(serverSummary.patterns) || 0, learningProfile().size), policy: 'Tidak ada sinyal yang ditahan. Pembelajaran hanya menurunkan keyakinan dan menambah syarat konfirmasi.' };
     return j;
   }
   function histRecord(j) {
@@ -999,8 +1003,8 @@
       if (nearDup) return;
       const existing = arr.find(h => h.key === key);
       if (existing) {
-        /* Observasi yang sudah ditahan bisa dipromosikan menjadi entry nyata
-           setelah pola pulih; hasil yang sudah final tidak diubah. */
+        /* Observasi yang belum tereksekusi bisa dipromosikan menjadi entry
+           nyata setelah pola pulih; hasil yang sudah final tidak diubah. */
         if (!shadow && existing.shadow && !['SL', 'TP1', 'TP2', 'TPMAX'].includes(existing.status)) {
           existing.shadow = false; existing.status = 'AKTIF'; existing.why = String(existing.why || '').replace(/^\[Observasi pembelajaran\]\s*/, ''); existing.reason = 'Pola pulih dari pembelajaran; entry kembali aktif.'; existing.updatedAt = Date.now();
         }
@@ -1057,7 +1061,14 @@
           const same = prev.status === rv.status && prev.preSlMfePips === rv.preSlMfePips
             && prev.postSlMfePips === rv.postSlMfePips && prev.reachedTp2AfterSl === rv.reachedTp2AfterSl
             && prev.barsPost === rv.barsPost && prev.entryDelayMin === rv.entryDelayMin;
-          if (!same) { h.review = rv; h.lesson = histFailure(h); changed = true; }
+          if (!same) {
+            /* learnedAt dipertahankan: pelajaran pertama terjadi seketika saat
+               SL terdeteksi, bukan saat observasi 30 menit selesai. */
+            h.review = Object.assign({}, rv, { learnedAt: prev.learnedAt || new Date().toISOString() });
+            h.lesson = histFailure(h); changed = true;
+          } else if (!h.review.learnedAt) {
+            h.review.learnedAt = new Date().toISOString(); changed = true;
+          }
         }
         return;
       }
@@ -1084,6 +1095,7 @@
           h.status = 'SL'; h.closedAt = at; h.pips = -Math.round(Math.abs(h.entry - h.sl) / 0.1);
           h.reason = (h.shadow ? 'Observasi (tidak dieksekusi): ' : '') + 'Candle M5 ' + new Date(r.t).toLocaleTimeString('id-ID') + (buy ? ' low ' + Number(r.l).toFixed(2) : ' high ' + Number(r.h).toFixed(2)) + ' menembus SL ' + h.sl + '. Entry ' + h.entry + ' gagal; SL 30 pip.';
           h.review = histReviewStats(h, rows);
+          if (h.review) h.review.learnedAt = h.review.learnedAt || new Date().toISOString();
           h.lesson = histFailure(h); changed = true; break;
         }
         if (!h.tp2Hit && hitTp2) {
@@ -1135,8 +1147,9 @@
       ${isSl && h.review ? (() => {
         const rv = h.review;
         const left = rv.dueAt ? Math.max(0, Date.parse(rv.dueAt) - Date.now()) : 0;
-        const state = rv.status === 'selesai' ? '✅ Kajian 30 menit selesai' : '⏳ Observasi 30 menit · sisa ±' + Math.ceil(left / 60000) + ' menit';
-        return `<div class="small" style="margin-top:5px;padding:6px 8px;border-left:3px solid ${rv.status === 'selesai' ? 'var(--ok)' : 'var(--warn)'};background:rgba(255,255,255,.03)"><b>${state}</b><div class="mut" style="margin-top:2px">MFE sebelum SL ${XE(rv.preSlMfePips)} pip · tunggu entry ${XE(rv.entryDelayMin)} menit · rata-rata range M5 ${rv.avgRangePips == null ? '—' : XE(rv.avgRangePips) + ' pip'} · setelah SL ${XE(rv.postSlMfePips)} pip${rv.reachedTp2AfterSl ? ' (TP2 tercapai setelah SL)' : ''}</div>${(rv.fixes || []).length ? `<div style="margin-top:3px"><b>Perbaikan:</b> ${rv.fixes.map(x => XE(x)).join(' ')}</div>` : ''}</div>`;
+        const learned = rv.learnedAt ? new Date(rv.learnedAt).toLocaleString('id-ID') : '—';
+        const state = '✅ Dipelajari seketika (' + learned + ') · ' + (rv.status === 'selesai' ? 'kajian 30 menit selesai' : 'observasi 30 menit berjalan · sisa ±' + Math.ceil(left / 60000) + ' menit');
+        return `<div class="small" style="margin-top:5px;padding:6px 8px;border-left:3px solid var(--ok);background:rgba(255,255,255,.03)"><b>${state}</b><div class="mut" style="margin-top:2px">MFE sebelum SL ${XE(rv.preSlMfePips)} pip · tunggu entry ${XE(rv.entryDelayMin)} menit · rata-rata range M5 ${rv.avgRangePips == null ? '—' : XE(rv.avgRangePips) + ' pip'} · setelah SL ${XE(rv.postSlMfePips)} pip${rv.reachedTp2AfterSl ? ' (TP2 tercapai setelah SL)' : ''}</div><div class="mut" style="margin-top:2px">Penyebab + perbaikan sudah masuk ke daftar pelajaran di atas sejak candle SL close; observasi 30 menit hanya menambah data setelah SL.</div></div>`;
       })() : ''}
       ${ctx.ai && ctx.ai.summary ? `<div class="mut" style="margin-top:4px">Catatan AI saat entry: ${XE(ctx.ai.summary)}</div>` : ''}
       ${(ctx.sources || []).length ? `<div class="mut" style="margin-top:3px">Sumber: ${XE(ctx.sources.join(' · '))}</div>` : ''}
@@ -1199,15 +1212,16 @@
     const traits = (j && j.learning && Array.isArray(j.learning.top)) ? j.learning.top : [];
     const latest = sl.slice().sort((a, b) => (Date.parse(b.closedAt || '') || Number(b.updatedAt) || 0) - (Date.parse(a.closedAt || '') || Number(a.updatedAt) || 0))[0];
     return `<div class="card" id="learnCard"><div class="rb-card-head"><h3>🧪 Pembelajaran otomatis dari SL & observasi</h3><span class="rb-pill ${j && j.learning && j.learning.blocked ? 'y' : ''}">${settled.length} hasil · ${sl.length} SL${obs ? ' · ' + obs + ' amati' : ''}</span></div>
-      <div class="small mut">Mesin mencatat pola persis + sifat teknikal (mode, POI, trigger, sesi, makro, TF, risiko rilis, konfluensi metode, sumber TP) untuk setiap entry SIAP/PENDING dan setiap setup TUNGGU yang levelnya sudah valid. Setiap SL menjalani <b>kajian 30 menit</b>: mesin mengukur MFE sebelum SL, lama entry menunggu, volatilitas M5, dan apakah TP2 justru tercapai setelah SL, lalu menulis penyebab + perbaikan konkret. Setup TUNGGU dicatat sebagai <b>observasi</b>: tidak dieksekusi, tetapi SL/TP-nya tetap dinilai candle M5, sehingga mesin punya data untuk belajar walau belum ada trade nyata. Hasil observasi hanya menurunkan keyakinan; yang boleh menahan entry adalah SL dari trade nyata. News dan radar juga mencatat akurasi arahnya sendiri.</div>
-      <div class="rb-kpis" style="margin-top:8px"><div><span>TP</span><b style="color:var(--ok)">${tp.length}</b><small>TP2 ${tp2} · TPmax ${tpmax}</small></div><div><span>SL</span><b style="color:var(--no)">${sl.length}</b><small>evaluasi M5</small></div><div><span>Pola dipelajari</span><b>${patterns.length}</b><small>minimal 2 hasil</small></div><div><span>Ditahan sekarang</span><b style="color:var(--warn)">${current.filter(s => s.learning.blocked).length}</b><small>setup TUNGGU</small></div></div>
-      ${latest ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Pelajaran SL terakhir</b> <span class="small mut">${XE(latest.entry + ' · ' + latest.style + ' ' + latest.dir)}</span>${latest.review ? `<div class="small" style="margin-top:3px;color:${latest.review.status === 'selesai' ? 'var(--ok)' : 'var(--warn)'}">${latest.review.status === 'selesai' ? '✅ Kajian 30 menit selesai' : '⏳ Observasi 30 menit berjalan · sisa ±' + Math.ceil(Math.max(0, (Date.parse(latest.review.dueAt) || Date.now()) - Date.now()) / 60000) + ' menit'} · MFE ${XE(latest.review.preSlMfePips)} pip · entry delay ${XE(latest.review.entryDelayMin)} menit</div>` : ''}<div class="small" style="margin-top:3px">${(Array.isArray(latest.lesson) ? latest.lesson : histFailure(latest)).map(x => '• ' + XE(x)).join('<br>')}</div></div>` : '<div class="small mut" style="margin-top:8px">Belum ada SL yang bisa dipelajari. Setelah ada hasil, pelajaran muncul di sini.</div>'}
+      <div class="small mut">Mesin mencatat pola persis + sifat teknikal (mode, POI, trigger, sesi, makro, TF, risiko rilis, konfluensi metode, sumber TP) untuk setiap entry SIAP/PENDING dan setiap setup TUNGGU yang levelnya sudah valid. <b>Setiap SL langsung dipelajari seketika</b>: saat candle M5 yang menembus SL close, mesin menghitung MFE sebelum SL, lama entry menunggu, volatilitas M5, dan apakah TP2 justru tercapai setelah SL, lalu menulis penyebab + perbaikan konkret dan menyimpannya ke akun. <b>Kajian 30 menit tetap berjalan</b> untuk menambah observasi setelah SL, bukan untuk menunda pelajaran. Setup TUNGGU dicatat sebagai <b>observasi</b>: tidak dieksekusi, tetapi SL/TP-nya tetap dinilai candle M5, sehingga mesin punya data untuk belajar walau belum ada trade nyata. Hasil observasi hanya menurunkan keyakinan; <b>tidak ada sinyal yang ditahan</b> — level entry/SL/TP yang valid tetap tampil, dengan peringatan bila pola pernah SL. News dan radar juga mencatat akurasi arahnya sendiri.</div>
+      <div class="rb-kpis" style="margin-top:8px"><div><span>TP</span><b style="color:var(--ok)">${tp.length}</b><small>TP2 ${tp2} · TPmax ${tpmax}</small></div><div><span>SL</span><b style="color:var(--no)">${sl.length}</b><small>evaluasi M5</small></div><div><span>Pola dipelajari</span><b>${patterns.length}</b><small>minimal 2 hasil</small></div><div><span>Sinyal ditahan</span><b style="color:var(--ok)">0</b><small>${current.length} peringatan aktif</small></div></div>
+      ${latest ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Pelajaran SL terakhir</b> <span class="small mut">${XE(latest.entry + ' · ' + latest.style + ' ' + latest.dir)}</span>${latest.review ? `<div class="small" style="margin-top:3px;color:var(--ok)">✅ Pelajaran instan ${XE(latest.review.learnedAt ? new Date(latest.review.learnedAt).toLocaleString('id-ID') : '—')} · ${latest.review.status === 'selesai' ? 'kajian 30 menit selesai' : 'observasi 30 menit berjalan · sisa ±' + Math.ceil(Math.max(0, (Date.parse(latest.review.dueAt) || Date.now()) - Date.now()) / 60000) + ' menit'} · MFE ${XE(latest.review.preSlMfePips)} pip · entry delay ${XE(latest.review.entryDelayMin)} menit</div>` : ''}<div class="small" style="margin-top:3px">${(Array.isArray(latest.lesson) ? latest.lesson : histFailure(latest)).map(x => '• ' + XE(x)).join('<br>')}</div></div>` : '<div class="small mut" style="margin-top:8px">Belum ada SL yang bisa dipelajari. Setelah ada hasil, pelajaran muncul di sini.</div>'}
       ${patterns.length ? `<div style="margin-top:8px"><b class="small">Pola yang perlu diwaspadai</b>${patterns.map(([k, s]) => `<div class="item"><span class="small">${XE(histPatternLabel(k))}</span><b class="small" style="color:${s.w ? 'var(--warn)' : 'var(--no)'}">${s.l} SL / ${s.w} TP</b></div>`).join('')}</div>` : ''}
       ${traits.length ? `<div style="margin-top:8px"><b class="small">Sifat teknikal yang paling sering SL</b>${traits.map(t => `<div class="item"><span class="small">${XE(t.label)}</span><b class="small" style="color:var(--no)">${XE(t.losses)} SL / ${XE(t.wins)} TP · ${XE(t.rate)}%</b></div>`).join('')}</div>` : ''}
+      ${j && j.learning && (j.learning.causes || []).length ? `<div style="margin-top:8px"><b class="small">Penyebab SL yang tersimpan (dipakai semua AI)</b>${j.learning.causes.map(x => `<div class="item"><span class="small">${XE(x.text)}</span><b class="small" style="color:var(--no)">${XE(x.n)}×</b></div>`).join('')}${(j.learning.fixes || []).length ? `<div class="small mut" style="margin-top:4px"><b>Perbaikan:</b> ${j.learning.fixes.map(x => XE(x.text)).join(' · ')}</div>` : ''}</div>` : ''}
       ${current.length ? `<div class="small" style="margin-top:8px;color:var(--warn)">${current.map(s => '• ' + XE(s.style + ' ' + s.dir) + ': ' + XE(s.learning.note) + ((s.learning.reasons || []).length ? ' (' + XE((s.learning.reasons || []).join('; ')) + ')' : '')).join('<br>')}</div>` : ''}
-      ${j && j.learning ? `<div class="small mut" style="margin-top:6px">Profil belajar: ${XE(j.learning.patterns || 0)} pola · ${XE(j.learning.records || 0)} hasil · ${XE(j.learning.traits || 0)} sifat teknikal · ${XE(j.learning.blocked || 0)} ditahan · ${XE(j.learning.warned || 0)} peringatan${j.learning.outcomes ? ' · outcome TP2 ' + XE(j.learning.outcomes.tp2 || 0) + ' / TPmax ' + XE(j.learning.outcomes.tpmax || 0) : ''}. ${XE(j.learning.source || '')}</div>` : ''}
+      ${j && j.learning ? `<div class="small mut" style="margin-top:6px">Profil belajar: ${XE(j.learning.patterns || 0)} pola · ${XE(j.learning.records || 0)} hasil · ${XE(j.learning.traits || 0)} sifat teknikal · 0 ditahan · ${XE(j.learning.warned || 0)} peringatan${j.learning.outcomes ? ' · outcome TP2 ' + XE(j.learning.outcomes.tp2 || 0) + ' / TPmax ' + XE(j.learning.outcomes.tpmax || 0) : ''}. ${XE(j.learning.source || '')}</div>` : ''}
       ${knowledgeNote(j && j.knowledge, 'Belajar dari sumber global (web, YouTube resmi & akademi emas)')}
-      <div class="small mut" style="margin-top:6px">Ambang: satu SL tidak langsung menahan pola; pola ditahan hanya bila ≥2 SL nyata tanpa TP pada pola yang sama dalam 7 hari (atau ≥3 hasil semuanya SL). Pola yang sudah punya TP hanya diberi peringatan, bukan diblokir permanen. Cooldown 7 hari lalu dievaluasi ulang, dan hasil observasi ikut dihitung agar mesin tidak terkunci permanen. Kajian SL 30 menit menjadi bahan perbaikan, bukan alasan menahan entry selamanya. Data historis terbatas; tetap cek berita dan risiko.</div></div>`;
+      <div class="small mut" style="margin-top:6px">Kebijakan: <b>tidak ada sinyal yang ditahan</b>. Riwayat SL berulang hanya menurunkan keyakinan (maksimal 8 poin) dan menambah syarat konfirmasi; level LIMIT yang valid tetap tampil. Pelajaran SL instan + kajian 30 menit dipakai untuk memperbaiki pemilihan POI, trigger, sesi, dan sumber TP — bukan untuk menyembunyikan sinyal. Data historis terbatas; tetap cek berita dan risiko.</div></div>`;
   }
   function histCard() {
     const deleted = histDeletedSet();
@@ -1254,7 +1268,7 @@
     const selected = histFilter === 'ACTIVE' ? active : histFilter === 'TP' ? tp : histFilter === 'SL' ? sl : histFilter === 'SHADOW' ? shadow : arr;
     const selectedTitle = histFilter === 'ACTIVE' ? 'Aktif / berjalan' : histFilter === 'TP' ? 'Kena TP' : histFilter === 'SL' ? 'Kena SL' : histFilter === 'SHADOW' ? 'Observasi pembelajaran (tidak dieksekusi)' : 'Semua riwayat';
     return `<div class="card" id="sigHist"><div class="rb-card-head"><h3>🗂️ Riwayat Signal Entry</h3><span class="rb-pill ${histSyncState === 'akun' ? 'y' : ''}">${actual.length} entry${shadow.length ? ' · ' + shadow.length + ' amati' : ''} · ${running} berjalan · ${XE(sync)}</span></div>
-      <div class="small mut">Dikelompokkan per tanggal entry (waktu perangkat); TP2 minimal 200 pip. Entry aktif hari ini ada di grup <b>Hari ini</b>; tanggal mendatang belum punya riwayat karena entry belum terbentuk. Buka <b>detail</b> di kolom Hasil untuk melihat alasan entry, bukti teknikal/global, penyebab TP atau SL, dan pelajaran otomatisnya. SL/TP dievaluasi dari candle M5 TradingView sesudah waktu sinyal; SL didahulukan bila satu candle menyentuh SL dan TP. Setup yang ditahan pembelajaran tetap dicatat sebagai <b>observasi</b> agar mesin bisa menguji keputusannya tanpa mengeksekusi entry.</div>
+      <div class="small mut">Dikelompokkan per tanggal entry (waktu perangkat); TP2 minimal 200 pip. Entry aktif hari ini ada di grup <b>Hari ini</b>; tanggal mendatang belum punya riwayat karena entry belum terbentuk. Buka <b>detail</b> di kolom Hasil untuk melihat alasan entry, bukti teknikal/global, penyebab TP atau SL, dan pelajaran otomatisnya. SL/TP dievaluasi dari candle M5 TradingView sesudah waktu sinyal; SL didahulukan bila satu candle menyentuh SL dan TP. Setup yang belum tereksekusi tetap dicatat sebagai <b>observasi</b> agar mesin bisa menguji levelnya tanpa mengeksekusi entry; tidak ada setup yang ditahan karena pembelajaran.</div>
       <div class="rb-pill-row" style="margin-top:8px;align-items:center">
         <button class="x" type="button" onclick="pHistFilter('ALL')" style="${histFilter === 'ALL' ? 'border-color:var(--b);color:var(--b)' : ''}">Semua · ${arr.length}</button>
         <button class="x" type="button" onclick="pHistFilter('ACTIVE')" style="${histFilter === 'ACTIVE' ? 'border-color:var(--b);color:var(--b)' : ''}">Aktif · ${active.length}</button>
@@ -1652,6 +1666,67 @@
       <div class="small mut" style="margin-top:7px">Arah rilis berikutnya masih pra-rilis selama aktualnya belum terbit; panel AI dan data resmi tidak boleh dianggap sebagai hasil rilis.</div></div>`;
   }
 
+  /* Peta pasar per rilis: skenario bersyarat, tabel banding bersatuan,
+     audit kalender vs angka resmi, jadwal rujukan, dan matriks sumber. */
+  function newsPlaybookCard(j) {
+    const p = j && j.playbook;
+    if (!p) return '';
+    const sc = p.scenario || {}, c = p.compare || {}, au = p.audit || {}, rf = p.reference || {}, sm = p.sources || {};
+    const v = (x) => x == null || x === '' ? '—' : XE(x);
+    const state = String(sc.state || 'BELUM TERBIT');
+    const stateCol = /PANAS/.test(state) ? 'var(--no)' : /DINGIN/.test(state) ? 'var(--ok)' : 'var(--warn)';
+    const cmpRows = (c.rows || []).map(x => `<div class="item"><span><b>${XE(x.metric)}</b><div class="small mut">${XE(x.unit || 'satuan tidak tertulis')} · ${XE(x.period || 'periode tidak tersedia')} · ${XE(x.source || '—')}</div>${x.note ? `<div class="small mut" style="margin-top:1px">${XE(x.note)}</div>` : ''}</span><span style="text-align:right;max-width:46%"><b>${v(x.actual)}</b><div class="small mut">konsensus ${v(x.forecast)} · prev ${v(x.previous)}${x.change != null ? ' · Δ ' + XE(x.change) : ''}${x.revision != null ? ' · revisi ' + XE(x.revision) : ''}</div></span></div>`).join('');
+    const branches = (sc.branches || []).map(b => `<div class="exp" style="color:var(--tx)"><b>${XE(b.name)}</b> <span class="rb-pill" style="margin-left:4px">${XE(b.gold)}</span><div class="small" style="margin-top:3px"><b>Jika:</b> ${XE(b.if)}</div><div class="small"><b>Maka:</b> ${XE(b.then)}</div><div class="small mut"><b>Konfirmasi:</b> ${XE(b.confirm)}</div></div>`).join('');
+    const sched = (rf.schedule || []).map(x => `<div class="item"><span><b>${XE(x.tag)}</b> · ${XE(x.title)}<div class="small mut">${XE(x.label)} · ${XE(x.role)}</div></span><span class="small mut" style="text-align:right">${x.at ? XE(new Date(x.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) : '—'}</span></div>`).join('');
+    const latest = (rf.latest || []).map(x => `<div class="item"><span>${XE(x.tag)} · ${XE(x.metric)}</span><span class="small"><b>${XE(x.value)}</b> <span class="mut">${XE(x.period)} · ${XE(x.source)}</span></span></div>`).join('');
+    const srcBlock = (title, list) => (list || []).length ? `<details class="exp" style="margin-top:6px;color:var(--tx)"><summary class="small"><b>${XE(title)} (${list.length})</b></summary>${list.map(x => `<div class="small" style="margin-top:3px"><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.name)}</a>${x.need ? ' · ' + XE(x.need) : ''} — ${XE(x.use || '')}</div>`).join('')}</details>` : '';
+    const yt = (sm.youtube || []).map(q => `<span class="rb-pill" style="margin:2px 3px 2px 0;display:inline-block">${XE(q)}</span>`).join('');
+    return `<div class="card"><div class="rb-card-head"><h3>🧭 Peta pasar per rilis ${XE(p.tag || j.focus)}</h3><span class="rb-pill" style="color:${stateCol}">${XE(state)}</span></div>
+      <div class="small" style="margin-top:4px;color:${stateCol}"><b>${XE(sc.where || 'Aktual belum terbit; skenario menunggu angka.')}</b></div>
+      ${(sc.mixed || []).length ? `<div class="warn" style="margin-top:6px"><b>Komponen bertentangan:</b> ${sc.mixed.map(x => XE(x)).join(' · ')}</div>` : ''}
+      ${sc.pricedIn ? `<div class="warn" style="margin-top:6px">Reaksi berlawanan dengan bias data: mungkin sudah priced in atau ada safe-haven. Arah data tidak dipaksa; ikuti reaksi yield/USD.</div>` : ''}
+      <div style="margin-top:8px"><b class="small">Skenario bersyarat (bukan hukum harga)</b>${branches}</div>
+      <div class="small mut" style="margin-top:6px"><b>Yang dipantau:</b> ${XE((sc.watch || []).join(' · '))}</div>
+      <div class="small" style="margin-top:4px;color:var(--warn)"><b>Invalidasi:</b> ${XE(sc.invalidation || '—')}</div>
+      <div style="margin-top:10px"><b class="small">Actual / Forecast / Previous / Perubahan — dipisah satuan & periode</b>${cmpRows || '<div class="small mut">Belum ada baris pembanding.</div>'}
+        <div class="small" style="margin-top:5px;color:var(--warn)">${XE(c.unitWarning || '')}</div>
+        <div class="small mut" style="margin-top:3px">${XE(c.note || '')}</div>
+        <div class="small mut" style="margin-top:3px">${XE(c.revisionNote || '')}</div></div>
+      <div class="exp" style="margin-top:10px;color:var(--tx)"><b>${au.matched ? '✅' : '⚠️'} Audit kalender → angka resmi</b>
+        <div class="small" style="margin-top:3px">Kalender dipakai: <b>${XE(au.used || '—')}</b>${au.officialSource ? ' · resmi: <b>' + XE(au.officialSource) + '</b>' : ''}${au.officialPeriod ? ' · periode ' + XE(au.officialPeriod) : ''}${au.gap != null ? ' · beda angka ' + XE(au.gap) : ''}</div>
+        <div class="small mut" style="margin-top:2px">${XE(au.note || '')} Pembanding lain: ${XE((au.alternatives || []).join(', '))}.</div>
+      </div>
+      <div style="margin-top:10px"><b class="small">Jadwal resmi terdekat</b><div class="small ${rf.stale ? 'warn' : 'mut'}">Diperiksa ${XE(rf.checked || '—')} · ${XE(rf.note || '')}</div>${sched}</div>
+      <div style="margin-top:8px"><b class="small">Data terbaru yang tersedia</b>${latest}<div class="small mut" style="margin-top:3px">${XE(rf.latestNote || '')}</div></div>
+      <div style="margin-top:8px">${srcBlock('Sumber primer', sm.primary)}${srcBlock('Kalender konsensus & berita pasar', sm.secondary)}${srcBlock('Konteks pra-NFP', sm.context)}</div>
+      ${yt ? `<div style="margin-top:8px"><b class="small">Pencarian YouTube (kanal resmi/edukasi)</b><div style="margin-top:3px">${yt}</div><div class="small mut" style="margin-top:3px">${XE(sm.youtubeNote || '')}</div></div>` : ''}
+      <div class="exp" style="margin-top:10px;color:var(--tx)"><b>Aturan inti</b><div class="small" style="margin-top:3px">${XE(p.coreRule || '')}</div><div class="small" style="margin-top:3px">${XE(p.entryRule || '')}</div></div>
+    </div>`;
+  }
+
+  /* Playbook Alchemist: prosedur MTF, model reversal/kelanjutan, aturan risiko,
+     dan rencana TP. Tidak ada level baru di sini; level tetap dari setup. */
+  function signalPlaybookCard(j) {
+    const p = j && j.playbook;
+    if (!p) return '';
+    const plan = modeOf(j, sigMode) || j.plan;
+    const tp = plan && plan.tpPlan, vd = plan && plan.validity;
+    const mtf = (p.mtf || []).map(s => `<div class="item" style="display:block"><b>${XE(s.tf)}</b> <span class="small">${XE(s.task)}</span><div class="small mut">Cek: ${XE((s.checks || []).join(' · '))}</div><div class="small" style="color:var(--warn)">${XE(s.warn)}</div></div>`).join('');
+    const models = (p.models || []).map(m => `<div class="exp" style="color:var(--tx)"><b>${XE(m.name)}</b> <span class="rb-pill" style="margin-left:4px">${XE(m.model)}</span><div class="small" style="margin-top:3px"><b>Urutan:</b> ${XE(m.order)}</div><div class="small"><b>Invalidasi:</b> ${XE(m.invalid)}</div><details style="margin-top:3px"><summary class="small" style="cursor:pointer">Langkah lengkap</summary>${(m.steps || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</details></div>`).join('');
+    return `<div class="card"><div class="rb-card-head"><h3>📘 Playbook Alchemist — prosedur & TP</h3><span class="rb-pill y">0 sinyal ditahan</span></div>
+      <div class="small mut">${XE(p.noHold || '')} ${XE(p.conflict || '')}</div>
+      <div style="margin-top:8px"><b class="small">Urutan multi-timeframe</b>${mtf}</div>
+      <div style="margin-top:10px"><b class="small">Model entry yang dapat diuji</b>${models}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px">
+        <div class="exp" style="color:var(--tx)"><b>Aturan risiko</b>${(p.risk || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>
+        <div class="exp" style="color:var(--tx)"><b>Aturan TP</b>${(p.tp || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>
+      </div>
+      ${vd ? `<div class="small" style="margin-top:8px;color:${vd.grade === 'A+' || vd.grade === 'A' ? 'var(--ok)' : 'var(--warn)'}"><b>Validitas rencana ${XE(vd.grade)} (${XE(vd.ok)}/${XE(vd.total)}):</b> ${XE(vd.note)} ${(vd.checks || []).map(c => (c.ok ? '✅' : '⚠️') + ' ' + XE(c.k)).join(' · ')}</div>` : ''}
+      ${tp ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Rencana TP aktif (${XE(plan.style)} ${XE(plan.dir)})</b><div class="small" style="margin-top:3px">${XE(tp.quality)}</div><div class="small">TP2 ${num(plan.tp2)} (${XE(plan.tp2Pips)} pip) · TPmax ${num(plan.tpMax)} (${XE(plan.tpMaxPips)} pip) · SL ${num(plan.sl)} (30 pip)</div>${(tp.management || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>` : ''}
+      ${(p.youtube || []).length ? `<div style="margin-top:8px"><b class="small">Pencarian YouTube metode Alchemist</b><div style="margin-top:3px">${p.youtube.map(q => `<span class="rb-pill" style="margin:2px 3px 2px 0;display:inline-block">${XE(q)}</span>`).join('')}</div><div class="small mut" style="margin-top:3px">${XE(p.youtubeNote || '')}</div></div>` : ''}
+    </div>`;
+  }
+
   /* Checklist rilis: komponen yang benar-benar dihitung, proxy pra-rilis,
      respons pasar, dan sumber primer. Tidak ada baris yang diisi angka baru. */
   function releaseCard(j) {
@@ -1782,7 +1857,7 @@
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
     if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Server mencoba ulang otomatis; data tersimpan per akun tetap dipertahankan bila sudah ada.</div></div>`; return; }
-    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + releaseCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
+    out.innerHTML = verdictCard(j) + timingCard(j) + newsPlaybookCard(j) + releaseCompareCard(j) + eventCard(j) + releaseCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
     startNewsClock(j.event && j.event.when);
   }
 
@@ -1993,8 +2068,10 @@
         <div class="rb-lv"><span>Arah</span><b style="color:${buy ? 'var(--ok)' : 'var(--no)'}">${XE(p.dir)}</b></div>
       </div>
       ${tg ? `<div style="margin-top:8px"><div class="small mut" style="margin-bottom:2px">Tangga TP dari likuiditas nyata:</div>${tg}</div>` : ''}
+      ${p.validity ? `<div class="small" style="margin-top:6px;color:${p.validity.grade === 'A+' || p.validity.grade === 'A' ? 'var(--ok)' : 'var(--warn)'}"><b>Validitas ${XE(p.validity.grade)} (${XE(p.validity.ok)}/${XE(p.validity.total)}):</b> ${XE(p.validity.note)}</div>` : ''}
+      ${p.tpPlan ? `<div class="exp" style="margin-top:6px;color:var(--tx)"><b>📈 Manajemen TP (TP2 tetap ≥200 pip)</b><div class="small" style="margin-top:2px">${XE(p.tpPlan.quality)}</div>${(p.tpPlan.management || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>` : ''}
       ${p.statusWhy ? `<div class="small" style="color:${p.tooClose ? 'var(--warn)' : 'var(--mut)'};margin-top:8px">${XE(p.statusWhy)}</div>` : ''}
-      ${p.learning ? `<div class="small" style="color:${p.learning.blocked ? 'var(--no)' : 'var(--warn)'};margin-top:6px"><b>${p.learning.blocked ? '⛔ Ditahan pembelajaran' : '⚠️ Pola pernah SL'}:</b> ${XE(p.learning.label)} · ${XE(p.learning.losses)} SL / ${XE(p.learning.wins)} TP</div>` : ''}
+      ${p.learning ? `<div class="small" style="color:var(--warn);margin-top:6px"><b>⚠️ Pola pernah SL — sinyal tetap aktif:</b> ${XE(p.learning.label)} · ${XE(p.learning.losses)} SL / ${XE(p.learning.wins)} TP${p.learning.wouldHold ? ' · konfirmasi tambahan wajib' : ''}</div>` : ''}
       <div class="small mut" style="margin-top:8px">${XE(p.why)}</div>
       ${p.invalidation ? `<div class="small" style="color:var(--warn);margin-top:4px">Batal: ${XE(p.invalidation)}</div>` : ''}</div>`;
   }
@@ -2113,7 +2190,7 @@
         ${s.smc ? `<div class="small" style="color:${s.smc.grade === 'A+' || s.smc.grade === 'A' ? 'var(--ok)' : s.smc.grade === 'D' ? 'var(--warn)' : 'var(--mut)'}"><b>SMC ${XE(s.smc.grade)}</b> · fase ${XE(s.smc.phase || '—')} · ${s.smc.killzone && s.smc.killzone.active ? 'kill zone aktif' : 'di luar kill zone'} · PD ${XE(s.smc.pd && s.smc.pd.zone || '—')} · sweep ${XE(s.smc.sweep && s.smc.sweep.pool || '—')} · fib ${s.smc.fib && s.smc.fib.ok ? 'siap' : 'belum'} · ${XE(s.smc.optional || 0)}/${XE(s.smc.optionalTotal || 0)} konfirmasi</div>` : ''}
         ${s.mtf ? `<div class="small" style="color:${s.mtf.ok ? 'var(--ok)' : 'var(--warn)'}"><b>🧩 MTF ${s.mtf.ok ? 'selaras' : 'belum lengkap'}</b> · 1D–4H ${s.mtf.htf && s.mtf.htf.direction ? XE(s.mtf.htf.direction.d1 + '/' + s.mtf.htf.direction.h4) : '—'} · 1H–15m ${s.mtf.mid && s.mtf.mid.trend ? XE(s.mtf.mid.trend.h1 + '/' + s.mtf.mid.trend.m15) : '—'} · 5m–1m ${s.mtf.ltf && s.mtf.ltf.m1Available ? 'M1 tersedia' : 'M1 tidak tersedia'} · ${XE(s.mtf.gate && s.mtf.gate.note || '—')}</div>` : ''}
         ${(s.entrySteps || []).length ? `<div class="small" style="margin-top:4px;color:var(--tx)"><b>Cara entry:</b>${s.entrySteps.map(x => `<div style="margin-top:2px">${XE(x)}</div>`).join('')}</div>` : ''}
-        ${s.learning ? `<div class="small" style="color:${s.learning.blocked ? 'var(--no)' : 'var(--warn)'}"><b>${s.learning.blocked ? '⛔ Pembelajaran menahan entry' : '⚠️ Pola berisiko'}:</b> ${XE(s.learning.label)} · ${XE(s.learning.losses)} SL / ${XE(s.learning.wins)} TP${(s.learning.reasons || []).length ? ' · ' + XE((s.learning.reasons || []).join('; ')) : ''}</div>` : ''}
+        ${s.learning ? `<div class="small" style="color:var(--warn)"><b>⚠️ Pola berisiko — sinyal tidak ditahan:</b> ${XE(s.learning.label)} · ${XE(s.learning.losses)} SL / ${XE(s.learning.wins)} TP${s.learning.wouldHold ? ' · konfirmasi tambahan wajib' : ''}${(s.learning.reasons || []).length ? ' · ' + XE((s.learning.reasons || []).join('; ')) : ''}</div>` : ''}
         <div class="small mut">${XE(s.why)}</div></div>`).join('') || '<div class="warn">Belum ada setup yang lolos filter. Bias HTF, POI, atau trigger M5 belum searah; jangan paksa entry di luar rencana.</div>'}</div>`;
   }
 
@@ -2257,7 +2334,7 @@
     const chip = X$('tvPrice');
     if (chip) chip.textContent = 'harga ' + num(j.price) + ' · ' + new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID');
     learnApply(j);
-    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + styleCard(j) + smcCard(j) + methodCard(j) + liquidityCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
+    out.innerHTML = signalVerdict(j) + planCard(j) + signalPlaybookCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + styleCard(j) + smcCard(j) + methodCard(j) + liquidityCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
     drawChart(j);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
@@ -2541,6 +2618,7 @@
     sigData: function () { return sigData; },
     setSigData: function (j) { sigData = j; },
     paintSignal, drawChart,
-    releaseCard, liquidityCard, styleCard, planCard, setupsCard, signalVerdict, checklistCard
+    releaseCard, liquidityCard, styleCard, planCard, setupsCard, signalVerdict, checklistCard,
+    newsPlaybookCard, signalPlaybookCard
   };
 })();

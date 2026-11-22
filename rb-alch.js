@@ -726,6 +726,16 @@ const ALCH_TERM_CASE = {
   'MSNR': 'ocl', 'Storyline': 'bos', 'HTF / LTF': 'sweep', 'POI': 'sweep', 'OCL': 'ocl', 'Band level': 'ocl', 'Touch': 'ocl', 'Miss': 'ocl', 'Fresh': 'ocl', 'Unfresh': 'ocl', 'SBR': 'bos', 'RBS': 'bos', 'Roadblock': 'premium', 'Rejection': 'engulfing', 'Breakout internal': 'bos', 'Breakout external': 'bos', 'CRT': 'crt', 'Sweep': 'sweep', 'Internal liquidity': 'sweep', 'External liquidity': 'sweep', 'MSS': 'sweep', 'CHoCH': 'sweep', 'BOS': 'bos', 'Engulfing zone': 'engulfing', 'Order block': 'ob', 'FVG': 'sweep', 'QM / QML': 'qm', 'Apex': 'qm', 'Third touch': 'third', 'Break & retest': 'bos', 'Confluence': 'sweep', 'Killzone': 'judas', 'A+ setup': 'sweep', 'Turtle soup': 'sweep', 'Power of Three': 'ipda', 'IPDA': 'ipda', 'Draw on liquidity': 'ipda', 'Dealing range': 'premium', 'Premium / discount': 'premium', 'PD array': 'sweep', 'Break of Structure': 'bos', 'Market Structure Shift': 'sweep', 'Change of Character': 'sweep', 'Displacement': 'sweep', 'Fair Value Gap': 'sweep', 'Consequent encroachment': 'sweep', 'Breaker block': 'breaker', 'Mitigation block': 'breaker', 'Liquidity void': 'sweep', 'Equal highs / lows': 'sweep', 'Optimal Trade Entry': 'ote', 'Silver bullet': 'silver', 'Judas swing': 'judas', 'SMT divergence': 'smt', 'Real yield': 'macro', 'DXY': 'macro', 'COT report': 'macro', 'News blackout': 'risk', 'TP ladder': 'risk', 'Backtest sample': 'risk', 'Session liquidity': 'judas', 'Multi-timeframe alignment': 'sweep',
   'Bid / Ask': 'execution', 'Pip': 'execution', 'Point': 'execution', 'Lot': 'execution', 'Leverage': 'execution', 'Margin': 'execution', 'Margin call': 'execution', 'Swap': 'execution', 'Market order': 'execution', 'Limit order': 'execution', 'Stop order': 'execution', 'Trailing stop': 'execution', 'Partial close': 'execution', 'Break even (BE)': 'execution', 'Time stop': 'risk', 'Position sizing': 'risk', 'Inducement': 'sweep', 'Asian range': 'judas', 'Profit factor': 'risk', 'Risk of ruin': 'risk', 'Win rate': 'risk', 'Over-trading': 'risk', 'FOMO': 'risk', 'Slippage': 'execution', 'Korelasi': 'macro'
 };
+function alTfKey(tf) {
+  const s = String(tf || '').toUpperCase();
+  if (s.indexOf('M15') >= 0) return 'M15';
+  if (s.indexOf('M5') >= 0) return 'M5';
+  if (s.indexOf('M1') >= 0) return 'M1';
+  if (s.indexOf('H4') >= 0) return 'H4';
+  if (s.indexOf('H1') >= 0) return 'H1';
+  if (s.indexOf('D1') >= 0) return 'D1';
+  return 'M15';
+}
 function alTermCase(t) {
   const name = String(t[0] || '');
   let key = ALCH_TERM_CASE[name];
@@ -737,7 +747,18 @@ function alTermCase(t) {
     else key = 'sweep';
   }
   const c = ALCH_CHART_CASES[key] || ALCH_CHART_CASES.sweep;
-  return { key: key, tf: t[4] || c.tf, def: t[2] || '', use: t[3] || '', c: c };
+  let tfKey = alTfKey(t[4] || c.tf);
+  /* TF penanda disesuaikan dengan jenis level: level harian butuh H1/D1,
+     level mingguan butuh D1, dan POI intraday tetap M15/H1. */
+  if (/PWH|PWL/i.test(name)) tfKey = 'D1';
+  else if (/PDH|PDL/i.test(name)) tfKey = 'H1';
+  else if (/IPDA|Draw on liquidity|Power of Three|AMD|CRT|Candle Range/i.test(name)) tfKey = 'D1';
+  else if (/Premium|Dealing range|OTE/i.test(name)) tfKey = 'H4';
+  else if (/COT report|Real yield|DXY|Korelasi/i.test(name)) tfKey = 'D1';
+  else if (/HTF \/ LTF|Multi-timeframe/i.test(name)) tfKey = 'H4';
+  else if (/SMT divergence|SMT/i.test(name)) tfKey = 'H1';
+  else if (/A\+ setup|Confluence|Roadblock|PD array|Internal liquidity|External liquidity|POI/i.test(name)) tfKey = 'H1';
+  return { key: key, tf: t[4] || c.tf, tfKey: tfKey, def: t[2] || '', use: t[3] || '', c: c };
 }
 
 /* ==========================================================================
@@ -1055,6 +1076,8 @@ function alTermPaintVisible() {
     const r = el.getBoundingClientRect();
     if (r.bottom > -400 && r.top < vh + 400) alTermDraw(el);
   });
+  /* Chart istilah dari candle TradingView digambar malas, satu per satu. */
+  if (typeof alLivePaint === 'function') alLivePaint();
 }
 function alTermSchedule() {
   if (ALCH_CHART_TICK) return;
@@ -1063,7 +1086,7 @@ function alTermSchedule() {
   ALCH_CHART_TICK = setTimeout(alTermPaintVisible, 60);
 }
 function alTermMount() {
-  if (!document.querySelector('[data-alch-chart]:not([data-alch-on])')) return;
+  if (!document.querySelector('[data-alch-chart]:not([data-alch-on]),[data-alch-live]:not([data-alch-live-on])')) return;
   if (!ALCH_CHART_BOUND) {
     ALCH_CHART_BOUND = true;
     document.addEventListener('scroll', alTermSchedule, true);
@@ -1075,8 +1098,10 @@ function alTermMount() {
      (mis. render ditunda). Polling ringan berhenti sendiri setelah semua
      chart tergambar atau tab ditinggalkan. */
   if (!ALCH_CHART_POLL) {
+    let tries = 0;
     ALCH_CHART_POLL = setInterval(function () {
-      if (!document.querySelector('[data-alch-chart]:not([data-alch-on])')) {
+      tries++;
+      if (!document.getElementById('alchterms') || tries > 60) {
         clearInterval(ALCH_CHART_POLL);
         ALCH_CHART_POLL = 0;
         return;
@@ -1149,21 +1174,22 @@ function alTermsHtml() {
       + '<div class="rb-card-head"><h3>' + alEsc(c.title) + '</h3><span class="rb-pill">' + alEsc(c.tf) + ' · ' + rows.length + ' istilah</span></div>'
       + alCaseChartSlot(k)
       + '<div class="rb-chart-levels"><div><span>Entry — kenapa di situ</span><b>' + alEsc(c.entry) + '</b></div><div><span>Stop loss — 30 pip</span><b>' + alEsc(c.sl) + '</b></div><div><span>Take profit — TP2 200 pip</span><b>' + alEsc(c.tp) + '</b></div></div>'
-      + '<div class="rb-note" style="margin-top:8px"><b>Alasan:</b> ' + alEsc(c.why) + '</div>'
+      + '<div class="rb-note" style="margin-top:8px"><b>Alasan:</b> ' + alEsc(c.why) + ' <span class="mut">Chart per istilah di bawah memakai candle TradingView terbaru; jika pola belum ada, statusnya area pantau — bukan penanda karangan.</span></div>'
       + '<div class="rb-callout warn" style="margin-top:6px"><b>Invalidasi:</b> ' + alEsc(c.invalid) + '</div>'
       + '<div class="rb-terms">' + rows.map(function (r) {
         const t = r.t, tc = alTermCase(t);
         return '<div class="rb-term"><span class="rb-term-abbr">' + alEsc(t[1]) + '</span><b>' + alEsc(t[0]) + '</b>'
           + '<p>' + alEsc(t[2]) + '</p><div class="rb-term-use"><b>Dipakai:</b> ' + alEsc(t[3]) + '</div>'
           + '<div class="small mut" style="margin-top:4px"><b>TF:</b> ' + alEsc(tc.tf) + '</div>'
-          + '<button type="button" class="x" style="margin-top:8px" onclick="alTermChart(' + r.i + ')">📈 Chart XAUUSD real-time</button></div>';
+          + (typeof alLiveSlotHtml === 'function' ? alLiveSlotHtml(r.i, t, tc) : '')
+          + '<button type="button" class="x" style="margin-top:8px" onclick="alTermChart(' + r.i + ')">🔎 Chart besar + TradingView</button></div>';
       }).join('') + '</div>'
       + '<button class="x" type="button" style="margin-top:8px" onclick="alTermChart(' + first + ')">📈 Buka chart real-time kelompok ini</button>'
       + '</section>';
   }).join('');
   return alEntryGuideHtml() + alRealChartsHtml()
     + '<div class="card"><div class="rb-card-head"><h3>📚 Daftar istilah (' + ALCH_TERMS.length + ')</h3><span class="rb-pill">' + keys.length + ' kelompok</span></div>'
-    + '<div class="rb-note">Cari istilah, lalu baca arti, TF pemakaian, dan chart anatominya. Setiap kelompok punya tombol chart XAUUSD real-time. Skema di bawah adalah anatomi pola; angka entry/SL/TP mengikuti mesin: SL 30 pip, TP2 ≥200 pip.</div>'
+    + '<div class="rb-note">Cari istilah, lalu baca arti, TF pemakaian, dan chart-nya. <b>Setiap istilah punya chart candle XAUUSD dari TradingView</b> dengan penanda di candle/harga yang tepat; chart besar menampilkan aturan deteksi, alasan lokasi, invalidasi, dan cara cek di TradingView. Skema kelompok tetap ditampilkan sebagai anatomi pola. Angka SL/TP mengikuti mesin: SL 30 pip, TP2 ≥200 pip. <span class="mut">Penanda dihitung dari candle yang sudah close; pola SMC adalah interpretasi aturan, bukan garis resmi TradingView.</span></div>'
     + '<input placeholder="Cari istilah (mis. FVG, OB, MSS, premium)..." autocomplete="off" value="' + alEsc(ALCH.term) + '" oninput="alTerm(this.value)" style="margin:8px 0">'
     + '<div class="rb-pill-row rb-term-index">' + index + '</div></div>'
     + (sections || '<div class="rb-muted-box">Istilah tidak ditemukan.</div>');
@@ -1171,10 +1197,11 @@ function alTermsHtml() {
 
 function alTvInterval(tf) {
   const s = String(tf || '').toUpperCase();
-  if (/M5/.test(s)) return '5';
   if (/M15/.test(s)) return '15';
-  if (/H1/.test(s)) return '60';
+  if (/M5/.test(s)) return '5';
+  if (/M1/.test(s)) return '1';
   if (/H4/.test(s)) return '240';
+  if (/H1/.test(s)) return '60';
   if (/D1|W1|MN/.test(s)) return 'D';
   return '15';
 }

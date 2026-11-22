@@ -288,6 +288,19 @@ test('News: fokus CPI memakai kalender, FRED, wire, YouTube, dan 8 panelis mock'
   assert.ok(Array.isArray(j.release.pre) && j.release.pre.length >= 2, 'proxy pra-rilis wajib ada');
   assert.ok(j.release.watch && j.release.watch.note && j.release.watch.state, 'respons pasar wajib dihitung');
   assert.ok(Array.isArray(j.release.sources) && j.release.sources.length >= 3, 'sumber primer rilis wajib ada');
+  /* Playbook baru: skenario per rilis, tabel banding bersatuan, audit kalender,
+     jadwal rujukan, dan matriks sumber. */
+  assert.ok(j.playbook && j.playbook.scenario, 'playbook skenario wajib dikirim');
+  assert.equal(j.playbook.scenario.branches.length, 4, 'empat cabang skenario wajib ada');
+  assert.ok(j.playbook.compare && j.playbook.compare.rows.length >= 4, 'tabel banding bersatuan wajib ada');
+  assert.ok(j.playbook.compare.rows.every(r => r.unit || r.period || r.actual == null), 'setiap baris banding wajib punya satuan/periode');
+  assert.ok(j.playbook.compare.unitWarning && /MoM|satuan/i.test(j.playbook.compare.unitWarning), 'peringatan satuan wajib ada');
+  assert.ok(j.playbook.audit && j.playbook.audit.used, 'audit kalender wajib ada');
+  assert.ok(Array.isArray(j.playbook.reference.schedule) && j.playbook.reference.schedule.length >= 3, 'jadwal rujukan wajib ada');
+  assert.ok(Array.isArray(j.playbook.sources.primary) && j.playbook.sources.primary.length >= 5, 'sumber primer wajib lengkap');
+  assert.ok(Array.isArray(j.playbook.sources.secondary) && j.playbook.sources.secondary.length >= 4, 'kalender sekunder wajib ada');
+  assert.ok(Array.isArray(j.playbook.sources.youtube) && j.playbook.sources.youtube.length >= 2, 'kueri YouTube wajib ada');
+  assert.ok(j.reference && j.reference.checked, 'referensi jadwal wajib dikirim ke UI');
   } finally { global.fetch = savedFetch; }
 });
 
@@ -340,6 +353,10 @@ test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', a
     assert.ok(s.sequence && Array.isArray(s.sequence.steps) && s.sequence.steps.length === 6, 'alur 6 langkah wajib ada');
     assert.ok(['REVERSAL', 'KELANJUTAN'].includes(s.sequenceModel), 'model alur wajib jelas');
     assert.ok(Array.isArray(s.cancel) && s.cancel.length >= 5, 'aturan batal wajib dihitung');
+    assert.ok(s.tpPlan && Array.isArray(s.tpPlan.management) && s.tpPlan.management.length >= 4, 'rencana manajemen TP wajib ada');
+    assert.ok(s.tpPlan.tp2Pips >= 200 || s.tpPlan.tp2.pips >= 200, 'TP2 di rencana TP wajib >=200');
+    assert.ok(s.validity && s.validity.grade && Array.isArray(s.validity.checks), 'validitas setup wajib dihitung');
+    assert.ok(s.learning == null || s.learning.blocked === false, 'pembelajaran tidak boleh menahan sinyal');
     assert.ok(s.invalidationLevel != null, 'level invalidasi wajib ada');
     assert.ok(s.status !== 'SIAP' || s.sequence.ok, 'SIAP hanya bila alur entry lengkap');
     assert.ok(/1D–4H/.test(s.entrySteps.join(' ')) && /5m–1m/.test(s.entrySteps.join(' ')), 'langkah entry wajib memuat urutan 1D–4H dan 5m–1m');
@@ -351,6 +368,44 @@ test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', a
   assert.ok(j.liquidity.dol && (j.liquidity.dol.up || j.liquidity.dol.down), 'DOL wajib menunjuk level nyata');
   assert.ok(j.terms && j.terms.EQH && j.terms.BSL && j.terms.DOL, 'glosarium istilah wajib dikirim');
   assert.ok(Array.isArray(j.styleGuide) && j.styleGuide.length >= 5, 'gaya trading wajib lengkap');
+  assert.ok(j.playbook && Array.isArray(j.playbook.mtf) && j.playbook.mtf.length === 6, 'prosedur MTF 6 langkah wajib ada');
+  assert.ok(Array.isArray(j.playbook.models) && j.playbook.models.length >= 4, 'model reversal & kelanjutan wajib ada');
+  assert.ok(j.playbook.models.some(m => m.model === 'REVERSAL') && j.playbook.models.some(m => m.model === 'KELANJUTAN'), 'kedua model wajib ada');
+  assert.ok(Array.isArray(j.playbook.risk) && j.playbook.risk.some(x => /SL (selalu )?30 pip/.test(x)), 'aturan SL 30 pip wajib ada');
+  assert.ok(Array.isArray(j.playbook.tp) && j.playbook.tp.some(x => /200 pip/.test(x)), 'aturan TP2 200 pip wajib ada');
+  assert.equal(j.learning.held, 0, 'tidak ada sinyal yang ditahan');
+  assert.equal(j.learning.blocked, 0, 'pembelajaran tidak memblokir sinyal');
+  assert.match(String(j.learning.policy), /tidak menahan sinyal/i);
+});
+
+test('Learning: penyebab SL diagregasi dan sinyal tidak pernah ditahan', () => {
+  const L = require(path.join(ROOT, 'lib/learn.js'));
+  const now = Date.now();
+  const records = [];
+  for (let i = 0; i < 6; i++) records.push({
+    r: 'SL', dir: 'BUY', style: 'DAY', poi: 'M15', trigger: 'BOS', session: 'London',
+    macro: 'melawan', risk: 'TINGGI', htf: 'melawan', smc: 'B', phase: 'MARKUP', kill: 'ya', pd: 'DISCOUNT',
+    target: 'EQL M15', conf: 70, at: now - i * 3600000,
+    causes: ['Trigger terlalu dini sebelum displacement close.', 'POI tidak bertahan setelah sweep.'],
+    fixes: ['Tunggu candle M5 close melewati swing.', 'Perkecil zona ke FVG/OB M5.']
+  });
+  const engine = L.buildLessons({ records });
+  assert.ok(engine.causes.length >= 1, 'penyebab SL wajib diagregasi');
+  assert.equal(engine.causes[0].text, 'Trigger terlalu dini sebelum displacement close.');
+  assert.equal(engine.causes[0].n, 6);
+  assert.ok(engine.fixes.some(x => /candle M5 close/i.test(x.text)), 'perbaikan SL wajib tersimpan');
+
+  const pack = {
+    setups: [{ status: 'SIAP', style: 'DAY', dir: 'BUY', conf: 80, poiTf: 'M15', trigger: 'BOS M5', targets: [{ pips: 220, src: 'EQL M15' }] }],
+    methods: { agreement: 70, agree: 4, total: 5, against: [] }
+  };
+  const out = S.applyLearning(pack, { records });
+  assert.equal(out.setups[0].status, 'SIAP', 'status SIAP tidak boleh diubah oleh pembelajaran');
+  assert.equal(out.learning.blocked, 0, 'tidak ada setup yang diblokir');
+  assert.equal(out.learning.held, 0, 'tidak ada sinyal yang ditahan');
+  assert.ok(out.setups[0].learning && out.setups[0].learning.blocked === false, 'learning hanya peringatan');
+  assert.ok(out.setups[0].learning.wouldHold === true, 'risiko berulang tetap ditandai');
+  assert.equal(out.learning.causes[0].n, 6, 'penyebab SL ikut ke profil belajar');
 });
 
 test('Radar: horizon 30 menit, sumber beralasan, arah dari fundamental', async () => {
@@ -522,7 +577,14 @@ test('Kajian SL: selesai 30 menit memakai candle M5 segar, bukan payload sinyal 
   assert.ok(h.review.barsPost > 0, 'harus ada candle setelah SL');
   assert.equal(h.review.reachedTp2AfterSl, true, 'TP2 setelah SL harus tercatat');
   assert.ok(h.review.postSlMfePips >= 200, 'MFE setelah SL dihitung dari candle segar');
+  assert.ok(h.review.learnedAt, 'pelajaran SL harus punya waktu belajar instan');
   assert.match(H.histOutcomeHtml(h), /Kajian 30 menit selesai/i);
+  assert.match(H.histOutcomeHtml(h), /Dipelajari seketika/i);
+  /* Pelajaran harus tetap muncul walau observasi 30 menit belum selesai. */
+  const early = { dir: 'BUY', ctx: {}, review: { status: 'mengamati', causes: ['Penyebab instan'], fixes: ['Perbaikan instan'], learnedAt: new Date(NOW).toISOString() } };
+  const earlyLesson = H.histFailure(early).join(' ');
+  assert.match(earlyLesson, /Penyebab instan/);
+  assert.match(earlyLesson, /Perbaikan instan/);
 });
 
 test('UI News & Signal: kartu baru merender data tanpa undefined/NaN', () => {
@@ -611,6 +673,8 @@ test('UI News & Signal: kartu baru merender data tanpa undefined/NaN', () => {
   ];
   const setup = {
     style: 'SCALPING', dir: 'SELL', status: 'PENDING', order: 'LIMIT SELL', type: 'LIMIT',
+    tpPlan: { quality: 'TP2 dari likuiditas nyata.', management: ['SL 30 pip tidak digeser.', 'BE di +100 pip.', 'Trailing 40 pip setelah TP2.'], tp2: { price: 3540, pips: 200 }, tpMax: { price: 3530, pips: 300 } },
+    validity: { grade: 'B', ok: 5, total: 7, note: 'Beberapa syarat belum lengkap.', checks: [{ k: 'HTF', ok: true }, { k: 'TP2', ok: true }] },
     entry: 3560, sl: 3563, tp2: 3540, tpMax: 3530, tp2Pips: 200, tpMaxPips: 300, rr: 6.7,
     entryPolicy: 'PROXIMAL', slClear: true, zoneWidthPips: 20, entryMode: 'FVG50', entryTf: 'M5', poiTf: 'M15',
     entryDistancePips: 40, minEntryPips: 20,
@@ -645,6 +709,36 @@ test('UI News & Signal: kartu baru merender data tanpa undefined/NaN', () => {
   assert.match(partial, /Checklist rilis NFP/);
   assert.doesNotMatch(partial, /undefined|NaN|\[object Object\]/);
   assert.match(H.styleCard({}), /Glosarium istilah chart \(0\)/);
+
+  const playbook = {
+    tag: 'CPI',
+    scenario: { state: 'LEBIH PANAS', where: 'Data lebih panas; tunggu konfirmasi yield.', mixed: [], pricedIn: false, watch: ['DXY', 'yield riil'], invalidation: 'Reaksi 30 pip berlawanan.', branches: [{ name: 'Lebih panas', if: 'Aktual > konsensus', then: 'Bias SELL.', gold: 'SELL', confirm: 'DXY/yield naik.' }] },
+    compare: { unitWarning: 'Headline MoM bukan core YoY.', revisionNote: 'Revisi resmi dari BLS.', rows: [{ metric: 'CPI headline MoM', actual: '0,4', forecast: '0,3', previous: '0,2', revision: null, unit: '% MoM', period: 'Okt 2026', source: 'BLS', comparable: true, note: 'MoM SA' }] },
+    audit: { used: 'TradingView Economic Calendar', alternatives: ['Trading Economics'], matched: true, officialSource: 'FRED', officialPeriod: 'Okt 2026', gap: 0.01, note: 'Angka sejalan.' },
+    reference: { checked: '2026-11-23', note: 'Cek ulang kalender resmi.', latestNote: 'Bukan forecast.', schedule: [{ tag: 'NFP', title: 'Employment Situation', at: '2026-12-04T13:30:00Z', label: '4 Des 2026 · 08:30 ET', role: 'Payrolls' }], latest: [{ tag: 'CPI', metric: 'Headline MoM', value: '+0,4%', period: 'Okt 2026', source: 'BLS' }] },
+    sources: { primary: [{ need: 'CPI', name: 'BLS CPI', url: 'https://www.bls.gov/cpi/', use: 'angka resmi' }], secondary: [], context: [], youtube: ['BLS CPI news release explained'], youtubeNote: 'Kanal resmi/edukasi.' },
+    coreRule: 'News untuk skenario; chart untuk lokasi.', entryRule: 'Entry LIMIT, SL 30 pip, TP2 200 pip.'
+  };
+  const np = H.newsPlaybookCard({ playbook, focus: 'CPI' });
+  assert.match(np, /Peta pasar per rilis CPI/);
+  assert.match(np, /Actual \/ Forecast/);
+  assert.match(np, /Audit kalender/);
+  assert.match(np, /Jadwal resmi terdekat/);
+  assert.doesNotMatch(np, /undefined|NaN|\[object Object\]/);
+
+  const sp = H.signalPlaybookCard({
+    playbook: {
+      mtf: [{ tf: 'Weekly', task: 'Tandai rentang.', checks: ['PWH/PWL'], warn: 'Jangan bias dari satu candle.' }],
+      models: [{ name: 'BUY reversal', model: 'REVERSAL', order: 'POI → sweep → MSS', invalid: 'Di bawah sweep.', steps: ['POI', 'sweep'] }],
+      risk: ['SL 30 pip.'], tp: ['TP2 minimal 200 pip.'], noHold: 'Tidak ada sinyal yang ditahan.', conflict: 'Konflik TF = tunggu.'
+    },
+    plan: setup, setups: [setup], direction: 'SELL'
+  });
+  assert.match(sp, /Playbook Alchemist/);
+  assert.match(sp, /Urutan multi-timeframe/);
+  assert.match(sp, /Validitas rencana/);
+  assert.match(sp, /Rencana TP aktif/);
+  assert.doesNotMatch(sp, /undefined|NaN|\[object Object\]/);
 });
 
 test('Alchemist Istilah: chart anatomi, chart nyata, dan aturan entry konsisten', () => {
@@ -657,7 +751,7 @@ test('Alchemist Istilah: chart anatomi, chart nyata, dan aturan entry konsisten'
   };
   ctx.window = ctx;
   ctx.globalThis = ctx;
-  const code = fs.readFileSync(path.join(ROOT, 'rb-content.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch.js'), 'utf8');
+  const code = fs.readFileSync(path.join(ROOT, 'rb-content.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch-live.js'), 'utf8');
   vm.runInNewContext(code, ctx, { filename: 'alchemist-content.js' });
   const html = ctx.alTermsHtml();
   assert.match(html, /Gabungkan semua istilah/);
@@ -666,11 +760,12 @@ test('Alchemist Istilah: chart anatomi, chart nyata, dan aturan entry konsisten'
   assert.match(html, /SL 30 pip/);
   assert.match(html, /TP2 ≥200 pip/);
   assert.match(html, /<svg/);
-  assert.match(html, /Chart XAUUSD real-time/);
+  assert.match(html, /Chart besar \+ TradingView/);
   /* Chart kelompok istilah dirender malas: placeholder dulu, SVG saat terlihat. */
   assert.match(html, /data-alch-chart="sweep"/);
   assert.ok((html.match(/data-alch-chart="/g) || []).length >= 13, 'setiap kelompok istilah punya slot chart');
   assert.equal((html.match(/<section class="card rb-term-sec"/g) || []).length, (html.match(/data-alch-chart="/g) || []).length, 'satu slot chart per section');
+  assert.equal((html.match(/data-alch-live="/g) || []).length, (html.match(/class="rb-term"/g) || []).length, 'setiap istilah punya slot chart candle TradingView');
   assert.doesNotMatch(html, /undefined|NaN|\[object Object\]/);
   assert.equal((html.match(/<b>Order block<\/b>/g) || []).length, 1, 'istilah duplikat harus digabung');
   assert.equal((html.match(/<b>Premium \/ discount<\/b>/gi) || []).length, 1, 'premium/discount tidak boleh dobel');
@@ -686,4 +781,49 @@ test('Alchemist Istilah: chart anatomi, chart nyata, dan aturan entry konsisten'
   const risk = ctx.alCaseSvg('risk');
   assert.match(risk, /R:R = 200 \/ 30 = 1:6,7/);
   assert.match(risk, /SL 3497 · 30 pip/);
+});
+
+test('Alchemist Live: penanda istilah presisi dari candle TradingView', () => {
+  const ctx = {
+    console, Date, Math, JSON, String, Number, Object, Array, Map, Set,
+    rb26Norm: s => String(s == null ? '' : s).toLowerCase(),
+    rb26Safe: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
+    document: { addEventListener: () => {}, getElementById: () => null, body: { classList: { add: () => {}, remove: () => {} } } },
+    window: null
+  };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  const code = fs.readFileSync(path.join(ROOT, 'rb-content.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch-live.js'), 'utf8');
+  vm.runInNewContext(code, ctx, { filename: 'alchemist-live.js' });
+  const base = Date.UTC(2026, 10, 22, 10, 0);
+  const rows = [
+    { t: base, o: 100, h: 101.2, l: 99, c: 100 },
+    { t: base + 300000, o: 100, h: 101.2, l: 99.5, c: 100.5 },
+    { t: base + 600000, o: 100.5, h: 106, l: 103, c: 105 },
+    { t: base + 900000, o: 105, h: 106, l: 101.22, c: 104 },
+    { t: base + 1200000, o: 104, h: 105, l: 102, c: 103 },
+    { t: base + 1500000, o: 103, h: 104.5, l: 102.2, c: 104 },
+    { t: base + 1800000, o: 104, h: 105, l: 102.5, c: 103.5 },
+    { t: base + 2100000, o: 103.5, h: 104.8, l: 102.4, c: 104 },
+    { t: base + 2400000, o: 104, h: 105.2, l: 103, c: 104.5 },
+    { t: base + 2700000, o: 104.5, h: 106, l: 103.5, c: 105 }
+  ];
+  const a = ctx.__alchTest.alTermAnalysis('FVG', 'sweep', rows, 'M15');
+  assert.equal(a.found, true);
+  const z = a.marks.find(m => m.kind === 'zone');
+  const ce = a.marks.find(m => m.kind === 'line');
+  assert.ok(z, 'FVG harus punya zona');
+  assert.ok(Math.abs(z.p1 - 101.2) < 1e-9, 'batas bawah FVG = high candle pertama');
+  assert.ok(Math.abs(z.p2 - 103) < 1e-9, 'batas atas FVG = low candle ketiga');
+  assert.ok(ce && Math.abs(ce.p - 102.1) < 1e-9, 'CE 50% dihitung dari zona');
+  assert.match(a.why, /101\.20/);
+  assert.match(a.why, /103\.00/);
+  assert.match(a.rule, /low candle ke-3/i);
+  const svg = ctx.__alchTest.alLiveSvg(rows, a, { h: 200, bars: 60 });
+  assert.match(svg, /<svg/);
+  assert.match(svg, /101\.20/);
+  assert.doesNotMatch(svg, /undefined|NaN|\[object Object\]/);
+  assert.equal(ctx.__alchTest.alTfKey('M15 · M5'), 'M15');
+  assert.equal(ctx.__alchTest.alTfKey('D1'), 'D1');
+  assert.match(ctx.__alchTest.alLiveSlotHtml(0, ['FVG', 'Fair Value Gap', 'contoh', 'contoh', 'M15'], { tfKey: 'M15' }), /data-alch-live="0"/);
 });

@@ -292,3 +292,39 @@ html [style*="color:#e8e8e8"]{color:var(--warn)!important}
 .rb-term-index{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .rb-term-index .x{font-size:.76rem}
 .rb-term-sec .rb-terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:10px}
+
+/* ==========================================================================
+   V36 — chart istilah Alchemist dari candle TradingView (penanda presisi)
+   ========================================================================== */
+.rb-live-slot{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden}
+.rb-live{padding:8px}
+.rb-live-slot .rb-live{padding:8px}
+.rb-live-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.rb-live-chart{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0f172a}
+.rb-live-chart svg{display:block;width:100%;height:auto}
+.rb-live-why{font-size:.78rem;line-height:1.58;color:var(--tx-soft);margin-top:6px}
+.rb-live-why b{color:var(--tx)}
+.rb-live-mk{display:inline-block;margin:0 7px 3px 0;color:var(--tx-soft)}
+.rb-live-mk b{display:inline-block;min-width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;background:var(--b);color:#08101c;font-size:.64rem;margin-right:3px}
+.rb-live-rule{font-size:.76rem;line-height:1.55;color:var(--tx-soft);margin-top:4px;padding-left:8px;border-left:2px solid var(--line2)}
+.rb-live-rule b{color:var(--tx)}
+.rb-live-src{font-size:.7rem;line-height:1.5;color:var(--mut);margin-top:6px}
+.rb-live-btn{margin-top:7px}
+.rb-live-load{padding:10px;font-size:.78rem;color:var(--mut)}
+.rb-live-err{padding:9px;font-size:.78rem;line-height:1.55;color:var(--warn);border:1px solid rgba(255,193,7,.35);border-radius:8px;background:rgba(255,193,7,.06);margin:6px}
+.rb-live-tf{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.rb-live-tf .x{min-height:28px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.rb-live-tf .x.on{border-color:var(--b);color:var(--b);font-weight:800}
+.rb-live-modal .rb-live{margin-top:0;border:0;background:transparent;padding:0}
+.rb-live-modal .rb-live-why,.rb-live-modal .rb-live-rule{font-size:.82rem}
+.rb-live-tv{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)}
+.rb-live-tv summary{color:var(--tx)}
+@media(max-width:640px){
+  .rb-live{padding:6px}
+  .rb-live-why{font-size:.75rem}
+  .rb-live-rule{font-size:.73rem}
+}
+
+/* Chart per istilah butuh lebar; kartu 230px terlalu sempit untuk candle + penanda. */
+.rb-term-sec .rb-terms{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+@media(max-width:640px){.rb-term-sec .rb-terms{grid-template-columns:1fr}}
