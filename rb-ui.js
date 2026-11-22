@@ -193,7 +193,7 @@ var RB_GUIDE = [
   ['trading', ' Trading & Alchemist',
     '<h3>Tab Trading</h3><ul>'
     + '<li><b>News</b> — kalender dan analisis berita NFP/CPI/PPI/FOMC dengan data rilis resmi, reaksi harga nyata, wire emas/USD, FRED, dan panel AI; ringkasan bisa disalin.</li>'
-    + '<li><b>Radar 1H</b> — arah XAUUSD untuk 60 menit ke depan, fokus fundamental global XAUUSD (wire emas/dolar, DXY, yield nominal & riil, dolar broad, breakeven inflasi, kalender USD) yang dikonfirmasi TradingView multi-TF, candle H1/M15/M5, momentum, EMA/RSI, dan SMC/AMD. Berlaku 30 menit dan refresh otomatis 30 menit; bukan jaminan bebas SL.</li>'
+    + '<li><b>Radar 30m</b> — arah XAUUSD untuk 30 menit ke depan, ditentukan dari fundamental global XAUUSD (wire emas/dolar, DXY, yield nominal & riil, dolar broad, breakeven inflasi, kalender USD) lalu dikonfirmasi TradingView multi-TF, candle H1/M15/M5, momentum, EMA/RSI, dan SMC/AMD. Setiap sumber menjelaskan alasan validitasnya; berlaku 30 menit dan refresh otomatis 30 menit; bukan jaminan bebas SL.</li>'
     + '<li><b>Signal Entry</b> — sinyal XAUUSD real-time dengan entry M5 dan SL 30 pip. Arah wajib mengikuti trigger M5 yang sudah close; bias HTF hanya menyaring. TP yang ditampilkan adalah TP2 minimal 200 pip dan TPmax. Chart TradingView, tanda chart, AI, dan riwayat SL/TP otomatis. Refresh otomatis tiap 15 menit selama tab aktif; hasil disimpan per akun sehingga saat browser dibuka lagi tidak dihitung dari nol.</li>'
     + '<li><b>Alchemist</b> — kurikulum lengkap dari pemula sampai mahir.</li>'
     + '<li><b>Tutor</b> — tanya konsep, model entry, atau manajemen risiko.</li>'

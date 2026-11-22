@@ -19,7 +19,7 @@
     { k: 'PPI', t: 'PPI', s: 'harga produsen' },
     { k: 'FOMC', t: 'FOMC', s: 'suku bunga' }
   ];
-  const NEWS_KEY = 'rb_xau_news_v5_';
+  const NEWS_KEY = 'rb_xau_news_v6_';
   let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false, newsGen = 0;
   /* News di-refresh tiap 20 menit; Signal tiap 15 menit selama halaman
      terbuka. State hasilnya disimpan per akun (UID) di cache lokal + dokumen
@@ -36,12 +36,12 @@
   let sigRetryAt = 0, sigWake = false, sigBootGen = 0;
   let chartLabelAll = false, chartTF = 'ALL';
   try { chartLabelAll = localStorage.getItem('rb_xau_chart_labels') === 'all'; } catch (e) { }
-  try { const tf = localStorage.getItem('rb_xau_chart_tf'); if (['ALL', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf)) chartTF = tf; } catch (e) { }
+  try { const tf = localStorage.getItem('rb_xau_chart_tf'); if (['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf)) chartTF = tf; } catch (e) { }
   let sigCd = null;
   const SIG_MODES = [['SCALPING', 'Scalping M5'], ['DAY', 'Day M5'], ['SWING', 'Swing M5']];
   const SIG_HIST_KEY = 'rb_xau_sig_hist_v2'; // cache lama tanpa akun (dimigrasi ke key per akun)
   const SIG_DEL_KEY = 'rb_xau_sig_del_v1';
-  const SIG_CACHE_KEY = 'rb_xau_signal_v4';
+  const SIG_CACHE_KEY = 'rb_xau_signal_v5';
   const SIG_MODE_KEY = 'rb_xau_sig_mode_v2';
   function sigCacheKey() { const u = histUid(); return SIG_CACHE_KEY + (u ? '_' + u : ''); }
   function sigCacheLoad() {
@@ -70,8 +70,9 @@
     } catch (e) { }
   })();
 
-  /* Riwayat signal disimpan di perangkat. Setiap sinyal SIAP dicatat saat
-     terbentuk, lalu SL/TP dievaluasi dari candle M5 TradingView setelahnya.
+  /* Riwayat signal disimpan di perangkat. Setiap sinyal SIAP atau PENDING
+     (rencana LIMIT valid) dicatat saat terbentuk, lalu SL/TP dievaluasi dari
+     candle M5 TradingView setelahnya.
      Tidak ada hasil yang dikarang: jika belum tersentuh, statusnya AKTIF. */
   function histUid() { try { return (typeof user !== 'undefined' && user && user.uid) ? user.uid : null; } catch (e) { return null; } }
   function histStoreKey() { const u = histUid(); return SIG_HIST_KEY + (u ? '_' + u : ''); }
@@ -490,9 +491,92 @@
     if (m.gold1d != null) out.push('emas 1d ' + Number(m.gold1d).toFixed(2) + '%');
     return out.length ? out.join(' · ') : 'Data makro tersimpan tetapi nilainya kosong.';
   }
+  /* ---------- Kajian SL 30 menit ----------
+     Setiap SL diamati 30 menit: berapa MFE sebelum SL, berapa lama entry
+     menunggu, volatilitas M5 saat itu, dan apakah harga justru mencapai TP2
+     setelah SL. Hasilnya menjadi penyebab + perbaikan konkret, bukan status
+     "ditahan" tanpa akhir. Semua angka dari candle M5 yang sudah close. */
+  const SL_REVIEW_MS = 30 * 60000;
+  function histReviewStats(h, rows) {
+    const closedTs = Date.parse(h.closedAt || '') || 0;
+    if (!closedTs) return null;
+    const startTs = Date.parse(h.hitAt || h.createdAt || '') || closedTs;
+    const createdTs = Date.parse(h.createdAt || '') || startTs;
+    const dueTs = closedTs + SL_REVIEW_MS;
+    const now = Date.now();
+    const buy = h.dir === 'BUY';
+    const entry = Number(h.entry), tp2 = Number(h.tp2);
+    /* Candle tempat SL kena tidak dimasukkan ke MFE: urutan high/low di dalam
+       satu candle tidak diketahui, jadi jangan mengklaim harga sempat untung. */
+    const winPre = (rows || []).filter(r => r && r.t >= startTs - 60000 && r.t < closedTs);
+    const winPost = (rows || []).filter(r => r && r.t > closedTs && r.t <= Math.min(now, dueTs));
+    const pips = x => Math.round(Math.abs(Number(x) || 0) / 0.1);
+    let preFav = 0, preRange = 0;
+    winPre.forEach(r => {
+      preFav = Math.max(preFav, buy ? Number(r.h) - entry : entry - Number(r.l));
+      preRange += Math.max(0, Number(r.h) - Number(r.l));
+    });
+    let postFav = 0;
+    winPost.forEach(r => { postFav = Math.max(postFav, buy ? Number(r.h) - entry : entry - Number(r.l)); });
+    const reachedTp2 = isFinite(tp2) && winPost.some(r => buy ? Number(r.h) >= tp2 : Number(r.l) <= tp2);
+    const done = now >= dueTs;
+    const stats = {
+      status: done ? 'selesai' : 'mengamati',
+      openedAt: new Date(closedTs).toISOString(), dueAt: new Date(dueTs).toISOString(),
+      doneAt: done ? new Date(now).toISOString() : null,
+      leftMin: done ? 0 : Math.max(0, Math.ceil((dueTs - now) / 60000)),
+      observedMin: Math.max(1, Math.round((Math.min(now, dueTs) - closedTs) / 60000)),
+      entryDelayMin: Math.max(0, Math.round((startTs - createdTs) / 60000)),
+      barsPre: winPre.length, barsPost: winPost.length,
+      preSlMfePips: pips(Math.max(0, preFav)),
+      avgRangePips: winPre.length ? pips(preRange / winPre.length) : null,
+      postSlMfePips: pips(Math.max(0, postFav)),
+      reachedTp2AfterSl: reachedTp2
+    };
+    const causes = [], fixes = [];
+    if (stats.entryDelayMin > 30) {
+      causes.push('Entry tidak tersentuh selama ' + stats.entryDelayMin + ' menit; setup sudah basi saat limit akhirnya kena.');
+      fixes.push('Batalkan limit bila >30 menit belum tersentuh, lalu perbarui POI dari candle terbaru.');
+    }
+    if (stats.preSlMfePips < 8) {
+      causes.push('Setelah entry harga hampir tidak bergerak ke arah TP (MFE ' + stats.preSlMfePips + ' pip) lalu langsung menuju SL.');
+      fixes.push('Tunggu displacement + MSS/CHoCH M5 yang sudah close; jangan pasang limit sebelum candle konfirmasi.');
+    } else if (stats.preSlMfePips >= 15) {
+      causes.push('Sempat menguntungkan ' + stats.preSlMfePips + ' pip, lalu berbalik ke SL; target 200 pip terlalu jauh untuk volatilitas saat itu.');
+      fixes.push('Amankan sebagian di +' + Math.max(20, Math.round(stats.preSlMfePips * 0.6)) + ' pip atau pindahkan SL ke BE; TP2 tetap 200 pip, runner yang dikurangi.');
+    }
+    if (stats.avgRangePips != null && stats.avgRangePips < 8) {
+      causes.push('Volatilitas M5 rendah (rata-rata range ' + stats.avgRangePips + ' pip); pasar sideways, bukan displacement.');
+      fixes.push('Hindari entry saat ATR M5 <8 pip; tunggu kill zone London/New York atau candle momentum.');
+    }
+    if (stats.reachedTp2AfterSl) {
+      causes.push('Harga mencapai TP2 setelah SL kena: arah benar, tetapi SL 30 pip berada di dalam noise saat itu.');
+      fixes.push('SL tetap 30 pip; entry harus lebih dekat ke sweep/POI (buffer 10–20 pip) agar SL tidak berada di dalam sapuan.');
+    }
+    if (h.ctx && h.ctx.risk && h.ctx.risk.level === 'TINGGI') {
+      causes.push('Ada rilis high-impact saat entry; spread/volatilitas melebar.');
+      fixes.push('Jangan pasang limit 30 menit sebelum/sesudah rilis high-impact.');
+    }
+    if (h.ctx && h.ctx.smc && h.ctx.smc.kill === false) {
+      causes.push('Entry diambil di luar kill zone London/New York.');
+      fixes.push('Utamakan kill zone atau fib OTE lengkap; di luar itu hanya observasi.');
+    }
+    if (h.ctx && h.ctx.methods && (h.ctx.methods.against || []).length) {
+      causes.push('Metode ' + h.ctx.methods.against.join(', ') + ' melawan arah entry.');
+      fixes.push('Tunggu konfluensi ≥60% dan minimal 2 metode searah sebelum limit.');
+    }
+    if (!causes.length) causes.push('SL murni invalidasi teknikal 30 pip; tidak ada faktor global tunggal yang tersimpan.');
+    if (!fixes.length) fixes.push('Pertahankan SL 30 pip dan TP2 ≥200 pip; ulangi setup hanya bila POI + trigger M5 searah.');
+    return { ...stats, causes: causes.slice(0, 5), fixes: fixes.slice(0, 4) };
+  }
+
   function histFailure(h) {
     const ctx = h.ctx || {};
     const out = [];
+    if (h.review && h.review.status === 'selesai') {
+      (h.review.causes || []).forEach(x => out.push(x));
+      if ((h.review.fixes || []).length) out.push('Perbaikan: ' + h.review.fixes.join(' '));
+    }
     if (histMacroSide(ctx, h.dir) === 'melawan') out.push('DXY/yield bergerak melawan arah entry saat entry dibuka.');
     if (histTfSide(ctx, h.dir) === 'melawan') out.push('Matriks TF saat entry lebih banyak melawan arah ' + h.dir + '.');
     if (ctx.methods && (ctx.methods.against || []).length) out.push('Metode ' + ctx.methods.against.join(', ') + ' melawan arah entry saat sinyal.');
@@ -647,7 +731,7 @@
     arr.forEach(x => {
       if (!x || x.ok != null || !x.due || now < x.due) return;
       /* Jangan menilai prakiraan yang sudah lewat jauh dari horizon: harga
-         saat itu bukan harga 1 jam, jadi hasilnya bisa keliru. */
+         saat itu bukan harga 30 menit, jadi hasilnya bisa keliru. */
       if (now > x.due + 30 * 60000) return;
       if (!(px > 0) || !(Number(x.price) > 0)) return;
       x.actual = px > x.price ? 'BUY' : px < x.price ? 'SELL' : 'FLAT';
@@ -661,7 +745,7 @@
     if ((dir === 'BUY' || dir === 'SELL') && Number(j.confidence) >= 55 && j.generatedAt
       && (!lastRadarRec || now - lastRadarRec >= 30 * 60000)
       && !arr.some(x => x.gen === j.generatedAt)) {
-      arr.unshift({ dir, c: Number(j.confidence), ag: Number(j.agreement) || null, price: px, at: now, due: now + 60 * 60000, gen: j.generatedAt, ok: null });
+      arr.unshift({ dir, c: Number(j.confidence), ag: Number(j.agreement) || null, price: px, at: now, due: now + 30 * 60000, gen: j.generatedAt, ok: null });
     }
     const next = arr.filter(x => {
       if (!x || !(Number(x.at) > now - 30 * 86400000)) return false;
@@ -676,11 +760,11 @@
 
   /* ---------- Pembelajaran sumber global (web/YouTube terpercaya) ----------
      Setiap judul yang punya kecenderungan arah dicatat sekali beserta harga
-     saat itu. Setelah 60 menit arahnya dibandingkan dengan harga nyata, jadi
+     saat itu. Setelah 30 menit arahnya dibandingkan dengan harga nyata, jadi
      server bisa menimbang sumber mana yang berulang benar. Arah sinyal tidak
      pernah diubah oleh pencatatan ini; hanya keyakinan yang boleh bergeser. */
   const SOURCE_LEARN_KEY = 'rb_xau_source_learn_v1';
-  const SOURCE_HORIZON_MS = 60 * 60000;
+  const SOURCE_HORIZON_MS = 30 * 60000;
   function sourceLearnStoreKey() { const u = histUid(); return SOURCE_LEARN_KEY + (u ? '_' + u : ''); }
   function sourceLearnLoad() { try { const a = JSON.parse(localStorage.getItem(sourceLearnStoreKey()) || '[]'); return Array.isArray(a) ? a.filter(x => x && x.id && x.s && x.p && x.at) : []; } catch (e) { return []; } }
   function sourceLearnSave(a) { try { localStorage.setItem(sourceLearnStoreKey(), JSON.stringify(a.slice(0, 300))); } catch (e) { } }
@@ -857,9 +941,11 @@
       let best = null, bestKey = '';
       keys.forEach(k => { const st = profile.get(k); if (st && (!best || st.n > best.n || (st.n === best.n && st.l > best.l))) { best = st; bestKey = k; } });
       const recent = (st) => !!st && st.last > 0 && Date.now() - st.last < 7 * 86400000;
-      const stop = serverBlocked || !!((exact && exact.l >= 1 && exact.w === 0 && recent(exact)) || (best && best.n >= 2 && best.l >= 2 && best.w === 0 && recent(best)) || (best && best.n >= 3 && best.l / best.n >= 0.6 && best.w === 0 && recent(best)));
+      /* Satu SL tidak langsung menahan pola; butuh minimal 2 SL nyata pada pola
+         yang sama agar sinyal tidak berhenti muncul karena satu hasil. */
+      const stop = serverBlocked || !!((exact && exact.l >= 2 && exact.w === 0 && recent(exact)) || (best && best.n >= 3 && best.l >= 2 && best.w === 0 && recent(best)) || (best && best.n >= 4 && best.l / best.n >= 0.75 && best.w === 0 && recent(best)));
       const warn = !!(!stop && best && (best.l > 0 || best.pl > 0));
-      const wasReady = s.status === 'SIAP';
+      const wasReady = s.status === 'SIAP' || s.status === 'PENDING';
       s.learning = stop || warn ? {
         blocked: stop, warn,
         n: best ? best.n : Number(serverLearn && serverLearn.n) || 0,
@@ -897,9 +983,10 @@
          status bisa TUNGGU selamanya. Hasil observasi dinilai candle M5 dan
          masuk ke pembelajaran sebagai bukti, bukan sebagai trade nyata. */
       const blockedObs = !!(s.learning && s.learning.blocked);
+      const pending = !blockedObs && s.status === 'PENDING' && s.entry != null && s.sl != null && s.tp2 != null;
       const paper = !blockedObs && s.status === 'TUNGGU' && s.entry != null && s.sl != null && s.tp2 != null;
       const shadow = blockedObs || paper;
-      if (s.status !== 'SIAP' && !shadow) return;
+      if (s.status !== 'SIAP' && !pending && !shadow) return;
       const tp2Pips = Number(s.tp2Pips != null ? s.tp2Pips : Math.round(Math.abs(Number(s.tp2) - Number(s.entry)) / 0.1));
       if (!(tp2Pips >= 200)) return;
       const key = histKey(s, j) + (shadow ? '|S' : '');
@@ -926,7 +1013,7 @@
         status: shadow ? 'SHADOW' : 'AKTIF', shadow, paper,
         entryHit: s.type === 'MARKET', hitAt: s.type === 'MARKET' ? (j.generatedAt || new Date().toISOString()) : null,
         tp1Hit: false, tp2Hit: false, maxHit: false, closedAt: null, pips: null, updatedAt: Date.now(),
-        reason: blockedObs ? 'Observasi: pola pernah SL; entry tidak dieksekusi tetapi hasilnya tetap dipantau untuk pembelajaran.' : paper ? 'Observasi belajar: setup belum lolos syarat eksekusi (' + String(s.statusWhy || '').slice(0, 120) + '). Level tetap diuji candle M5 agar mesin punya data.' : s.type === 'MARKET' ? 'Entry market saat sinyal SIAP terbentuk.' : 'Menunggu harga menyentuh entry ' + s.entry + '.'
+        reason: blockedObs ? 'Observasi: pola pernah SL; entry tidak dieksekusi tetapi hasilnya tetap dipantau untuk pembelajaran.' : paper ? 'Observasi belajar: setup belum lolos syarat eksekusi (' + String(s.statusWhy || '').slice(0, 120) + '). Level tetap diuji candle M5 agar mesin punya data.' : pending ? 'Rencana LIMIT valid (PENDING): pasang limit di entry ' + s.entry + '; menunggu harga menyentuh level. ' + String(s.statusWhy || '').slice(0, 140) : s.type === 'MARKET' ? 'Entry market saat sinyal SIAP terbentuk.' : 'Menunggu harga menyentuh entry ' + s.entry + '.'
       };
       rec.ctx = histCtx(j, s);
       rec.patternKeys = histPatternKeys(rec);
@@ -939,15 +1026,18 @@
     histSave(arr);
     return arr;
   }
-  function histUpdate(j) {
+  function histUpdate(j, freshRows) {
     const arr = histRecord(j);
     const deleted = histDeletedSet();
     const before = new Map(arr.map(h => [h.key, JSON.stringify(h)]));
     /* Riwayat hanya dievaluasi dari candle M5 yang SUDAH CLOSE. Bar berjalan
        bisa menyentuh SL/TP sementara lalu berbalik; memakainya membuat status
        SL/TP premature dan pembelajaran mencatat hasil yang belum final. */
-    const rows = ((j.chart && j.chart.m5) || []).filter(r => r && isFinite(r.t) && r.t + 300000 <= Date.now()).slice().sort((a, b) => a.t - b.t);
-    const chartAt = Date.parse(j.generatedAt) || Date.now();
+    const sourceRows = freshRows && freshRows.length ? freshRows : ((j.chart && j.chart.m5) || []);
+    const rows = sourceRows.filter(r => r && isFinite(r.t) && r.t + 300000 <= Date.now()).slice().sort((a, b) => a.t - b.t);
+    /* Saat candle datang dari endpoint ringan, waktu acuan adalah candle
+       terbaru itu — bukan generatedAt payload sinyal yang bisa 15 menit lalu. */
+    const chartAt = freshRows && rows.length ? rows[rows.length - 1].t + 300000 : (Date.parse(j.generatedAt) || Date.now());
     let changed = false;
     arr.forEach(h => {
       if (deleted.has(h.key)) return;
@@ -958,7 +1048,20 @@
       const remoteStatus = histRemoteStatus.get(h.key);
       if (remoteStatus && histStatusRank(remoteStatus) > histStatusRank(h.status)) return;
       if (remoteAt && remoteAt > chartAt) return;
-      if (h.status === 'SL' || h.status === 'TPMAX' || h.closedAt) return;
+      /* SL sudah final, tetapi kajian 30 menitnya masih berjalan. Perbarui
+         hasil observasi sampai dueAt, lalu finalkan penyebab + perbaikan. */
+      if (h.status === 'SL') {
+        const rv = histReviewStats(h, rows);
+        if (rv) {
+          const prev = h.review || {};
+          const same = prev.status === rv.status && prev.preSlMfePips === rv.preSlMfePips
+            && prev.postSlMfePips === rv.postSlMfePips && prev.reachedTp2AfterSl === rv.reachedTp2AfterSl
+            && prev.barsPost === rv.barsPost && prev.entryDelayMin === rv.entryDelayMin;
+          if (!same) { h.review = rv; h.lesson = histFailure(h); changed = true; }
+        }
+        return;
+      }
+      if (h.status === 'TPMAX' || h.closedAt) return;
       const start = Date.parse(h.createdAt) || 0;
       const after = rows.filter(r => r.t >= start - 60000);
       if (!after.length) return;
@@ -980,6 +1083,7 @@
         if (!h.tp2Hit && hitSl) {
           h.status = 'SL'; h.closedAt = at; h.pips = -Math.round(Math.abs(h.entry - h.sl) / 0.1);
           h.reason = (h.shadow ? 'Observasi (tidak dieksekusi): ' : '') + 'Candle M5 ' + new Date(r.t).toLocaleTimeString('id-ID') + (buy ? ' low ' + Number(r.l).toFixed(2) : ' high ' + Number(r.h).toFixed(2)) + ' menembus SL ' + h.sl + '. Entry ' + h.entry + ' gagal; SL 30 pip.';
+          h.review = histReviewStats(h, rows);
           h.lesson = histFailure(h); changed = true; break;
         }
         if (!h.tp2Hit && hitTp2) {
@@ -1028,6 +1132,12 @@
       <div><b>Risiko rilis:</b> ${XE(risk)}</div>
       <div style="margin-top:4px"><b>${isActive ? (shadow ? 'Status observasi' : 'Status saat ini') : 'Kenapa ' + XE(st)}:</b> ${XE(reasonText)}</div>
       <div style="margin-top:4px;color:${isActive ? 'var(--warn)' : isSl ? 'var(--warn)' : 'var(--ok)'}"><b>${isActive ? 'Yang dipantau' : isSl ? 'Pelajaran otomatis' : 'Bukti TP'}:</b> ${factors.map(x => '• ' + XE(x)).join('<br>')}</div>
+      ${isSl && h.review ? (() => {
+        const rv = h.review;
+        const left = rv.dueAt ? Math.max(0, Date.parse(rv.dueAt) - Date.now()) : 0;
+        const state = rv.status === 'selesai' ? '✅ Kajian 30 menit selesai' : '⏳ Observasi 30 menit · sisa ±' + Math.ceil(left / 60000) + ' menit';
+        return `<div class="small" style="margin-top:5px;padding:6px 8px;border-left:3px solid ${rv.status === 'selesai' ? 'var(--ok)' : 'var(--warn)'};background:rgba(255,255,255,.03)"><b>${state}</b><div class="mut" style="margin-top:2px">MFE sebelum SL ${XE(rv.preSlMfePips)} pip · tunggu entry ${XE(rv.entryDelayMin)} menit · rata-rata range M5 ${rv.avgRangePips == null ? '—' : XE(rv.avgRangePips) + ' pip'} · setelah SL ${XE(rv.postSlMfePips)} pip${rv.reachedTp2AfterSl ? ' (TP2 tercapai setelah SL)' : ''}</div>${(rv.fixes || []).length ? `<div style="margin-top:3px"><b>Perbaikan:</b> ${rv.fixes.map(x => XE(x)).join(' ')}</div>` : ''}</div>`;
+      })() : ''}
       ${ctx.ai && ctx.ai.summary ? `<div class="mut" style="margin-top:4px">Catatan AI saat entry: ${XE(ctx.ai.summary)}</div>` : ''}
       ${(ctx.sources || []).length ? `<div class="mut" style="margin-top:3px">Sumber: ${XE(ctx.sources.join(' · '))}</div>` : ''}
     </div>`;
@@ -1089,15 +1199,15 @@
     const traits = (j && j.learning && Array.isArray(j.learning.top)) ? j.learning.top : [];
     const latest = sl.slice().sort((a, b) => (Date.parse(b.closedAt || '') || Number(b.updatedAt) || 0) - (Date.parse(a.closedAt || '') || Number(a.updatedAt) || 0))[0];
     return `<div class="card" id="learnCard"><div class="rb-card-head"><h3>🧪 Pembelajaran otomatis dari SL & observasi</h3><span class="rb-pill ${j && j.learning && j.learning.blocked ? 'y' : ''}">${settled.length} hasil · ${sl.length} SL${obs ? ' · ' + obs + ' amati' : ''}</span></div>
-      <div class="small mut">Mesin mencatat pola persis + sifat teknikal (mode, POI, trigger, sesi, makro, TF, risiko rilis, konfluensi metode, sumber TP) untuk setiap entry SIAP dan setiap setup TUNGGU yang levelnya sudah valid. Setup TUNGGU dicatat sebagai <b>observasi</b>: tidak dieksekusi, tetapi SL/TP-nya tetap dinilai candle M5, sehingga mesin punya data untuk belajar walau belum ada trade nyata. Hasil observasi hanya menurunkan keyakinan; yang boleh menahan entry adalah SL dari trade nyata. News dan radar juga mencatat akurasi arahnya sendiri.</div>
+      <div class="small mut">Mesin mencatat pola persis + sifat teknikal (mode, POI, trigger, sesi, makro, TF, risiko rilis, konfluensi metode, sumber TP) untuk setiap entry SIAP/PENDING dan setiap setup TUNGGU yang levelnya sudah valid. Setiap SL menjalani <b>kajian 30 menit</b>: mesin mengukur MFE sebelum SL, lama entry menunggu, volatilitas M5, dan apakah TP2 justru tercapai setelah SL, lalu menulis penyebab + perbaikan konkret. Setup TUNGGU dicatat sebagai <b>observasi</b>: tidak dieksekusi, tetapi SL/TP-nya tetap dinilai candle M5, sehingga mesin punya data untuk belajar walau belum ada trade nyata. Hasil observasi hanya menurunkan keyakinan; yang boleh menahan entry adalah SL dari trade nyata. News dan radar juga mencatat akurasi arahnya sendiri.</div>
       <div class="rb-kpis" style="margin-top:8px"><div><span>TP</span><b style="color:var(--ok)">${tp.length}</b><small>TP2 ${tp2} · TPmax ${tpmax}</small></div><div><span>SL</span><b style="color:var(--no)">${sl.length}</b><small>evaluasi M5</small></div><div><span>Pola dipelajari</span><b>${patterns.length}</b><small>minimal 2 hasil</small></div><div><span>Ditahan sekarang</span><b style="color:var(--warn)">${current.filter(s => s.learning.blocked).length}</b><small>setup TUNGGU</small></div></div>
-      ${latest ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Pelajaran SL terakhir</b> <span class="small mut">${XE(latest.entry + ' · ' + latest.style + ' ' + latest.dir)}</span><div class="small" style="margin-top:3px">${(Array.isArray(latest.lesson) ? latest.lesson : histFailure(latest)).map(x => '• ' + XE(x)).join('<br>')}</div></div>` : '<div class="small mut" style="margin-top:8px">Belum ada SL yang bisa dipelajari. Setelah ada hasil, pelajaran muncul di sini.</div>'}
+      ${latest ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Pelajaran SL terakhir</b> <span class="small mut">${XE(latest.entry + ' · ' + latest.style + ' ' + latest.dir)}</span>${latest.review ? `<div class="small" style="margin-top:3px;color:${latest.review.status === 'selesai' ? 'var(--ok)' : 'var(--warn)'}">${latest.review.status === 'selesai' ? '✅ Kajian 30 menit selesai' : '⏳ Observasi 30 menit berjalan · sisa ±' + Math.ceil(Math.max(0, (Date.parse(latest.review.dueAt) || Date.now()) - Date.now()) / 60000) + ' menit'} · MFE ${XE(latest.review.preSlMfePips)} pip · entry delay ${XE(latest.review.entryDelayMin)} menit</div>` : ''}<div class="small" style="margin-top:3px">${(Array.isArray(latest.lesson) ? latest.lesson : histFailure(latest)).map(x => '• ' + XE(x)).join('<br>')}</div></div>` : '<div class="small mut" style="margin-top:8px">Belum ada SL yang bisa dipelajari. Setelah ada hasil, pelajaran muncul di sini.</div>'}
       ${patterns.length ? `<div style="margin-top:8px"><b class="small">Pola yang perlu diwaspadai</b>${patterns.map(([k, s]) => `<div class="item"><span class="small">${XE(histPatternLabel(k))}</span><b class="small" style="color:${s.w ? 'var(--warn)' : 'var(--no)'}">${s.l} SL / ${s.w} TP</b></div>`).join('')}</div>` : ''}
       ${traits.length ? `<div style="margin-top:8px"><b class="small">Sifat teknikal yang paling sering SL</b>${traits.map(t => `<div class="item"><span class="small">${XE(t.label)}</span><b class="small" style="color:var(--no)">${XE(t.losses)} SL / ${XE(t.wins)} TP · ${XE(t.rate)}%</b></div>`).join('')}</div>` : ''}
       ${current.length ? `<div class="small" style="margin-top:8px;color:var(--warn)">${current.map(s => '• ' + XE(s.style + ' ' + s.dir) + ': ' + XE(s.learning.note) + ((s.learning.reasons || []).length ? ' (' + XE((s.learning.reasons || []).join('; ')) + ')' : '')).join('<br>')}</div>` : ''}
       ${j && j.learning ? `<div class="small mut" style="margin-top:6px">Profil belajar: ${XE(j.learning.patterns || 0)} pola · ${XE(j.learning.records || 0)} hasil · ${XE(j.learning.traits || 0)} sifat teknikal · ${XE(j.learning.blocked || 0)} ditahan · ${XE(j.learning.warned || 0)} peringatan${j.learning.outcomes ? ' · outcome TP2 ' + XE(j.learning.outcomes.tp2 || 0) + ' / TPmax ' + XE(j.learning.outcomes.tpmax || 0) : ''}. ${XE(j.learning.source || '')}</div>` : ''}
       ${knowledgeNote(j && j.knowledge, 'Belajar dari sumber global (web, YouTube resmi & akademi emas)')}
-      <div class="small mut" style="margin-top:6px">Ambang: pola yang sudah SL tanpa TP ditahan; pola dengan ≥2 SL tanpa TP juga ditahan. Pola yang sudah punya TP hanya diberi peringatan, bukan diblokir permanen. Cooldown 7 hari lalu dievaluasi ulang, dan hasil observasi ikut dihitung agar mesin tidak terkunci permanen. Data historis terbatas; tetap cek berita dan risiko.</div></div>`;
+      <div class="small mut" style="margin-top:6px">Ambang: satu SL tidak langsung menahan pola; pola ditahan hanya bila ≥2 SL nyata tanpa TP pada pola yang sama dalam 7 hari (atau ≥3 hasil semuanya SL). Pola yang sudah punya TP hanya diberi peringatan, bukan diblokir permanen. Cooldown 7 hari lalu dievaluasi ulang, dan hasil observasi ikut dihitung agar mesin tidak terkunci permanen. Kajian SL 30 menit menjadi bahan perbaikan, bukan alasan menahan entry selamanya. Data historis terbatas; tetap cek berita dan risiko.</div></div>`;
   }
   function histCard() {
     const deleted = histDeletedSet();
@@ -1152,7 +1262,7 @@
         <button class="x" type="button" onclick="pHistFilter('SL')" style="${histFilter === 'SL' ? 'border-color:var(--no);color:var(--no)' : ''}">SL · ${sl.length}</button>
         <button class="x" type="button" onclick="pHistFilter('SHADOW')" style="${histFilter === 'SHADOW' ? 'border-color:var(--b);color:var(--b)' : ''}">Amati · ${shadow.length}</button>
       </div>
-      ${arr.length ? (selected.length ? `<div style="margin-top:6px"><div class="small" style="font-weight:700;color:${histFilter === 'SL' ? 'var(--no)' : histFilter === 'TP' ? 'var(--ok)' : 'var(--warn)'}">${XE(selectedTitle)} · ${selected.length}</div>${dateSections(selected).join('')}</div>` : '<div class="small mut" style="margin-top:8px">Tidak ada riwayat pada filter ini.</div>') : '<div class="warn" style="margin-top:8px">Belum ada sinyal SIAP yang tercatat. Riwayat terisi otomatis saat mesin menemukan entry valid, bukan dari sinyal yang dikarang.</div>'}
+      ${arr.length ? (selected.length ? `<div style="margin-top:6px"><div class="small" style="font-weight:700;color:${histFilter === 'SL' ? 'var(--no)' : histFilter === 'TP' ? 'var(--ok)' : 'var(--warn)'}">${XE(selectedTitle)} · ${selected.length}</div>${dateSections(selected).join('')}</div>` : '<div class="small mut" style="margin-top:8px">Tidak ada riwayat pada filter ini.</div>') : '<div class="warn" style="margin-top:8px">Belum ada sinyal SIAP/PENDING yang tercatat. Riwayat terisi otomatis saat mesin menemukan rencana entry valid, bukan dari sinyal yang dikarang.</div>'}
     </div>`;
   }
 
@@ -1306,7 +1416,7 @@
   };
 
   /* ---------------- RADAR 1H ---------------- */
-  const RADAR_CACHE_KEY = 'rb_xau_radar_v2';
+  const RADAR_CACHE_KEY = 'rb_xau_radar_v3';
   let radarData = null, radarAt = 0, radarBusy = false, radarTimer = null, radarCd = null, radarGen = 0, radarSavedAt = 0;
   function radarCacheKey() { const u = histUid(); return RADAR_CACHE_KEY + (u ? '_' + u : ''); }
   function radarCacheLoad() { try { const c = JSON.parse(localStorage.getItem(radarCacheKey()) || 'null'); return c && c.data ? c : null; } catch (e) { return null; } }
@@ -1318,27 +1428,28 @@
     const cls = radarDirClass(dir);
     const until = j.validUntil ? Date.parse(j.validUntil) : (Date.parse(j.generatedAt) || Date.now()) + 30 * 60000;
     return `<div class="card radar-hero">
-      <div class="rb-card-head"><h3>🛰️ Radar arah 1 jam — XAUUSD</h3><span class="rb-pill ${dir === 'WAIT' ? '' : 'y'}">${XE(j.symbol || 'XAUUSD')} · ${new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID')}</span></div>
+      <div class="rb-card-head"><h3>🛰️ Radar arah 30 menit — XAUUSD</h3><span class="rb-pill ${dir === 'WAIT' ? '' : 'y'}">${XE(j.symbol || 'XAUUSD')} · ${new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID')}</span></div>
       <div class="radar-top">
         <div class="radar-big ${cls}">${XE(dir)}</div>
         <div class="radar-meta"><b>Keyakinan ${XE(j.confidence)}%</b><div class="small mut">Skor ${XE(j.score)} · agreement ${XE(j.agreement)}% · horizon ${XE(j.horizonMin)} menit${j.baseConfidence != null ? ' · dasar ' + XE(j.baseConfidence) + '%' : ''}</div>${j.learning ? `<div class="small" style="color:${j.learning.delta < 0 ? 'var(--warn)' : 'var(--mut)'}">${XE(j.learning.note)}</div>` : ''}${knowledgeNote(j.knowledge, 'Bukti global')}<div class="small" id="radarCountdown" data-until="${until}">Berlaku sampai ${new Date(until).toLocaleTimeString('id-ID')}</div></div>
       </div>
-      <div class="radar-kpis"><div><span>Harga</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>Spot pembanding</span><b>${j.spot == null ? '—' : num(j.spot)}</b><small>${j.priceDifferencePips == null ? 'tidak tersedia' : j.priceDifferencePips + ' pip dari TV'}</small></div><div><span>Rentang 1 jam</span><b>${j.expectedRangePips == null ? '—' : j.expectedRangePips + ' pip'}</b><small>dari ATR H1 live</small></div><div><span>Risiko rilis</span><b style="color:${j.risk && j.risk.level === 'TINGGI' ? 'var(--no)' : j.risk && j.risk.level === 'SEDANG' ? 'var(--warn)' : 'var(--ok)'}">${XE((j.risk && j.risk.level) || '—')}</b><small>${XE((j.risk && j.risk.note) || '')}</small></div></div>
+      <div class="radar-kpis"><div><span>Harga</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>Spot pembanding</span><b>${j.spot == null ? '—' : num(j.spot)}</b><small>${j.priceDifferencePips == null ? 'tidak tersedia' : j.priceDifferencePips + ' pip dari TV'}</small></div><div><span>Rentang 30 menit</span><b>${j.expectedRangePips == null ? '—' : j.expectedRangePips + ' pip'}</b><small>dari ATR H1 live</small></div><div><span>Risiko rilis</span><b style="color:${j.risk && j.risk.level === 'TINGGI' ? 'var(--no)' : j.risk && j.risk.level === 'SEDANG' ? 'var(--warn)' : 'var(--ok)'}">${XE((j.risk && j.risk.level) || '—')}</b><small>${XE((j.risk && j.risk.note) || '')}</small></div></div>
       ${j.summary ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>${XE(j.summary.headline)}</b><div class="small" style="margin-top:3px">${XE(j.summary.fundamental)}</div><div class="small mut">${XE(j.summary.technical)}</div>${(j.summary.points || []).slice(0, 3).map(p => `<div class="small" style="margin-top:2px">• ${XE(p)}</div>`).join('')}${(j.summary.conflicts || []).length ? `<div class="small" style="color:var(--warn);margin-top:2px">${XE((j.summary.conflicts || []).join(' '))}</div>` : ''}</div>` : ''}
       <div class="small mut" style="margin-top:8px">${XE(j.method || '')}</div>
       ${j.smc && j.smc.ok ? `<div class="small" style="margin-top:6px"><b>SMC/AMD:</b> ${XE(j.smc.note)}${j.smcPdConflict ? ' · <span style="color:var(--warn)">arah radar melawan premium/discount 50%; keyakinan diturunkan.</span>' : ''}</div>` : ''}
-      ${j.fundamental ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Fundamental XAUUSD — horizon 1 jam</b>
+      ${j.fundamental ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>Fundamental XAUUSD — horizon 30 menit</b>
         <div class="small" style="margin-top:3px">${j.fundamental.wire ? `Wire emas/USD: <b style="color:${j.fundamental.wire.goldBias === 'BULLISH' ? 'var(--ok)' : j.fundamental.wire.goldBias === 'BEARISH' ? 'var(--no)' : 'var(--warn)'}">${XE(j.fundamental.wire.goldBias)}</b> · ${XE(j.fundamental.wire.note)}` : 'Wire emas/USD tidak tersedia; fundamental memakai FRED dan pasar.'}</div>
         <div class="small mut" style="margin-top:2px">DXY 1 jam: ${j.fundamental.fx && j.fundamental.fx.dxy1h != null ? (j.fundamental.fx.dxy1h > 0 ? '+' : '') + XE(j.fundamental.fx.dxy1h) + '%' : '—'} · Yield 10Y 1 jam: ${j.fundamental.fx && j.fundamental.fx.yield10_1h != null ? (j.fundamental.fx.yield10_1h > 0 ? '+' : '') + XE(j.fundamental.fx.yield10_1h) + ' pp' : '—'} · Emas 1 jam: ${j.fundamental.fx && j.fundamental.fx.gold1hPips != null ? (j.fundamental.fx.gold1hPips > 0 ? '+' : '') + XE(j.fundamental.fx.gold1hPips) + ' pip' : '—'}</div>
         ${(j.fundamental.macro || []).filter(x => /DFII10|DTWEXBGS|T10YIE/.test(String(x.id))).slice(0, 3).map(x => `<div class="small mut" style="margin-top:2px">${XE(x.label)}: <b>${XE(x.value)}${XE(x.unit || '')}</b> · 5 observasi ${x.chg5 > 0 ? '+' : ''}${XE(x.chg5)}${XE(x.unit || '')} · ${XE(x.date)}</div>`).join('')}
+        ${j.fundamental.score ? `<div class="small" style="margin-top:3px"><b>Basis arah:</b> ${XE(j.fundamental.score.basis)} · skor fundamental ${XE(j.fundamental.score.fundamental)} vs teknikal ${XE(j.fundamental.score.technical)} (bobot teknikal ${XE(Math.round((Number(j.fundamental.score.techFactor) || 0) * 100))}%).</div>` : ''}
         <div class="small mut" style="margin-top:3px">${XE(j.fundamental.note || '')}</div></div>` : ''}
       ${(j.factors || []).length ? `<div class="radar-factors">${j.factors.map(f => `<div class="radar-factor ${f.score >= 0 ? 'up' : 'down'}"><b>${XE(f.name)}</b><span>${f.score > 0 ? '+' : ''}${XE(f.score)}</span><div class="small mut">${XE(f.why)}<br><span>${XE(f.source || '')}${f.at ? ' · ' + new Date(f.at).toLocaleTimeString('id-ID') : ''}</span></div></div>`).join('')}</div>` : ''}
       <div class="small" style="margin-top:10px;color:var(--warn)">${XE(j.limitation || '')}</div>
       <div class="small mut" style="margin-top:4px">${XE(j.brokerNote || '')}</div>
     </div>
     <div class="card"><div class="rb-card-head"><h3>🔗 Sumber & waktu data radar</h3><span class="rb-pill">${(j.sources || []).filter(x => x.ok).length}/${(j.sources || []).length} aktif</span></div>
-      <div class="source-list">${(j.sources || []).map(x => `<div class="source-row"><span class="source-dot ${x.ok ? 'ok' : 'no'}"></span><div><b>${x.url ? `<a href="${XE(x.url)}" target="_blank" rel="noopener">${XE(x.name)}</a>` : XE(x.name)}</b><div class="small mut">${XE(x.role || '')}${x.at ? ' · diambil ' + new Date(x.at).toLocaleString('id-ID') : ''}</div></div><span class="small ${x.ok ? '' : 'warn'}">${x.ok ? 'aktif' : 'gagal'}</span></div>`).join('')}</div>
-      <div class="small mut" style="margin-top:6px">Tidak ada feed MT5 HFM/Exness publik untuk retail; selisih quote bisa berbeda dari TradingView/spot. Untuk eksekusi, salin level dari radar lalu cocokkan dengan harga MT5 broker.</div>
+      <div class="source-list">${(j.sources || []).map(x => `<div class="source-row"><span class="source-dot ${x.ok ? 'ok' : 'no'}"></span><div><b>${x.url ? `<a href="${XE(x.url)}" target="_blank" rel="noopener">${XE(x.name)}</a>` : XE(x.name)}</b><div class="small mut">${XE(x.role || '')}${x.at ? ' · diambil ' + new Date(x.at).toLocaleString('id-ID') : ''}${x.why ? '<br><span style="color:var(--tx)">Valid karena: ' + XE(x.why) + '</span>' : ''}</div></div><span class="small ${x.ok ? '' : 'warn'}">${x.ok ? 'aktif' : 'gagal'}</span></div>`).join('')}</div>
+      <div class="small mut" style="margin-top:6px">Setiap sumber menyertakan alasan validitasnya: asal data, frekuensi, dan perannya. Tidak ada feed MT5 HFM/Exness publik untuk retail; selisih quote bisa berbeda dari TradingView/spot. Untuk eksekusi, salin level dari radar lalu cocokkan dengan harga MT5 broker.</div>
     </div>` + knowledgeCard(j.knowledge, 'Bukti global: situs resmi, media, YouTube & akademi emas');
   }
   window.pRadar = function () {
@@ -1347,7 +1458,7 @@
     const gen = ++radarGen;
     const c = radarCacheLoad();
     if (c) { radarData = c.data; radarAt = c.at; }
-    X$('pane').innerHTML = `<div class="card radar-intro"><div class="rb-card-head"><h3>🛰️ Radar 1H — arah XAUUSD</h3><span class="rb-pill y">fundamental + teknikal · refresh 30 menit</span></div><div class="rb-note">Radar deterministik untuk horizon <b>1 jam</b>: fokus pada fundamental global XAUUSD (wire emas/dolar dari banyak situs, DXY & yield 1 jam, yield riil FRED, dolar broad, breakeven inflasi, kalender USD) yang dikonfirmasi struktur candle H1/M15/M5, momentum 1 jam, EMA/RSI, serta mesin SMC/AMD. Hasil berlaku 30 menit dan dihitung ulang otomatis; setiap faktor dan feed menampilkan sumber serta waktu ambil/status. Tidak ada angka karangan dan tidak ada jaminan bebas SL.</div><div id="radarMsg" class="small mut" style="margin-top:8px"></div><div id="radarOut" style="margin-top:10px">${radarData ? radarCard(radarData) : ''}</div></div>`;
+    X$('pane').innerHTML = `<div class="card radar-intro"><div class="rb-card-head"><h3>🛰️ Radar 30m — arah XAUUSD</h3><span class="rb-pill y">fundamental-first · refresh 30 menit</span></div><div class="rb-note">Radar deterministik untuk horizon <b>30 menit</b>: arah ditentukan dari fundamental global XAUUSD (wire emas/dolar dari banyak situs, DXY & yield 1 jam, yield riil FRED, dolar broad, breakeven inflasi, kalender USD), lalu dikonfirmasi struktur candle H1/M15/M5, momentum, EMA/RSI, dan mesin SMC/AMD. Hasil berlaku 30 menit dan dihitung ulang otomatis; setiap faktor dan feed menampilkan sumber, waktu ambil, dan alasan validitasnya. Tidak ada angka karangan dan tidak ada jaminan bebas SL.</div><div id="radarMsg" class="small mut" style="margin-top:8px"></div><div id="radarOut" style="margin-top:10px">${radarData ? radarCard(radarData) : ''}</div></div>`;
     const tick = function () {
       const el = X$('radarCountdown');
       if (!el) {
@@ -1357,7 +1468,7 @@
         return;
       }
       const left = Math.max(0, (Number(el.dataset.until) || Date.now()) - Date.now());
-      el.textContent = left ? 'Berlaku ' + Math.ceil(left / 60000) + ' menit lagi · auto-refresh 30 menit' : 'Horizon 1 jam / masa berlaku habis — menghitung ulang…';
+      el.textContent = left ? 'Berlaku ' + Math.ceil(left / 60000) + ' menit lagi · auto-refresh 30 menit' : 'Horizon 30 menit / masa berlaku habis — menghitung ulang…';
     };
     tick(); radarCd = setInterval(tick, 1000);
     /* Ambil state akun dulu; jangan langsung menembak feed baru bila perangkat
@@ -1386,7 +1497,7 @@
         try { sourceLearnSync(j); } catch (e) { }
         radarCacheSave(j);
         /* Simpan state akun maksimal sekali per 30 menit; radar dihitung
-           ulang tiap 30 menit untuk horizon 1 jamnya. */
+           ulang tiap 30 menit untuk horizon 30 menitnya. */
         if (!radarSavedAt || Date.now() - radarSavedAt >= 30 * 60000) {
           statePut('radar', null, j).then(ok => { if (ok) radarSavedAt = Date.now(); }).catch(() => { });
         }
@@ -1595,7 +1706,7 @@
       <div class="price-audit"><div><span>Harga acuan</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>TradingView</span><b>${pa.tv ? num(pa.tv.price) : '—'}</b><small>${pa.tv ? new Date(pa.tv.at).toLocaleString('id-ID') : 'tidak tersedia'}</small></div><div><span>Spot gold-api</span><b>${pa.spot ? num(pa.spot.price) : '—'}</b><small>${pa.differencePips == null ? 'pembanding tidak tersedia' : pa.differencePips + ' pip dari TV'}</small></div><div><span>Candle</span><b>${pa.candle ? XE(pa.candle.source || '—') : '—'}</b><small>${pa.freshMinutes == null ? 'waktu tidak tersedia' : pa.freshMinutes + ' menit lalu'}</small></div></div>
       <div class="small mut" style="margin-top:6px">${XE(pa.brokerNote || '')}</div>
       ${val && val.ok ? `<div class="exp" style="color:var(--tx);margin-top:6px"><b>${XE(val.label)}</b> · nilai <b>${XE(val.value)}</b>${val.prev != null ? ' · sebelumnya ' + XE(val.prev) : ''} · periode ${XE(val.period)} <div class="small mut">${XE(val.source)}</div>${(val.extra || []).map(x => `<div class="small mut">${XE(x.metric)}: ${XE(x.latest)}${x.previous != null ? ' (sebelumnya ' + XE(x.previous) + ')' : ''}</div>`).join('')}</div>` : `<div class="warn" style="margin-top:6px">Angka resmi FRED belum terbaca: ${XE((val && val.error) || '—')}</div>`}
-      <div class="source-list" style="margin-top:8px">${src.map(s => `<div class="source-row"><span class="source-dot ${s.ok ? 'ok' : 'no'}"></span><div><b>${s.url ? `<a href="${XE(s.url)}" target="_blank" rel="noopener">${XE(s.name)}</a>` : XE(s.name)}</b></div><span class="small ${s.ok ? '' : 'warn'}">${s.ok ? 'aktif' : 'gagal'}</span></div>`).join('')}</div>
+      <div class="source-list" style="margin-top:8px">${src.map(s => `<div class="source-row"><span class="source-dot ${s.ok ? 'ok' : 'no'}"></span><div><b>${s.url ? `<a href="${XE(s.url)}" target="_blank" rel="noopener">${XE(s.name)}</a>` : XE(s.name)}</b>${s.why ? `<div class="small mut" style="margin-top:1px">${XE(s.why)}</div>` : ''}</div><span class="small ${s.ok ? '' : 'warn'}">${s.ok ? 'aktif' : 'gagal'}</span></div>`).join('')}</div>
       <div class="small mut" style="margin-top:6px">Diambil ${XE(when(j.generatedAt))}${j.cached ? ' · cache server' : ''}${j.ai ? ' · AI: ' + XE((j.ai.model || j.ai.provider || '—')) : ''}</div>
     </div>`;
   }
@@ -1650,7 +1761,7 @@
     X$('pane').innerHTML = `
       <div class="card">
         <div class="rb-card-head"><h3>⚡ Signal Entry — XAUUSD</h3><span class="rb-pill">Alchemist · TradingView real-time</span></div>
-        <div class="rb-note">Entry M5 ala Alchemist: bias top-down (D1/H4/H1 sesuai mode), POI per mode, trigger candle M5 yang sudah close (BOS/CHoCH, sweep, FVG, order block, EQH/EQL), lalu SL 30 pip dan TP bertingkat ke likuiditas nyata (swing H1/H4, PDH/PDL, sesi, ADR). Scalping memakai POI M5/M15, Day memakai M15/H1, Swing memakai H4/H1 — bukan satu setup yang dipakai untuk semua mode.</div>
+        <div class="rb-note">Peta entry 1D → 1m: <b>1D–4H</b> = direction, liquidity, supply/demand; <b>1H–15m</b> = trend, breakout, reversal, OB/FVG, liquidity; <b>5m–1m</b> = confirmation dan entry. Bias top-down (D1/H4/H1 sesuai mode), POI per mode, trigger candle M5/M1 yang sudah close, lalu SL 30 pip dan TP bertingkat ke likuiditas nyata (swing H1/H4, PDH/PDL, sesi, ADR). Scalping memakai POI M5/M15, Day memakai M15/H1, Swing memakai H4/H1 — bukan satu setup untuk semua mode.</div>
         <div class="rb-pill-row"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">TP minimum 200 pip</span><span class="rb-pill">Scalp / Day / Swing terpisah</span><span class="rb-pill y">Auto-refresh 15 menit (tab aktif)</span><span class="rb-pill">Belajar dari SL</span><span class="rb-pill">State per akun</span></div>
         <div id="sigMsg" class="mut small" style="margin-top:8px"></div>
         <div id="sigNext" class="small" style="margin-top:4px;color:var(--warn)"></div>
@@ -1660,7 +1771,7 @@
         <div id="xTvHost" style="height:420px;border-radius:10px;overflow:hidden;margin-top:8px;background:#0f172a"></div>
         <div class="small mut" style="margin-top:6px">Chart TradingView live memakai feed publik yang benar-benar tersedia: FOREXCOM:XAUUSD. HFM:XAUUSD dan EXNESS:XAUUSD tidak tersedia di feed publik TradingView (scanner mengembalikan data kosong), jadi tidak dipakai sebagai klaim palsu. Candle, harga, struktur, dan tanda Alchemist dihitung dari feed live yang sama; chart di bawah bukan gambar statis.</div>
       </div>
-      <div id="sigOut"></div>`;
+      <div id="sigOut"><div class="card" id="sigLoading"><div class="small mut">⏳ Memuat chart dan sinyal dari candle terbaru…</div></div></div>`;
     xTvMount();
     const bootGen = ++sigBootGen;
     const boot = (async function () {
@@ -1694,7 +1805,7 @@
       sigTimer = setInterval(function () {
         if (!X$('sigOut')) { clearInterval(sigTimer); sigTimer = null; return; }
         if (!sigBusy && Date.now() >= (sigRetryAt || 0) && (!sigData || Date.now() - (sigAt || 0) >= SIG_REFRESH_MS)) pSigRun(true);
-        if (sigData && Date.now() - sigHistAt > 60000) { sigHistAt = Date.now(); try { histSync(sigData); } catch (e) { } }
+        if (sigData && Date.now() - sigHistAt > 60000) syncHistoryNow();
       }, 15000);
       if (!window.__sigVis) {
         window.__sigVis = 1;
@@ -1720,10 +1831,21 @@
     if (force || !sigData || Date.now() - (sigAt || 0) >= SIG_REFRESH_MS) pSigRun(true);
     else syncHistoryNow();
   }
-  function syncHistoryNow() {
-    if (!sigData || !X$('sigOut')) return;
+  let histFreshBusy = false;
+  async function syncHistoryNow() {
+    if (!sigData || !X$('sigOut') || histFreshBusy) return;
+    histFreshBusy = true;
     sigHistAt = Date.now();
-    histSync(sigData).catch(function () { });
+    const j = sigData;
+    try {
+      let rows = null;
+      /* Candle segar untuk kajian SL, terpisah dari payload sinyal 15 menit. */
+      try {
+        const c = await tcall({ action: 'xauCandles' });
+        if (c && c.ok && Array.isArray(c.rows) && c.rows.length) rows = c.rows;
+      } catch (e) { }
+      if (j === sigData) await histSync(j, rows);
+    } catch (e) { } finally { histFreshBusy = false; }
   }
   window.pSigRun = async function (silent) {
     if (sigBusy) { sigWake = true; return; }
@@ -1795,7 +1917,7 @@
     if (sigData) drawChart(sigData);
   };
   window.pChartTF = function (tf) {
-    chartTF = ['ALL', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf) ? tf : 'ALL';
+    chartTF = ['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf) ? tf : 'ALL';
     try { localStorage.setItem('rb_xau_chart_tf', chartTF); } catch (e) { }
     if (sigData) paintSignal(sigData);
   };
@@ -1821,9 +1943,9 @@
     }).join('');
     const tg = (p.targets || []).filter(t => Number(t.pips) >= 200).map((t, i, a) => `<div class="item"><span><b>${i === a.length - 1 ? 'TPmax' : 'TP2'}</b> ${num(t.price)} <span class="small mut">${XE(t.pips)} pip · ${XE(t.src)}</span></span><span class="small" style="color:var(--ok)">${t.strength > 1 ? 'konfluensi ' + t.strength : 'likuiditas'}</span></div>`).join('');
     return `<div class="card" style="border-left:5px solid ${buy ? 'var(--ok)' : 'var(--no)'}">
-      <div class="rb-card-head"><h3>🎯 Rencana entry M5</h3><span class="rb-pill ${p.status === 'SIAP' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
+      <div class="rb-card-head"><h3>🎯 Rencana entry M5</h3><span class="rb-pill ${p.status === 'SIAP' || p.status === 'PENDING' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
       <div class="rb-pill-row" style="margin-top:8px">${modes}</div>
-      <div class="rb-pill-row" style="margin-top:6px"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">RR 1:${XE(p.rr)}</span><span class="rb-pill">${XE(p.type)}</span>${p.entryDistancePips != null ? `<span class="rb-pill ${p.tooClose ? '' : 'y'}">Jarak ${XE(p.entryDistancePips)} pip${p.minEntryPips != null ? ' · min ' + XE(p.minEntryPips) : ''}</span>` : ''}</div>
+      <div class="rb-pill-row" style="margin-top:6px"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">RR 1:${XE(p.rr)}</span><span class="rb-pill y">${XE(p.order || p.type)}</span>${p.entryDistancePips != null ? `<span class="rb-pill ${p.tooClose ? '' : 'y'}">Jarak ${XE(p.entryDistancePips)} pip${p.minEntryPips != null ? ' · min ' + XE(p.minEntryPips) : ''}</span>` : ''}</div>
       <div class="rb-lv-grid" style="margin-top:8px">
         <div class="rb-lv"><span>Entry</span><b>${num(p.entry)}</b></div>
         <div class="rb-lv"><span>SL · 30 pip</span><b style="color:var(--no)">${num(p.sl)}</b></div>
@@ -1844,9 +1966,9 @@
       <div class="small mut">Kekuatan ${XE(j.directionStrength)}% · harga ${num(j.price)} · ${XE(j.priceSource)} · ${XE(j.markers ? j.markers.length : 0)} tanda chart</div>
       <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? `<span class="rb-pill ${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin <= 10 ? 'y' : ''}">${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin > 10 ? 'Candle tertunda ' + XE(j.freshness.candleAgeMin) + ' mnt' : 'Candle TradingView real-time'}</span>` : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
       ${j.freshness ? `<div class="small mut" style="margin-top:6px">Harga ${j.freshness.priceAt ? new Date(j.freshness.priceAt).toLocaleTimeString('id-ID') : '—'} · candle M5 ${j.freshness.candleAgeMin != null ? (j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') : '—'} lalu · ${XE(j.freshness.candleSource)}</div>` : ''}
-      ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Skor HTF dan trigger M5 berbeda. Arah final dipaksa mengikuti trigger M5 (${XE(j.m5TriggerDir || '—')}); setup yang melawan trigger tidak diaktifkan. Ini mencegah entry SELL saat candle M5 baru BOS BUY.</div>` : ''}
+      ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Bias dominan ${XE(j.direction)} dan trigger M5 ${XE(j.m5TriggerDir || '—')} berbeda. Arah final tetap bias dominan; trigger M5 yang melawan hanya pullback, bukan alasan membalik entry. Setup ditampilkan sebagai PENDING/LIMIT sampai trigger searah — bukan entry melawan tren.</div>` : ''}
       ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda. Semua setup berstatus TUNGGU sampai candle M5 baru muncul — bukan sinyal untuk entry sekarang.</div>` : ''}
-      ${j.smcGate ? `<div class="${j.smcGate.ok ? 'small' : 'warn'}" style="margin-top:8px">${j.smcGate.ok ? '✅' : '⛔'} <b>SMC:</b> ${XE(j.smcGate.note)}${j.smcGate.ok && !j.smcGate.executable ? ' Entry belum aktif sampai syarat eksekusi terpenuhi.' : ''}</div>` : ''}
+      ${j.smcGate ? `<div class="${j.smcGate.ok ? 'small' : 'warn'}" style="margin-top:8px">${j.smcGate.ok ? '✅' : '⛔'} <b>SMC:</b> ${XE(j.smcGate.note)}${j.smcGate.ok && !j.smcGate.executable ? ' Rencana LIMIT valid tetap ditampilkan (PENDING); status SIAP menunggu syarat eksekusi.' : ''}</div>` : ''}
       ${j.eventRisk && j.eventRisk.level !== 'RENDAH' ? `<div class="warn" style="margin-top:8px">⚠️ ${XE(j.eventRisk.note)}</div>` : ''}
       ${j.adr ? `<div class="small mut" style="margin-top:6px">ADR ${XE(j.adr.avgPips)} pip · hari ini ${XE(j.adr.todayPips)} pip · sisa rata-rata ${XE(j.adr.remainingPips)} pip</div>` : ''}
     </div>`;
@@ -1887,14 +2009,18 @@
     JUDAS: 'Judas swing (manipulasi sesi)', ASIA: 'Asian range', DO: 'Daily open', WO: 'Weekly open', PD: 'Premium/Discount 50%',
     SMT: 'SMT divergence', POI: 'Point of Interest', WICK: 'Wick entry (pucuk wick M5)', FVG50: 'FVG 50% entry',
     BPR: 'Balanced Price Range', REJECT: 'Rejection block', IFVG: 'Inversion FVG', ERL: 'External Range Liquidity',
-    DISP: 'Displacement', ENGULF: 'Engulfing', IDM: 'Inducement / IDM', AMD: 'AMD / Power of 3', FIB: 'Fibonacci golden ratio'
+    DISP: 'Displacement', ENGULF: 'Engulfing', IDM: 'Inducement / IDM', AMD: 'AMD / Power of 3', FIB: 'Fibonacci golden ratio',
+    HTF: 'Bias 1D–4H (arah, likuiditas, supply/demand)', CONFIRM: 'Konfirmasi 5m–1m (entry LIMIT)'
   };
   function chartTerm(t) { return CHART_TERMS[t] || ''; }
   /* Cache lama bisa masih membawa alias CHOCH. Tampilkan selalu CHoCH,
      termasuk saat data lama dibuka sebelum refresh berikutnya. */
   function chartType(t) { return t === 'CHOCH' ? 'CHoCH' : t; }
   function chartPick(j) {
-    const all = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF);
+    /* Penanda POI aktif adalah level entry yang sedang dipakai mesin. Tetap
+       tampilkan saat layer TF lain dipilih supaya entry tidak “hilang” dari
+       chart hanya karena POI berasal dari TF yang berbeda. */
+    const all = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF || m.active);
     if (chartLabelAll) return all;
     const sorted = all.slice().sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || Math.abs(a.price - (j.price || 0)) - Math.abs(b.price - (j.price || 0)));
     const out = [], seen = new Set();
@@ -1911,14 +2037,16 @@
   function chartCard(j) {
     const types = {};
     (j.markers || []).forEach(m => { const t = chartType(m.type); types[t] = (types[t] || 0) + 1; });
-    const nAll = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF).length, nShow = chartLabelShown(j);
-    return `<div class="card"><div class="rb-card-head"><h3>🏷️ Chart live M5 + layer multi-timeframe</h3><span class="rb-pill" id="sigStamp">${j.generatedAt ? new Date(j.generatedAt).toLocaleTimeString('id-ID') : '—'}</span></div>
+    const nAll = (j.markers || []).filter(m => chartTF === 'ALL' || m.tf === chartTF || m.active).length, nShow = chartLabelShown(j);
+    const tfLabel = chartTF === 'ALL' ? 'M5 + layer multi-TF' : chartTF + ' + layer POI';
+    return `<div class="card"><div class="rb-card-head"><h3>🏷️ Chart live ${XE(tfLabel)}</h3><span class="rb-pill" id="sigStamp">${j.generatedAt ? new Date(j.generatedAt).toLocaleTimeString('id-ID') : '—'}</span></div>
+      <div class="small mut" id="sigChartState" style="margin-top:6px">Menyiapkan chart…</div>
       <canvas id="xSigChart" title="Gulir untuk zoom, atau pakai tombol di bawah" style="width:100%;height:380px;display:block;margin-top:6px"></canvas>
       <div class="rb-pill-row" style="margin-top:8px;align-items:center"><button class="x" type="button" onclick="xSigZoom(-1)">🔍 Perbesar</button><span class="rb-pill" id="sigZoomLabel">${sigChartBars} candle</span><button class="x" type="button" onclick="xSigZoom(1)">🔍 Perkecil</button><button class="x" type="button" onclick="xSigZoom(0)">Reset</button><button class="x" type="button" id="sigLabelToggle" onclick="pChartLabels()">${chartLabelAll ? '🙈 Label ringkas' : '🏷️ Semua label'}</button></div>
-      <div class="rb-pill-row" style="margin-top:6px;align-items:center"><span class="small mut">Layer TF:</span>${['ALL', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].map(tf => `<button class="x" type="button" onclick="pChartTF('${tf}')" style="${chartTF === tf ? 'border-color:var(--b);color:var(--b)' : ''}">${tf}</button>`).join('')}<a class="x" href="https://www.tradingview.com/chart/?symbol=FOREXCOM%3AXAUUSD&interval=${chartTF === 'M15' ? '15' : chartTF === 'H1' ? '60' : chartTF === 'H4' ? '240' : chartTF === 'D1' ? 'D' : chartTF === 'W1' ? 'W' : '5'}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Buka TradingView</a></div>
-      <div class="small mut" id="sigLabelNote" style="margin-top:6px">${chartLabelAll ? 'Semua ' + nAll + ' label ditampilkan; pada chart padat beberapa label bisa berdekatan.' : 'Menampilkan ' + nShow + ' dari ' + nAll + ' label: satu per istilah + TF (maks 32), lalu yang terdekat. Tombol <b>Semua label</b> membuka seluruhnya.'} Label TF lama yang di luar window M5 tampil di tepi kanan sebagai label level, bukan ditempel ke candle palsu.</div>
+      <div class="rb-pill-row" style="margin-top:6px;align-items:center"><span class="small mut">Layer TF:</span>${['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].map(tf => `<button class="x" type="button" onclick="pChartTF('${tf}')" style="${chartTF === tf ? 'border-color:var(--b);color:var(--b)' : ''}">${tf}</button>`).join('')}<a class="x" href="https://www.tradingview.com/chart/?symbol=FOREXCOM%3AXAUUSD&interval=${chartTF === 'M1' ? '1' : chartTF === 'M15' ? '15' : chartTF === 'H1' ? '60' : chartTF === 'H4' ? '240' : chartTF === 'D1' ? 'D' : chartTF === 'W1' ? 'W' : '5'}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Buka TradingView</a></div>
+      <div class="small mut" id="sigLabelNote" style="margin-top:6px">${chartLabelAll ? 'Semua ' + nAll + ' label ditampilkan; pada chart padat beberapa label bisa berdekatan.' : 'Menampilkan ' + nShow + ' dari ' + nAll + ' label: satu per istilah + TF (maks 32), lalu yang terdekat. Tombol <b>Semua label</b> membuka seluruhnya.'} Label TF lama yang di luar window ${XE(chartTF === 'ALL' ? 'M5' : chartTF)} tampil di tepi kanan sebagai label level, bukan ditempel ke candle palsu.</div>
       <div class="rb-pill-row" style="margin-top:8px">${Object.keys(types).map(t => `<span class="rb-pill" title="${XE(chartTerm(t))}">${XE(t)}${chartTerm(t) ? ' · ' + XE(chartTerm(t)) : ''} · ${types[t]}</span>`).join('')}</div>
-      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle M5 dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). Semua label digambar langsung di chart halaman ini dan mengikuti harga real-time; tidak ada ekspor/download. Istilah memakai glosarium yang sama dengan mesin: BOS/RBS-SBR, CHoCH/MSS, SNR/liquidity, SND/supply-demand, OB, FVG/BISI-SIBI, OTE, PDH/PDL.</div></div>`;
+      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle ${XE(chartTF === 'ALL' ? 'M5' : chartTF)} dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). Semua label digambar langsung di chart halaman ini dan mengikuti harga real-time; tidak ada ekspor/download. Istilah memakai glosarium yang sama dengan mesin: BOS/RBS-SBR, CHoCH/MSS, SNR/liquidity, SND/supply-demand, OB, FVG/BISI-SIBI, OTE, PDH/PDL.</div></div>`;
   }
 
   function marksCard(j) {
@@ -1930,13 +2058,14 @@
   function setupsCard(j) {
     const ss = j.setups || [];
     return `<div class="card"><div class="rb-card-head"><h3>🎯 ${ss.length} setup satu arah (${XE(j.direction)})</h3><span class="rb-pill">SL 30 pip</span></div>
-      ${ss.map(s => `<div class="exp" style="color:var(--tx);margin-top:6px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(s.style)} · ${XE(s.dir)}</b><span class="small" style="color:${s.status === 'SIAP' ? 'var(--ok)' : 'var(--mut)'}">${XE(s.status)}</span></div>
-        <div class="small">Entry ${XE(s.entryTf || 'M5')} ${num(s.entry)} (${XE(s.type)}${s.entryMode === 'WICK' ? ' · pucuk wick' : s.entryMode === 'FVG50' ? ' · FVG 50%' : ''}) · POI ${XE(s.poiTf || '—')} · SL ${num(s.sl)} · TP2 ${num(s.tp2)} · TPmax ${num(s.tpMax)} (${XE(s.tpMaxPips)} pip)</div>
+      ${ss.map(s => `        <div class="exp" style="color:var(--tx);margin-top:6px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(s.style)} · ${XE(s.dir)}</b><span class="small" style="color:${s.status === 'SIAP' ? 'var(--ok)' : s.status === 'PENDING' ? 'var(--warn)' : 'var(--mut)'}">${XE(s.status)}${s.status === 'PENDING' ? ' · limit valid' : ''}</span></div>
+        <div class="small">${XE(s.order || s.type)} · entry ${XE(s.entryTf || 'M5')} ${num(s.entry)} (${XE(s.entryMode === 'WICK' ? 'pucuk wick M5' : s.entryMode === 'FVG50' ? '50% FVG M5' : 'tepi POI M5')}) · POI ${XE(s.poiTf || '—')} · SL ${num(s.sl)} · TP2 ${num(s.tp2)} · TPmax ${num(s.tpMax)} (${XE(s.tpMaxPips)} pip)</div>
         ${s.pattern ? `<div class="small" style="color:var(--ok)">🧩 ${XE(s.pattern.label)}</div>` : ''}
         ${(s.confluence || []).length ? `<div class="small mut">🔗 Konfluensi: ${XE((s.confluence || []).join(' · '))}</div>` : ''}
         ${s.wick ? `<div class="small" style="color:var(--warn)">📍 ${XE(s.wick.note)}</div>` : s.fvg50 ? `<div class="small" style="color:var(--warn)">📍 ${XE(s.fvg50.note)}</div>` : ''}
         ${s.statusWhy ? `<div class="small" style="color:${s.tooClose ? 'var(--warn)' : 'var(--mut)'}">${XE(s.statusWhy)}</div>` : ''}
         ${s.smc ? `<div class="small" style="color:${s.smc.grade === 'A+' || s.smc.grade === 'A' ? 'var(--ok)' : s.smc.grade === 'D' ? 'var(--warn)' : 'var(--mut)'}"><b>SMC ${XE(s.smc.grade)}</b> · fase ${XE(s.smc.phase || '—')} · ${s.smc.killzone && s.smc.killzone.active ? 'kill zone aktif' : 'di luar kill zone'} · PD ${XE(s.smc.pd && s.smc.pd.zone || '—')} · sweep ${XE(s.smc.sweep && s.smc.sweep.pool || '—')} · fib ${s.smc.fib && s.smc.fib.ok ? 'siap' : 'belum'} · ${XE(s.smc.optional || 0)}/${XE(s.smc.optionalTotal || 0)} konfirmasi</div>` : ''}
+        ${s.mtf ? `<div class="small" style="color:${s.mtf.ok ? 'var(--ok)' : 'var(--warn)'}"><b>🧩 MTF ${s.mtf.ok ? 'selaras' : 'belum lengkap'}</b> · 1D–4H ${s.mtf.htf && s.mtf.htf.direction ? XE(s.mtf.htf.direction.d1 + '/' + s.mtf.htf.direction.h4) : '—'} · 1H–15m ${s.mtf.mid && s.mtf.mid.trend ? XE(s.mtf.mid.trend.h1 + '/' + s.mtf.mid.trend.m15) : '—'} · 5m–1m ${s.mtf.ltf && s.mtf.ltf.m1Available ? 'M1 tersedia' : 'M1 tidak tersedia'} · ${XE(s.mtf.gate && s.mtf.gate.note || '—')}</div>` : ''}
         ${(s.entrySteps || []).length ? `<div class="small" style="margin-top:4px;color:var(--tx)"><b>Cara entry:</b>${s.entrySteps.map(x => `<div style="margin-top:2px">${XE(x)}</div>`).join('')}</div>` : ''}
         ${s.learning ? `<div class="small" style="color:${s.learning.blocked ? 'var(--no)' : 'var(--warn)'}"><b>${s.learning.blocked ? '⛔ Pembelajaran menahan entry' : '⚠️ Pola berisiko'}:</b> ${XE(s.learning.label)} · ${XE(s.learning.losses)} SL / ${XE(s.learning.wins)} TP${(s.learning.reasons || []).length ? ' · ' + XE((s.learning.reasons || []).join('; ')) : ''}</div>` : ''}
         <div class="small mut">${XE(s.why)}</div></div>`).join('') || '<div class="warn">Belum ada setup yang lolos filter. Bias HTF, POI, atau trigger M5 belum searah; jangan paksa entry di luar rencana.</div>'}</div>`;
@@ -1972,7 +2101,41 @@
       ${rows.map(x => `<div class="item"><span>${XE(x[0])}</span><span class="small mut" style="text-align:right">${XE(x[1])}</span></div>`).join('')}
       <div class="small" style="margin-top:8px"><b>POI M5 unmitigated:</b> ${XE(z(s.fvg && s.fvg.m5))}${s.ob && s.ob.m5 && s.ob.m5.length ? ' · OB ' + XE(z(s.ob.m5)) : ''}</div>
       ${s.fib ? `<div style="margin-top:8px"><b class="small">Fib golden ratio + candle momentum (${XE(s.fib.tf)} ${XE(s.fib.dir)})</b>${(s.fib.steps || []).map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>` : ''}
-      <div class="small mut" style="margin-top:6px">Level dihitung dari candle nyata; tidak ada angka karangan. Entry hanya valid bila bias HTF, PD 50%, POI, CHoCH/BOS + displacement/engulfing, sweep, fib OTE, kill zone, dan SL 30 pip terpenuhi.</div>
+      <div class="small mut" style="margin-top:6px">Level dihitung dari candle nyata; tidak ada angka karangan. Entry valid bila HTF 1D–4H, MTF 1H–15m, dan LTF 5m–1m selaras, PD 50% + POI terpenuhi, lalu salah satu jalur materi: (A) sweep BSL/SSL + displacement/engulfing, (B) MSS/CHoCH + FVG/OB, atau (C) fib golden + candle momentum, dengan kill zone atau fib OTE dan SL 30 pip.</div>
+    </div>`;
+  }
+
+  /* Peta eksekusi tiga lapis. Ini bukan dekorasi: status SIAP memakai
+     gate yang sama, jadi yang terlihat di sini adalah alasan level boleh
+     atau belum boleh dieksekusi. */
+  function mtfCard(j) {
+    const m = j && j.mtf;
+    if (!m) return `<div class="card"><h3>🧩 Peta multi-timeframe</h3><div class="small mut">Server belum mengirim peta 1D–4H / 1H–15m / 5m–1m. Refresh sinyal untuk menghitungnya.</div></div>`;
+    const row = (ok, label, detail) => `<div class="item"><span>${ok ? '✅' : '⚠️'} ${XE(label)}</span><span class="small mut" style="text-align:right;max-width:62%">${XE(detail || '—')}</span></div>`;
+    const h = m.htf || {}, mid = m.mid || {}, ltf = m.ltf || {}, gate = m.gate || {};
+    const br = (mid.breaks || []).map(x => x.tf + ' ' + x.kind + ' ' + x.dir).join(' · ') || 'belum ada break searah';
+    const rv = (mid.reversals || []).map(x => x.tf + ' ' + x.kind + ' ' + x.dir).join(' · ') || 'belum ada reversal searah';
+    const cf = (ltf.confirmations || []).map(x => x.label).join(' · ') || 'belum ada konfirmasi M1/M5';
+    return `<div class="card"><div class="rb-card-head"><h3>🧩 Peta multi-timeframe 1D → 1m</h3><span class="rb-pill ${gate.ok ? 'ok' : 'y'}">${gate.ok ? 'HTF + MTF + LTF selaras' : 'belum lengkap'}</span></div>
+      <div class="rb-note">Aturan gambar: <b>HTF memberi arah</b>, <b>LTF memberi konfirmasi</b>. 1D–4H menentukan direction, liquidity, supply/demand; 1H–15m menentukan trend, breakout, reversal, OB/FVG, liquidity; 5m–1m menentukan confirmation dan entry. Entry tetap <b>LIMIT</b>, SL 30 pip, TP2 minimal 200 pip.</div>
+      <div class="item" style="display:block"><b>1D–4H · HTF</b><div class="small mut">Direction · Liquidity · Supply & Demand</div>
+        ${row(h.direction && h.direction.ok, 'Direction', h.direction && h.direction.note)}
+        ${row(h.liquidity && h.liquidity.ok, 'Liquidity', h.liquidity && h.liquidity.note)}
+        ${row(h.supplyDemand && h.supplyDemand.ok, 'Supply & Demand', h.supplyDemand && h.supplyDemand.note)}
+      </div>
+      <div class="item" style="display:block"><b>1H–15m · MTF</b><div class="small mut">Trend · Breakout · Reversal · OB · FVG · Liquidity</div>
+        ${row(mid.trend && mid.trend.ok, 'Trend', mid.trend && mid.trend.note)}
+        ${row((mid.breaks || []).length > 0, 'Breakout / BOS', br)}
+        ${row((mid.reversals || []).length > 0, 'Reversal / CHoCH', rv)}
+        ${row(mid.poi && mid.poi.ok, 'Order Block / FVG', mid.poi && mid.poi.note)}
+        ${row(mid.liquidity && mid.liquidity.ok, 'Liquidity', mid.liquidity && mid.liquidity.note)}
+      </div>
+      <div class="item" style="display:block"><b>5m–1m · LTF</b><div class="small mut">Confirmation · Entry</div>
+        ${row(ltf.m1Available, 'Candle M1 nyata', ltf.m1Available ? 'tersedia dari feed TradingView' : 'tidak tersedia; konfirmasi memakai M5 dan tidak diklaim sebagai M1')}
+        ${row(ltf.ok, 'Confirmations', cf + ' · tren M5 ' + (ltf.trendOk ? 'searah' : 'belum searah'))}
+        ${row(!!gate.ok, 'Entry LIMIT', ltf.entry ? ltf.entry.note : '—')}
+      </div>
+      <div class="small" style="margin-top:6px;color:${gate.ok ? 'var(--ok)' : 'var(--warn)'}"><b>Gate:</b> ${XE(gate.note || '—')}</div>
     </div>`;
   }
 
@@ -1993,19 +2156,19 @@
      paintSignal sendiri tidak menarik Firestore agar mode/zoom tidak memicu
      siklus tulis dan tidak menimpa status remote yang lebih baru. */
   let histSyncBusy = false, histSyncPending = null;
-  async function histSync(j) {
-    if (histSyncBusy) { histSyncPending = j; return; }
+  async function histSync(j, freshRows) {
+    if (histSyncBusy) { histSyncPending = { j, rows: freshRows }; return; }
     histSyncBusy = true;
     try {
       await histPull();
       learnApply(j);
-      try { histUpdate(j); } catch (e) { }
+      try { histUpdate(j, freshRows); } catch (e) { }
       paintSignal(j);
       histPushLocal();
       histPushDeleted().catch(function () { });
     } finally {
       histSyncBusy = false;
-      if (histSyncPending) { const n = histSyncPending; histSyncPending = null; setTimeout(function () { histSync(n); }, 0); }
+      if (histSyncPending) { const n = histSyncPending; histSyncPending = null; setTimeout(function () { histSync(n.j, n.rows); }, 0); }
     }
   }
 
@@ -2016,7 +2179,7 @@
     const chip = X$('tvPrice');
     if (chip) chip.textContent = 'harga ' + num(j.price) + ' · ' + new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID');
     learnApply(j);
-    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + smcCard(j) + methodCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
+    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + smcCard(j) + methodCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
     drawChart(j);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
@@ -2049,10 +2212,29 @@
 
   function drawChart(j) {
     const cv = X$('xSigChart');
-    if (!cv || !j.chart) return;
-    const allRows = ((j.chart.m5 && j.chart.m5.length ? j.chart.m5 : j.chart.rows) || []);
+    const state = X$('sigChartState');
+    const showState = function (msg) {
+      if (state) { state.textContent = msg; state.style.display = 'block'; }
+    };
+    const clearChart = function () {
+      if (!cv) return;
+      try { const c = cv.getContext('2d'); if (c) c.clearRect(0, 0, cv.width, cv.height); } catch (e) { }
+    };
+    if (!cv || !j.chart) { clearChart(); showState('Chart belum tersedia. Menunggu data candle dari server.'); return; }
+    /* Chart mengikuti tab TF yang dipilih. Jangan fallback ke M5: TF kosong
+       harus terlihat kosong supaya pengguna tidak mengira candle M5 adalah
+       candle TF yang sedang dipilih. */
+    const tfKey = chartTF === 'ALL' ? 'm5' : ({ M1: 'm1', M5: 'm5', M15: 'm15', H1: 'h1', H4: 'h4', D1: 'd1', W1: 'w1' }[chartTF] || 'm5');
+    const tfLabel = chartTF === 'ALL' ? 'M5' : chartTF;
+    const allRows = Array.isArray(j.chart[tfKey]) ? j.chart[tfKey] : [];
+    if (!allRows.length) {
+      clearChart();
+      showState('Chart kosong: TF ' + tfLabel + ' tidak punya candle. Tidak memakai fallback M5; pilih TF lain atau refresh candle ' + tfLabel + '.');
+      return;
+    }
     const rows = allRows.slice(-Math.max(30, Math.min(240, sigChartBars)));
-    if (rows.length < 5) return;
+    if (rows.length < 5) { clearChart(); showState('Chart kosong: TF ' + tfLabel + ' hanya punya ' + rows.length + ' candle (minimal 5). Tidak memakai fallback M5.'); return; }
+    if (state) { state.style.display = 'none'; state.textContent = ''; }
     const ap = modeOf(j, sigMode) || j.plan;
     const lastC = rows[rows.length - 1].c;
     const refs = []
@@ -2116,7 +2298,7 @@
       g.fillStyle = color; g.fillText(text, box.x + 1, ly);
       g.restore();
     };
-    const colors = { BOS: '#f59e0b', CHoCH: '#a78bfa', CHOCH: '#a78bfa', SWEEP: '#38bdf8', FVG: '#34d399', OB: '#fb7185', SNR: '#94a3b8', SND: '#38bdf8', MB: '#c084fc', OTE: '#facc15', PDH: '#f472b6', PDL: '#f472b6', LIQ: '#22d3ee', EQH: '#f97316', EQL: '#f97316', JUDAS: '#e879f9', ASIA: '#64748b', DO: '#e2e8f0', WO: '#e2e8f0', PD: '#fbbf24', SMT: '#f43f5e', POI: '#ffffff', WICK: '#fde047', FVG50: '#fbbf24', BPR: '#22d3ee', REJECT: '#fb7185', IFVG: '#2dd4bf', ERL: '#818cf8', DISP: '#f59e0b', ENGULF: '#c084fc', IDM: '#fbbf24', AMD: '#f59e0b', FIB: '#facc15' };
+    const colors = { BOS: '#f59e0b', CHoCH: '#a78bfa', CHOCH: '#a78bfa', SWEEP: '#38bdf8', FVG: '#34d399', OB: '#fb7185', SNR: '#94a3b8', SND: '#38bdf8', MB: '#c084fc', OTE: '#facc15', PDH: '#f472b6', PDL: '#f472b6', LIQ: '#22d3ee', EQH: '#f97316', EQL: '#f97316', JUDAS: '#e879f9', ASIA: '#64748b', DO: '#e2e8f0', WO: '#e2e8f0', PD: '#fbbf24', SMT: '#f43f5e', POI: '#ffffff', WICK: '#fde047', FVG50: '#fbbf24', BPR: '#22d3ee', REJECT: '#fb7185', IFVG: '#2dd4bf', ERL: '#818cf8', DISP: '#f59e0b', ENGULF: '#c084fc', IDM: '#fbbf24', AMD: '#f59e0b', FIB: '#facc15', HTF: '#60a5fa', CONFIRM: '#f0abfc' };
     /* Hanya label + teks + titik penanda. Titik memakai timestamp candle asal
        dari server (m.at); fallback ke candle yang menyentuh level hanya bila
        candle asal berada di luar window chart. */
@@ -2182,9 +2364,37 @@
       g.restore();
     };
     const msShown = chartPick(j);
+    /* Zona POI/OB/FVG/SND digambar sebagai kotak dari candle asal sampai
+       kanan chart. Sebelumnya hanya label harga yang terlihat, sehingga
+       area entry tidak bisa dibaca sebagai zona. */
+    const zoneSeen = new Set();
+    let zoneCount = 0;
+    msShown.forEach(m => {
+      if (zoneCount >= 12 || !Array.isArray(m.zone) || m.zone.length < 2) return;
+      const zLo = Math.min(Number(m.zone[0]), Number(m.zone[1]));
+      const zHi = Math.max(Number(m.zone[0]), Number(m.zone[1]));
+      if (!isFinite(zLo) || !isFinite(zHi) || zHi <= zLo) return;
+      const key = String(m.type) + '|' + String(m.tf) + '|' + zLo.toFixed(1) + '|' + zHi.toFixed(1);
+      if (zoneSeen.has(key)) return;
+      zoneSeen.add(key); zoneCount++;
+      const idx = anchorOf(m);
+      const x0 = idx < 0 ? padL : Math.max(padL, x(idx) - bw / 2);
+      const yTop = Math.max(padT, Math.min(y(zHi), H - padB));
+      const yBot = Math.max(padT, Math.min(y(zLo), H - padB));
+      if (yBot - yTop < 1 || W - padR - x0 < 2) return;
+      const color = colors[chartType(m.type)] || '#94a3b8';
+      g.save();
+      g.globalAlpha = m.active ? 0.18 : 0.08;
+      g.fillStyle = color;
+      g.fillRect(x0, yTop, W - padR - x0, yBot - yTop);
+      g.globalAlpha = m.active ? 0.72 : 0.3;
+      g.strokeStyle = color; g.lineWidth = m.active ? 1.2 : 0.7; g.setLineDash(m.active ? [] : [3, 3]);
+      g.strokeRect(x0 + 0.5, yTop + 0.5, Math.max(1, W - padR - x0 - 1), Math.max(1, yBot - yTop - 1));
+      g.restore();
+    });
     msShown.forEach(markerTag);
     if (ap) {
-      level(ap.entry, '#e2e8f0', 'Entry ' + Number(ap.entry).toFixed(2), false);
+      level(ap.entry, '#e2e8f0', (ap.order || (ap.dir === 'BUY' ? 'LIMIT BUY' : 'LIMIT SELL')) + ' ' + Number(ap.entry).toFixed(2), false);
       level(ap.sl, '#ef4444', 'SL ' + Number(ap.sl).toFixed(2), false);
       level(ap.tp2, '#22c55e', 'TP2 ' + Number(ap.tp2).toFixed(2), true);
       if (ap.tpMax && ap.tpMax !== ap.tp2) level(ap.tpMax, '#86efac', 'TPmax ' + Number(ap.tpMax).toFixed(2), true);
@@ -2247,4 +2457,11 @@
   /* pastikan tab signal bisa dibuka walau nama fungsi berbeda */
   window.xauFocusGet = function () { return newsFocus; };
   /* Dipakai oleh skrip validasi lokal; tidak mengubah alur UI. */
+  if (window.__RB_TEST__) window.__rbTest = {
+    histReviewStats, histUpdate, histRecord, histFailure, histOutcomeHtml,
+    histLoad, histSave, chartTF: function () { return chartTF; },
+    sigData: function () { return sigData; },
+    setSigData: function (j) { sigData = j; },
+    paintSignal, drawChart
+  };
 })();
