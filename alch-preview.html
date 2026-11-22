@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preview Istilah Alchemist</title>
+<link rel="stylesheet" href="rb-modern.css">
+<style>
+:root{--bg:#08090c;--bg2:#0d1015;--card:#12151b;--card2:#191d24;--field:#0e1116;--line:#232830;--line2:#333a45;--tx:#edf0f5;--mut:#98a1ae;--a:#fff;--b:#c9d2df;--bad:#8f97a4;--ok:#4ade9d;--warn:#f6c66b}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,sans-serif}
+#pane{max-width:1180px;margin:0 auto;padding:18px 18px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:12px}
+.card h3{margin:0;font-size:1rem}
+.rb-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.rb-pill{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--tx-soft,#98a1ae);font-size:.7rem}
+.rb-chart-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:10px}
+.rb-chart-levels div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.rb-chart-levels span{display:block;font-size:.7rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.rb-chart-levels b{font-size:.84rem;color:var(--tx)}
+.rb-callout.warn{background:rgba(246,198,107,.08);border-left:3px solid #f6c66b;padding:8px 10px;border-radius:8px;font-size:.82rem;color:var(--tx-soft,#c3cbd6)}
+.rb-terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:10px}
+.rb-term{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.rb-term p{margin:6px 0;font-size:.82rem;line-height:1.55}
+.rb-term-abbr{display:inline-block;font-size:.68rem;color:var(--mut);margin-bottom:4px}
+.rb-term-use{font-size:.78rem;color:var(--mut);line-height:1.5}
+.rb-flow{display:grid;gap:8px}
+.rb-step{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.84rem}
+.x{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;color:var(--tx);cursor:pointer}
+.rb-term-photo img{width:100%;height:auto}
+</style>
+</head>
+<body>
+<div id="pane"></div>
+<script>
+window.$ = function (id) { return document.getElementById(id); };
+window.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+window.rb26Safe = window.esc;
+window.rb26Norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); };
+</script>
+<script src="rb-content.js"></script>
+<script src="rb-alch.js"></script>
+<script>
+ALCH.tab = 'istilah';
+document.getElementById('pane').innerHTML = alTermsHtml();
+alTermMount();
+</script>
+</body>
+</html>

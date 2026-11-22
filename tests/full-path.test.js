@@ -524,3 +524,166 @@ test('Kajian SL: selesai 30 menit memakai candle M5 segar, bukan payload sinyal 
   assert.ok(h.review.postSlMfePips >= 200, 'MFE setelah SL dihitung dari candle segar');
   assert.match(H.histOutcomeHtml(h), /Kajian 30 menit selesai/i);
 });
+
+test('UI News & Signal: kartu baru merender data tanpa undefined/NaN', () => {
+  const store = {};
+  const ctx = {
+    console, setTimeout, clearTimeout, setInterval: () => 0, clearInterval: () => {},
+    Date, Math, JSON, Intl, URL, URLSearchParams, TextEncoder, TextDecoder,
+    localStorage: { getItem: k => store[k] == null ? null : store[k], setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+    document: { getElementById: () => null, addEventListener: () => {}, visibilityState: 'visible', querySelector: () => null, querySelectorAll: () => [] },
+    fetch: async () => { throw new Error('no network'); },
+    user: null,
+    window: null
+  };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  ctx.window.__RB_TEST__ = true;
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'rb-xau.js'), 'utf8'), ctx, { filename: 'rb-xau.js' });
+  const H = ctx.window.__rbTest;
+  ['releaseCard', 'liquidityCard', 'styleCard', 'planCard', 'setupsCard', 'signalVerdict', 'checklistCard'].forEach(k => {
+    assert.equal(typeof H[k], 'function', k + ' harus diekspos untuk smoke test');
+  });
+
+  const release = {
+    tag: 'CPI', note: 'Checklist rilis fokus CPI.', coverage: { ok: 7, total: 7, pct: 100 },
+    guide: { read: ['Headline CPI MoM & YoY', 'Core CPI', 'Shelter', 'Jasa'], rules: ['Baca NSA untuk YoY'], reaction: ['DXY', 'yield riil'] },
+    components: [
+      { k: 'CPI headline', value: 3.91, prev: 3.8, change: 0.11, unit: '% YoY', source: 'FRED CPIAUCNS', period: 'Okt 2026', ok: true },
+      { k: 'CPI core', value: 2.76, prev: 2.9, change: -0.14, unit: '% YoY', source: 'FRED CPILFENS', period: 'Okt 2026', ok: true }
+    ],
+    pre: [{ k: 'JOLTS', ok: true, d: '7,2 juta lowongan', source: 'FRED', url: 'https://fred.stlouisfed.org/series/JTSJOL' }],
+    watch: { state: 'MENDUKUNG', gold: { h1Pips: 4, d1Pct: 1.2 }, dxy: { h1Pct: -0.2 }, us10: { h1Pp: -0.03 }, real: { value: 1.78, chg5: -0.05 }, note: 'DXY dan yield turun.' },
+    sources: [{ name: 'BLS CPI', url: 'https://www.bls.gov/cpi/', use: 'angka resmi' }]
+  };
+  const news = H.releaseCard({ release, focus: 'CPI' });
+  assert.match(news, /Checklist rilis CPI/);
+  assert.match(news, /7\/7 komponen/);
+  assert.match(news, /CPI headline/);
+  assert.match(news, /Respons pasar/);
+  assert.match(news, /Sumber primer rilis/);
+  assert.doesNotMatch(news, /undefined|NaN|\[object Object\]/);
+
+  const liquidity = {
+    note: 'Level dari candle.',
+    levels: [
+      { kind: 'EQH', tf: 'M15', bias: 'BSL', level: 3560, distPips: 12, swept: false, note: 'dua high sejajar' },
+      { kind: 'EQL', tf: 'H1', level: 3500, distPips: 48, swept: true, note: 'sudah disapu' }
+    ],
+    dol: { up: { kind: 'EQH', level: 3560 }, down: { kind: 'EQL', level: 3500 } }
+  };
+  const liq = H.liquidityCard({ liquidity });
+  assert.match(liq, /Peta likuiditas & DOL/);
+  assert.match(liq, /EQH/);
+  assert.match(liq, /DOL atas/);
+  assert.doesNotMatch(liq, /undefined|NaN|\[object Object\]/);
+
+  const style = H.styleCard({
+    styleGuide: [
+      { k: 'SCALPING', tfs: 'M1–M5', use: 'Entry M5, SL 30 pip.', mode: true },
+      { k: 'DAY', tfs: 'M5–H1', use: 'POI M15/H1.', mode: true },
+      { k: 'SWING', tfs: 'H4–D1', use: 'POI H4/H1.', mode: true },
+      { k: 'MACRO', tfs: 'D1–W1', use: 'Konteks saja.', mode: false },
+      { k: 'FUTURES', tfs: 'CME', use: 'Konteks saja.', mode: false }
+    ],
+    terms: { EQH: 'Equal Highs', BSL: 'Buy-side liquidity', DOL: 'Draw on Liquidity' }
+  });
+  assert.match(style, /Gaya trading & alur entry/);
+  assert.match(style, /SL 30 pip/);
+  assert.match(style, /TP2 ≥200 pip/);
+  assert.match(style, /Glosarium istilah chart/);
+  assert.doesNotMatch(style, /undefined|NaN|\[object Object\]/);
+
+  const seqSteps = [
+    { n: 1, k: 'POI HTF layak diamati', ok: true, d: 'zona H4' },
+    { n: 2, k: 'Sweep EQH/high', ok: true, d: 'sweep 3565' },
+    { n: 3, k: 'Reclaim', ok: true, d: 'close 3562' },
+    { n: 4, k: 'Displacement + MSS/BOS', ok: false, d: 'belum' },
+    { n: 5, k: 'FVG/OB terbentuk', ok: false, d: 'belum' },
+    { n: 6, k: 'Retrace + trigger LIMIT', ok: false, d: 'belum' }
+  ];
+  const cancel = [
+    { k: 'Sweep tanpa displacement', ok: false },
+    { k: 'Harga bertahan di sisi breakout', ok: true },
+    { k: 'Tidak ada retrace', ok: true },
+    { k: 'R:R TP2 minimal 1:2', ok: true },
+    { k: 'SL 30 pip di luar struktur invalidasi', ok: true }
+  ];
+  const setup = {
+    style: 'SCALPING', dir: 'SELL', status: 'PENDING', order: 'LIMIT SELL', type: 'LIMIT',
+    entry: 3560, sl: 3563, tp2: 3540, tpMax: 3530, tp2Pips: 200, tpMaxPips: 300, rr: 6.7,
+    entryPolicy: 'PROXIMAL', slClear: true, zoneWidthPips: 20, entryMode: 'FVG50', entryTf: 'M5', poiTf: 'M15',
+    entryDistancePips: 40, minEntryPips: 20,
+    sequenceModel: 'REVERSAL', sequenceStatus: '3/6',
+    sequence: { ok: false, done: 3, total: 6, steps: seqSteps, note: 'Menunggu displacement.' },
+    cancel, cancelBlocked: ['Sweep tanpa displacement'],
+    targets: [{ price: 3540, pips: 200, src: 'EQL M15', strength: 1 }],
+    why: 'POI H4 searah bias.', invalidation: 'M5 close di atas FVG.',
+    entrySteps: ['1. HTF 1W–1D–4H: bias SELL.', '2. Sweep EQH M15.', '3. MSS M5.', '4. FVG M5.', '5. LIMIT 50% FVG.', '6. SL 30 pip; TP2 200 pip.'],
+    mtf: { ok: false, gate: { ok: false, note: 'M15 belum MSS' }, htf: { direction: { d1: 'SELL', h4: 'SELL' } }, mid: { trend: { h1: 'SELL', m15: 'SELL' } }, ltf: { m1Available: false } },
+    smc: { grade: 'B', phase: 'MARKUP', killzone: { active: false }, pd: { zone: 'premium' }, sweep: { pool: 'EQH' }, fib: { ok: true }, optional: 2, optionalTotal: 5 },
+    confluence: ['H4 SELL', 'DXY kuat'], wick: { note: 'Entry di pucuk wick M5.' }
+  };
+  const plan = H.planCard({ plan: setup, setups: [] });
+  assert.match(plan, /Alur REVERSAL/);
+  assert.match(plan, /3\/6/);
+  assert.match(plan, /Aturan batal/);
+  assert.match(plan, /TP2 · 200 pip/);
+  assert.doesNotMatch(plan, /undefined|NaN|\[object Object\]/);
+
+  const setups = H.setupsCard({ direction: 'SELL', setups: [setup] });
+  assert.match(setups, /Cara entry:/);
+  assert.match(setups, /SL 30 pip/);
+  assert.match(setups, /Alur REVERSAL/);
+  assert.match(setups, /Aturan batal/);
+  assert.doesNotMatch(setups, /undefined|NaN|\[object Object\]/);
+
+  /* Data belum lengkap: kartu harus kosong/aman, bukan melempar error. */
+  assert.equal(H.liquidityCard({}), '');
+  assert.equal(H.planCard({}), '');
+  const partial = H.releaseCard({ release: { tag: 'NFP', components: [], pre: [], sources: [], coverage: {}, guide: {}, watch: {} }, focus: 'NFP' });
+  assert.match(partial, /Checklist rilis NFP/);
+  assert.doesNotMatch(partial, /undefined|NaN|\[object Object\]/);
+  assert.match(H.styleCard({}), /Glosarium istilah chart \(0\)/);
+});
+
+test('Alchemist Istilah: chart anatomi, chart nyata, dan aturan entry konsisten', () => {
+  const ctx = {
+    console, Date, Math, JSON, String, Number, Object, Array, Map, Set,
+    rb26Norm: s => String(s == null ? '' : s).toLowerCase(),
+    rb26Safe: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
+    document: { addEventListener: () => {}, getElementById: () => null, body: { classList: { add: () => {}, remove: () => {} } } },
+    window: null
+  };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  const code = fs.readFileSync(path.join(ROOT, 'rb-content.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'rb-alch.js'), 'utf8');
+  vm.runInNewContext(code, ctx, { filename: 'alchemist-content.js' });
+  const html = ctx.alTermsHtml();
+  assert.match(html, /Gabungkan semua istilah/);
+  assert.match(html, /metode%20amd\.jpg/);
+  assert.match(html, /metode%20ict%20simple\.jpg/);
+  assert.match(html, /SL 30 pip/);
+  assert.match(html, /TP2 ≥200 pip/);
+  assert.match(html, /<svg/);
+  assert.match(html, /Chart XAUUSD real-time/);
+  /* Chart kelompok istilah dirender malas: placeholder dulu, SVG saat terlihat. */
+  assert.match(html, /data-alch-chart="sweep"/);
+  assert.ok((html.match(/data-alch-chart="/g) || []).length >= 13, 'setiap kelompok istilah punya slot chart');
+  assert.equal((html.match(/<section class="card rb-term-sec"/g) || []).length, (html.match(/data-alch-chart="/g) || []).length, 'satu slot chart per section');
+  assert.doesNotMatch(html, /undefined|NaN|\[object Object\]/);
+  assert.equal((html.match(/<b>Order block<\/b>/g) || []).length, 1, 'istilah duplikat harus digabung');
+  assert.equal((html.match(/<b>Premium \/ discount<\/b>/gi) || []).length, 1, 'premium/discount tidak boleh dobel');
+  ['sweep', 'ob', 'premium', 'bos', 'qm', 'crt', 'ocl', 'smt', 'ipda', 'risk', 'engulfing', 'breaker', 'third'].forEach(k => {
+    const svg = ctx.alCaseSvg(k);
+    assert.match(svg, /<svg/, k + ' harus punya chart anatomi');
+    assert.doesNotMatch(svg, /undefined|NaN|\[object Object\]/, k + ' tidak boleh berisi nilai rusak');
+  });
+  const sweep = ctx.alCaseSvg('sweep');
+  assert.match(sweep, /entry LIMIT 78/);
+  assert.match(sweep, /SL 75 · 30 pip/);
+  assert.match(sweep, /TP2 98 · 200 pip/);
+  const risk = ctx.alCaseSvg('risk');
+  assert.match(risk, /R:R = 200 \/ 30 = 1:6,7/);
+  assert.match(risk, /SL 3497 · 30 pip/);
+});

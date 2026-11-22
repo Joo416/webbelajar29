@@ -409,8 +409,19 @@ const ALCH_SESSIONS = [
   ['Overlap London–NY', '19.00 – 23.00', 'Likuiditas tertinggi; peluang target besar, tetapi spread bisa melebar saat berita.']
 ];
 
-function alSet(tab) { ALCH.tab = tab; pAlchemist(); }
-function alTerm(v) { ALCH.term = v; const box = $('alchterms'); if (box) box.innerHTML = alTermsHtml(); }
+function alTerm(v) {
+  ALCH.term = v;
+  /* Daftar istilah kini memuat 18 kelompok chart; debounce agar mengetik
+     tidak merender ulang seluruh SVG pada setiap huruf. */
+  clearTimeout(ALCH._termTimer);
+  ALCH._termTimer = setTimeout(function () {
+    const box = $('alchterms');
+    if (box) {
+      box.innerHTML = alTermsHtml();
+      alTermMount();
+    }
+  }, 160);
+}
 function alCheck(i, on) {
   ALCH.check[i] = !!on;
   const row = $('alchcl_' + i);
@@ -425,23 +436,6 @@ function alCheckScore() {
 function alQuizPick(i, k) {
   ALCH.quiz[i] = k;
   pAlchemist();
-}
-function alTermsHtml() {
-  const q = rb26Norm(ALCH.term);
-  const picked = new Map();
-  ALCH_TERMS.forEach(function (x, i) {
-    if (q && rb26Norm(x[0] + ' ' + x[1] + ' ' + x[2] + ' ' + x[3]).indexOf(q) < 0) return;
-    picked.set(rb26Norm(x[0]), { x: x, i: i });
-  });
-  const rows = Array.from(picked.values());
-  return '<input placeholder="Cari istilah (mis. FVG, QML, SBR)..." autocomplete="off" value="' + rb26Safe(ALCH.term) + '" oninput="alTerm(this.value)" style="margin-bottom:10px">'
-    + '<div class="rb-note" style="margin-bottom:6px">' + rows.length + ' istilah · setiap istilah punya contoh chart TradingView real-time, level entry/SL/TP, dan alasan invalidasi.</div>'
-    + '<div class="rb-terms">' + (rows.length ? rows.map(function (r) {
-      const x = r.x;
-      return '<div class="rb-term"><span class="rb-term-abbr">' + rb26Safe(x[1]) + '</span><b>' + rb26Safe(x[0]) + '</b>'
-        + '<p>' + rb26Safe(x[2]) + '</p><div class="rb-term-use"><b>Dipakai:</b> ' + rb26Safe(x[3]) + '</div>'
-        + '<button type="button" class="x" style="margin-top:8px" onclick="alTermChart(' + r.i + ')">📈 Contoh chart real-time</button></div>';
-    }).join('') : '<div class="rb-muted-box">Istilah tidak ditemukan.</div>') + '</div>';
 }
 function alStudyCaseSvg() {
   return '<svg class="rb-chart" viewBox="0 0 720 340" role="img" aria-label="Skema entry Alchemist: range harian, sapuan low, perubahan struktur, FVG, stop loss dan target">'
@@ -495,30 +489,6 @@ function alStudyCaseSvg() {
     + '</svg>';
 }
 
-function pAlchemist() {
-  const tabs = [['mulai', ' Mulai'], ['istilah', ' Istilah'], ['story', ' Storyline'], ['level', ' Level & Zona'], ['entry', ' Model Entry'], ['sesi', ' Sesi'], ['risiko', ' Risiko'], ['cek', '✅ Checklist'], ['kasus', ' Studi Kasus'], ['kuis', ' Kuis']];
-  const body = ALCH.tab === 'istilah' ? '<div id="alchterms">' + alTermsHtml() + '</div>'
-    : ALCH.tab === 'story' ? alStoryHtml()
-      : ALCH.tab === 'level' ? alLevelHtml()
-        : ALCH.tab === 'entry' ? alEntryHtml()
-          : ALCH.tab === 'sesi' ? alSessionHtml()
-            : ALCH.tab === 'risiko' ? alRiskHtml()
-              : ALCH.tab === 'cek' ? alCheckHtml()
-                : ALCH.tab === 'kasus' ? alCaseHtml()
-                  : ALCH.tab === 'kuis' ? alQuizHtml()
-                    : alStartHtml();
-
-  $('pane').innerHTML = '<div class="card rb-hero-alch"><div class="rb-hero-main"><div class="rb-hero-copy">'
-    + '<div class="rb-eyebrow">Trading · kurikulum</div><h2> Strategi Alchemist</h2>'
-    + '<div class="rb-note">Gabungan Malaysian SNR (MSNR), SMC/ICT, Candle Range Theory, dan Quasimodo: cara membaca storyline, menandai level, menentukan entry, lalu mengeksekusi dengan risiko terkendali.</div>'
-    + '<div class="rb-pill-row"><span class="rb-pill y">Edukasi</span><span class="rb-pill">MSNR</span><span class="rb-pill">SMC / ICT</span><span class="rb-pill">CRT</span><span class="rb-pill">QM</span></div>'
-    + '</div><div class="ring" style="--p:100"><div class="ring-in"><b>10</b><span>modul</span></div></div></div></div>'
-    + '<div class="stabs" style="margin-bottom:12px">' + tabs.map(function (x) {
-      return '<button type="button" class="' + (ALCH.tab === x[0] ? 'on' : '') + '" onclick="alSet(\'' + x[0] + '\')">' + x[1] + '</button>';
-    }).join('') + '</div>'
-    + '<div>' + body + '</div>'
-    + '<div class="card"><h3>⚠️ Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, dan Candle Range Theory (lihat tautan di modul Mulai).</div></div>';
-}
 function alStartHtml() {
   return '<div class="rb-grid">'
     + '<div class="card"><h3>Apa itu "Alchemist"?</h3>'
@@ -637,41 +607,6 @@ function alCheckHtml() {
     }).join('') + '</div>'
     + '<button class="btn alt full" type="button" onclick="ALCH.check={};pAlchemist()">Reset checklist</button>'
     + '<div class="rb-callout" style="margin-top:10px"><b>Kebiasaan:</b> simpan screenshot sebelum entry, tulis checklist di jurnal. Setelah 20 trade, lihat mana syarat yang paling sering dilanggar.</div>'
-    + '</div>';
-}
-function alCaseHtml() {
-  return '<div class="card"><h3>🔬 Studi kasus: CRT bullish + FVG</h3>'
-    + '<div class="rb-note">Skenario edukasi pada XAUUSD H1. Perhatikan urutannya, bukan angka pastinya.</div>'
-    + alStudyCaseSvg()
-    + '<div class="rb-flow" style="margin-top:12px">'
-      + '<div class="rb-step"><b>Konteks</b>D1 membentuk range. Storyline belum jelas; tunggu manipulasi.</div>'
-      + '<div class="rb-step"><b>Sapuan</b>Harga menyapu low range (sweep) lalu close kembali di dalam range.</div>'
-      + '<div class="rb-step"><b>Konfirmasi</b>M15 membentuk MSS bullish dan meninggalkan FVG.</div>'
-      + '<div class="rb-step"><b>Entry</b>Limit di tepi FVG; stop di bawah low sapuan; target high range.</div>'
-    + '</div>'
-    + '<div class="rb-callout ok"><b>Kenapa masuk akal:</b> likuiditas diambil, struktur berubah, entry dekat dengan invalidasi sehingga RR besar.</div>'
-    + '<div class="rb-callout warn"><b>Kenapa bisa gagal:</b> berita besar tiba-tiba, FVG dilewati tanpa reaksi, atau storyline D1 ternyata bearish kuat sehingga high range tidak tercapai.</div>'
-    + '<div class="rb-card-head" style="margin-top:6px"><h3 style="font-size:.94rem">Uji pemahaman</h3><button class="x" onclick="alSet(\'kuis\')">Kerjakan kuis ›</button></div>'
-    + '</div>';
-}
-function alQuizHtml() {
-  const done = Object.keys(ALCH.quiz).length;
-  const right = ALCH_QUIZ.filter(function (q, i) { return ALCH.quiz[i] === q.a; }).length;
-  return '<div class="card"><div class="rb-card-head"><h3>🧠 Kuis Alchemist</h3><span class="rb-pill">' + right + '/' + ALCH_QUIZ.length + ' benar</span></div>'
-    + '<div class="rb-note">Jawab semua pertanyaan. Pembahasan muncul langsung setelah memilih.</div>'
-    + '<div style="margin-top:10px">' + ALCH_QUIZ.map(function (q, i) {
-      const pick = ALCH.quiz[i];
-      const answered = pick != null;
-      return '<div class="rb-quiz"><div style="font-weight:700;font-size:.86rem;line-height:1.5">' + (i + 1) + '. ' + rb26Safe(q.q) + '</div>'
-        + q.o.map(function (o, k) {
-          const cls = answered ? (k === q.a ? 'ok' : k === pick ? 'no' : '') : '';
-          return '<button type="button" class="rb-opt ' + cls + '" ' + (answered ? 'disabled' : '') + ' onclick="alQuizPick(' + i + ',' + k + ')">' + String.fromCharCode(65 + k) + '. ' + rb26Safe(o) + '</button>';
-        }).join('')
-        + (answered ? '<div class="rb-callout ' + (pick === q.a ? 'ok' : 'warn') + '" style="margin:8px 0 0">' + (pick === q.a ? '✅ Benar. ' : '❌ Belum tepat. ') + rb26Safe(q.e) + '</div>' : '')
-        + '</div>';
-    }).join('') + '</div>'
-    + '<button class="btn alt full" type="button" onclick="ALCH.quiz={};pAlchemist()">Ulangi kuis</button>'
-    + (done === ALCH_QUIZ.length ? '<div class="rb-callout ' + (right >= 6 ? 'ok' : 'warn') + '"><b>Skor akhir: ' + right + '/' + ALCH_QUIZ.length + '.</b> ' + (right >= 6 ? 'Lanjut ke latihan chart historis.' : 'Baca ulang modul Istilah dan Level sebelum lanjut.') + '</div>' : '')
     + '</div>';
 }
 

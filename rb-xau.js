@@ -2540,6 +2540,7 @@
     histLoad, histSave, chartTF: function () { return chartTF; },
     sigData: function () { return sigData; },
     setSigData: function (j) { sigData = j; },
-    paintSignal, drawChart
+    paintSignal, drawChart,
+    releaseCard, liquidityCard, styleCard, planCard, setupsCard, signalVerdict, checklistCard
   };
 })();

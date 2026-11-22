@@ -275,3 +275,20 @@ select,textarea,input{color:var(--tx)}
    mereka harus tetap tegas, bukan pudar. */
 html [style*="color:#dcdcdc"],html [style*="color:#d3d3d3"],html [style*="color:#c3c3c3"]{color:var(--tx)!important}
 html [style*="color:#e8e8e8"]{color:var(--warn)!important}
+
+/* Istilah Alchemist: chart anatomi, galeri chart nyata, aturan entry */
+.rb-term-sec{margin-top:12px}
+.rb-term-chart{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.rb-term-chart svg{display:block;width:100%;height:auto}
+.rb-term-chart[data-alch-chart]{aspect-ratio:720/340;background:linear-gradient(100deg,var(--card2),var(--bg))}
+.rb-term-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.rb-term-photo{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rb-term-photo img{display:block;width:100%;height:auto}
+.rb-term-photo figcaption{padding:8px 10px;font-size:.8rem;line-height:1.5;color:var(--mut)}
+.rb-term-photo figcaption b{color:var(--tx)}
+.rb-term-rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px}
+.rb-term-rule{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.8rem;line-height:1.5;color:var(--mut)}
+.rb-term-rule b{display:block;color:var(--tx);font-size:.88rem;margin-bottom:2px}
+.rb-term-index{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.rb-term-index .x{font-size:.76rem}
+.rb-term-sec .rb-terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:10px}

@@ -92,6 +92,15 @@ ALCH_TERMS.push(
   ['Multi-timeframe alignment', 'Konfluensi TF', 'Semua timeframe menunjuk arah dan zona yang sama.', 'Filter agar hanya mengambil setup A+.', 'D1 · H4 · H1 · M15 · M5']
 );
 
+/* Satu istilah = satu baris. Entri yang sama dari versi lama (mis. 'Order
+   block' atau 'Premium / Discount') digabung; definisi terbaru menang. */
+(function alDedupeTerms() {
+  const seen = new Map();
+  ALCH_TERMS.forEach(function (t) { seen.set(rb26Norm(t[0]), t); });
+  ALCH_TERMS.length = 0;
+  seen.forEach(function (t) { ALCH_TERMS.push(t); });
+})();
+
 /* ---------- tambahan model entry ---------- */
 ALCH_MODELS.push(
   {
@@ -710,7 +719,11 @@ const ALCH_CHART_CASES = {
   }
 };
 const ALCH_TERM_CASE = {
-  'MSNR': 'ocl', 'Storyline': 'macro', 'HTF / LTF': 'sweep', 'POI': 'sweep', 'OCL': 'ocl', 'Band level': 'ocl', 'Touch': 'ocl', 'Miss': 'ocl', 'Fresh': 'ob', 'Unfresh': 'ob', 'SBR': 'breaker', 'RBS': 'breaker', 'Roadblock': 'premium', 'Rejection': 'sweep', 'Breakout internal': 'bos', 'Breakout external': 'bos', 'CRT': 'crt', 'Sweep': 'sweep', 'Internal liquidity': 'sweep', 'External liquidity': 'sweep', 'MSS': 'sweep', 'CHoCH': 'sweep', 'BOS': 'bos', 'Engulfing zone': 'engulfing', 'Order block': 'ob', 'FVG': 'sweep', 'QM / QML': 'qm', 'Apex': 'qm', 'Third touch': 'third', 'Break & retest': 'bos', 'Confluence': 'sweep', 'Killzone': 'judas', 'A+ setup': 'sweep', 'Turtle soup': 'sweep', 'Power of Three': 'ipda', 'IPDA': 'ipda', 'Draw on liquidity': 'ipda', 'Dealing range': 'premium', 'Premium / discount': 'premium', 'PD array': 'sweep', 'Break of Structure': 'bos', 'Market Structure Shift': 'sweep', 'Change of Character': 'sweep', 'Displacement': 'sweep', 'Fair Value Gap': 'sweep', 'Consequent encroachment': 'sweep', 'Breaker block': 'breaker', 'Mitigation block': 'breaker', 'Liquidity void': 'sweep', 'Equal highs / lows': 'sweep', 'Optimal Trade Entry': 'ote', 'Silver bullet': 'silver', 'Judas swing': 'judas', 'SMT divergence': 'smt', 'Real yield': 'macro', 'DXY': 'macro', 'COT report': 'macro', 'News blackout': 'risk', 'TP ladder': 'risk', 'Backtest sample': 'risk', 'Session liquidity': 'judas', 'Multi-timeframe alignment': 'sweep',
+  'BOS': 'bos', 'MSS': 'sweep', 'CHoCH': 'sweep', 'FVG': 'sweep', 'OB': 'ob', 'OTE': 'premium',
+  'DOL': 'ipda', 'EQH': 'sweep', 'EQL': 'sweep', 'BSL': 'sweep', 'SSL': 'sweep',
+  'PDH': 'sweep', 'PDL': 'sweep', 'PWH': 'sweep', 'PWL': 'sweep', 'SMT': 'smt', 'AMD': 'ipda',
+  'CRT': 'crt', 'QM': 'qm', 'IDM': 'sweep', 'KZ': 'judas',
+  'MSNR': 'ocl', 'Storyline': 'bos', 'HTF / LTF': 'sweep', 'POI': 'sweep', 'OCL': 'ocl', 'Band level': 'ocl', 'Touch': 'ocl', 'Miss': 'ocl', 'Fresh': 'ocl', 'Unfresh': 'ocl', 'SBR': 'bos', 'RBS': 'bos', 'Roadblock': 'premium', 'Rejection': 'engulfing', 'Breakout internal': 'bos', 'Breakout external': 'bos', 'CRT': 'crt', 'Sweep': 'sweep', 'Internal liquidity': 'sweep', 'External liquidity': 'sweep', 'MSS': 'sweep', 'CHoCH': 'sweep', 'BOS': 'bos', 'Engulfing zone': 'engulfing', 'Order block': 'ob', 'FVG': 'sweep', 'QM / QML': 'qm', 'Apex': 'qm', 'Third touch': 'third', 'Break & retest': 'bos', 'Confluence': 'sweep', 'Killzone': 'judas', 'A+ setup': 'sweep', 'Turtle soup': 'sweep', 'Power of Three': 'ipda', 'IPDA': 'ipda', 'Draw on liquidity': 'ipda', 'Dealing range': 'premium', 'Premium / discount': 'premium', 'PD array': 'sweep', 'Break of Structure': 'bos', 'Market Structure Shift': 'sweep', 'Change of Character': 'sweep', 'Displacement': 'sweep', 'Fair Value Gap': 'sweep', 'Consequent encroachment': 'sweep', 'Breaker block': 'breaker', 'Mitigation block': 'breaker', 'Liquidity void': 'sweep', 'Equal highs / lows': 'sweep', 'Optimal Trade Entry': 'ote', 'Silver bullet': 'silver', 'Judas swing': 'judas', 'SMT divergence': 'smt', 'Real yield': 'macro', 'DXY': 'macro', 'COT report': 'macro', 'News blackout': 'risk', 'TP ladder': 'risk', 'Backtest sample': 'risk', 'Session liquidity': 'judas', 'Multi-timeframe alignment': 'sweep',
   'Bid / Ask': 'execution', 'Pip': 'execution', 'Point': 'execution', 'Lot': 'execution', 'Leverage': 'execution', 'Margin': 'execution', 'Margin call': 'execution', 'Swap': 'execution', 'Market order': 'execution', 'Limit order': 'execution', 'Stop order': 'execution', 'Trailing stop': 'execution', 'Partial close': 'execution', 'Break even (BE)': 'execution', 'Time stop': 'risk', 'Position sizing': 'risk', 'Inducement': 'sweep', 'Asian range': 'judas', 'Profit factor': 'risk', 'Risk of ruin': 'risk', 'Win rate': 'risk', 'Over-trading': 'risk', 'FOMO': 'risk', 'Slippage': 'execution', 'Korelasi': 'macro'
 };
 function alTermCase(t) {
@@ -726,6 +739,436 @@ function alTermCase(t) {
   const c = ALCH_CHART_CASES[key] || ALCH_CHART_CASES.sweep;
   return { key: key, tf: t[4] || c.tf, def: t[2] || '', use: t[3] || '', c: c };
 }
+
+/* ==========================================================================
+   ISTILAH → CHART → ENTRY
+   Setiap kelompok istilah punya skema anatomi yang digambar dari candle.
+   Chart XAUUSD real-time tetap dibuka lewat alTermChart(i). Skema ini tidak
+   mengubah arah mesin, SL 30 pip, atau TP2 200 pip.
+   ========================================================================== */
+function alEsc(s) { return rb26Safe(String(s == null ? '' : s)); }
+
+const ALCH_SVG = (function () {
+  const W = 720, H = 340;
+  /* Label kolom kanan (entry/SL/TP/zona) dikumpulkan dulu, lalu dirapatkan
+     dengan jarak minimum supaya tidak saling menimpa saat level berdekatan. */
+  let labels = [];
+  function y(v) { return Math.round((300 - v * 2.2) * 10) / 10; }
+  function x(i) { return 46 + i * 18; }
+  function fromCloses(closes, pad) {
+    pad = pad || 1.2;
+    return closes.map(function (c, i) {
+      const o = i ? closes[i - 1] : c;
+      return [o, c, Math.max(o, c) + pad, Math.min(o, c) - pad];
+    });
+  }
+  function candles(rows) {
+    return rows.map(function (r, i) {
+      const o = r[0], c = r[1], h = r[2], l = r[3];
+      const up = c >= o, col = up ? '#4ade9d' : '#ff7b8a';
+      const yo = y(o), yc = y(c), yh = y(h), yl = y(l);
+      const top = Math.min(yo, yc), bot = Math.max(yo, yc), xx = x(i);
+      return '<line x1="' + xx + '" y1="' + yh + '" x2="' + xx + '" y2="' + yl + '" stroke="' + col + '" stroke-width="1.3"/>'
+        + '<rect x="' + (xx - 5) + '" y="' + top + '" width="10" height="' + Math.max(2, bot - top) + '" rx="1.5" fill="' + col + '"/>';
+    }).join('');
+  }
+  function zone(a, b, label, col) {
+    const y1 = y(Math.max(a, b)), y2 = y(Math.min(a, b));
+    col = col || '#5eead4';
+    labels.push({ y: y1 - 5, mid: Math.round((y1 + y2) / 2), text: label, col: col, lead: true });
+    return '<rect x="40" y="' + y1 + '" width="474" height="' + Math.max(3, y2 - y1) + '" rx="4" fill="' + col + '" fill-opacity=".10" stroke="' + col + '" stroke-opacity=".65" stroke-dasharray="4 4"/>';
+  }
+  function line(v, label, col, dash) {
+    const yy = y(v);
+    labels.push({ y: yy - 4, mid: yy, text: label, col: col, lead: true });
+    return '<line x1="40" y1="' + yy + '" x2="682" y2="' + yy + '" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="' + (dash || '5 4') + '"/>';
+  }
+  function flushLabels() {
+    if (!labels.length) return '';
+    const items = labels.slice().sort(function (a, b) { return a.y - b.y; });
+    labels = [];
+    const GAP = 15, TOP = 30, BOTTOM = 294;
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].y - items[i - 1].y < GAP) items[i].y = items[i - 1].y + GAP;
+    }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const max = i === items.length - 1 ? BOTTOM : items[i + 1].y - GAP;
+      if (items[i].y > max) items[i].y = max;
+    }
+    if (items[0].y < TOP) {
+      const d = TOP - items[0].y;
+      items.forEach(function (it) { it.y += d; });
+    }
+    return items.map(function (it) {
+      /* Latar label menutup garis level yang lewat di belakang teks. */
+      const w = Math.min(170, Math.round(String(it.text).length * 6.1) + 8);
+      const bg = '<rect x="514" y="' + (it.y - 11) + '" width="' + w + '" height="14" rx="3" fill="var(--bg)" fill-opacity=".94"/>';
+      const lead = it.lead && Math.abs(it.y - it.mid) > 3
+        ? '<line x1="514" y1="' + it.mid + '" x2="517" y2="' + it.y + '" stroke="' + it.col + '" stroke-opacity=".5" stroke-width="1"/>'
+        : '';
+      return bg + lead + '<text x="518" y="' + it.y + '" fill="' + it.col + '" font-size="11" font-family="sans-serif">' + alEsc(it.text) + '</text>';
+    }).join('');
+  }
+  function tag(px, py, text, col, anchor) {
+    return '<text x="' + px + '" y="' + py + '" fill="' + (col || 'var(--mut)') + '" font-size="11" font-family="sans-serif" text-anchor="' + (anchor || 'start') + '">' + alEsc(text) + '</text>';
+  }
+  function badge(px, py, n, col) {
+    return '<circle cx="' + px + '" cy="' + py + '" r="9" fill="' + (col || '#8b9dff') + '"/>'
+      + '<text x="' + px + '" y="' + (py + 3.5) + '" fill="#08101c" font-size="10" font-weight="700" text-anchor="middle" font-family="sans-serif">' + n + '</text>';
+  }
+  function frame(title, body, foot) {
+    return '<svg class="rb-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + alEsc(title) + '">'
+      + '<line x1="40" y1="300" x2="682" y2="300" stroke="var(--line2)" stroke-width="1"/>'
+      + '<line x1="40" y1="34" x2="40" y2="300" stroke="var(--line2)" stroke-width="1"/>'
+      + body
+      + flushLabels()
+      + '<text x="46" y="326" fill="var(--mut)" font-size="11" font-family="sans-serif">' + alEsc(foot || '') + '</text>'
+      + '</svg>';
+  }
+
+  function sweep(title, foot) {
+    const rows = [
+      [96, 94, 97, 93], [94, 92, 95, 91], [92, 90, 93, 89], [90, 88, 91, 87],
+      [88, 86, 89, 85], [86, 84, 87, 83], [84, 82, 85, 81], [82, 80, 83, 79],
+      [80, 78, 81, 77], [78, 76, 79, 75.4], [76, 75.2, 76.2, 75.2],
+      [75.2, 80, 81, 75.4], [80, 84, 85, 79.8], [84, 86, 87, 80],
+      [86, 83, 87, 82], [83, 81, 84, 80.5], [81, 78, 82, 77.8],
+      [78, 82, 84, 77.9], [82, 86, 88, 81], [86, 90, 92, 85],
+      [90, 94, 96, 89], [94, 98, 100, 93]
+    ];
+    return frame(title || 'Anatomi sweep → CHoCH/MSS → FVG → entry', candles(rows)
+      + zone(76, 80, 'FVG 76–80 · CE 78', '#5eead4')
+      + line(78, 'entry LIMIT 78', '#8b9dff')
+      + line(75, 'SL 75 · 30 pip', '#ff7b8a')
+      + line(98, 'TP2 98 · 200 pip', '#4ade9d')
+      + badge(62, 176, 1, '#ff7b8a') + tag(78, 180, 'sweep SSL 75,2', '#ff7b8a')
+      + badge(62, 208, 2) + tag(78, 212, 'CHoCH/MSS', '#4ade9d')
+      + badge(62, 240, 3) + tag(78, 244, 'displacement', '#4ade9d')
+      + badge(330, 176, 4) + tag(346, 180, 'BOS', '#4ade9d')
+      + badge(330, 208, 5) + tag(346, 212, 'retest FVG', '#5eead4')
+      + badge(330, 240, 6) + tag(346, 244, 'LIMIT 50%', '#8b9dff'),
+      foot || 'Urutan: POI HTF → sweep → CHoCH/MSS + displacement → FVG/OB → retrace 50% → LIMIT. Entry bukan di titik sweep.');
+  }
+
+  function ob() {
+    const rows = [
+      [96, 94, 97, 93], [94, 92, 95, 91], [92, 90, 93, 89], [90, 88, 91, 87],
+      [88, 86, 89, 85], [86, 84, 87, 83], [84, 82, 85, 81], [82, 80, 83, 79],
+      [80, 78, 81, 77.2], [78, 86, 88, 77.5], [86, 84, 87, 83], [84, 82, 85, 81],
+      [82, 80, 83, 79.5], [80, 86, 88, 79.8], [86, 90, 92, 85], [90, 94, 96, 89]
+    ];
+    return frame('Anatomi order block (OB) retest', candles(rows)
+      + zone(77.2, 81, 'OB 77–81 · entry 50%', '#5eead4')
+      + line(79, 'entry LIMIT 79', '#8b9dff')
+      + line(76, 'SL 76 · 30 pip', '#ff7b8a')
+      + line(99, 'TP2 99 · 200 pip', '#4ade9d')
+      + tag(70, 270, 'candle bearish terakhir', '#ff7b8a')
+      + tag(126, 190, 'impulse meninggalkan OB', '#4ade9d')
+      + tag(236, 286, 'retest 50% OB', '#5eead4')
+      + tag(360, 258, 'SL di luar OB · TP likuiditas', '#8b9dff'),
+      'OB = candle berlawanan terakhir sebelum impuls. Entry di 50% OB atau retest pertama; SL 30 pip harus di luar OB.');
+  }
+
+  function premium() {
+    const rows = fromCloses([70, 74, 78, 82, 86, 90, 94, 98, 102, 106, 108, 104, 100, 96, 92, 88, 84, 80, 76, 72, 76, 82, 88, 94, 100, 106]);
+    return frame('Premium / discount, dealing range & OTE', candles(rows)
+      + line(110, 'range high 110', '#8b9dff')
+      + line(70, 'range low 70', '#8b9dff')
+      + line(90, 'EQ 50%', 'var(--mut)')
+      + line(100, 'roadblock 100', 'var(--warn)')
+      + zone(85, 92, 'OTE 62–79% · discount BUY', '#5eead4')
+      + line(88, 'entry BUY 88', '#8b9dff')
+      + line(85, 'SL 85 · 30 pip', '#ff7b8a')
+      + line(108, 'TP2 108 · 200 pip', '#4ade9d')
+      + tag(46, 48, 'premium > 50% → fokus jual', '#ff7b8a')
+      + tag(66, 250, 'discount < 50% → beli', '#4ade9d'),
+      'BELI hanya di discount (entry ≤50% range), JUAL hanya di premium (entry ≥50%). OTE 62–79% adalah zona entry, bukan sinyal reversal.');
+  }
+
+  function bos() {
+    const rows = fromCloses([70, 72, 74, 76, 78, 80, 78, 76, 78, 82, 84, 86, 84, 82, 84, 88, 92, 96]);
+    return frame('BOS, break & retest, third touch', candles(rows)
+      + line(81, 'level BOS 81', '#8b9dff')
+      + line(82, 'entry retest 82', '#8b9dff')
+      + line(79, 'SL 79 · 30 pip', '#ff7b8a')
+      + line(102, 'TP2 102 · 200 pip', '#4ade9d')
+      + tag(96, 200, 'BOS searah tren', '#4ade9d')
+      + tag(214, 246, 'retest = sentuhan ketiga', '#5eead4'),
+      'BOS meneruskan tren; entry di retest level BOS/FVG, bukan di breakout pertama. Failed break = close kembali ke sisi lama.');
+  }
+
+  function qm() {
+    const rows = fromCloses([92, 90, 88, 86, 84, 82, 80, 82, 86, 88, 84, 80, 78, 82, 86, 90, 86, 82, 80, 84, 88, 92, 96, 100]);
+    return frame('Quasimodo (QM) bullish & QML', candles(rows)
+      + line(88, 'neckline / return 88', '#8b9dff')
+      + line(80, 'QML entry 80', '#5eead4')
+      + line(77, 'SL 77 · 30 pip', '#ff7b8a')
+      + line(100, 'TP2 100 · 200 pip', '#4ade9d')
+      + tag(62, 240, 'left shoulder 80', '#8b9dff')
+      + tag(150, 286, 'head 78', '#ff7b8a')
+      + tag(300, 250, 'QML retest', '#5eead4'),
+      'QM: left shoulder → head → return → structure break. Entry di level left shoulder (QML), SL di luar head, TP likuiditas berikutnya.');
+  }
+
+  function crt() {
+    const rows = fromCloses([84, 86, 88, 90, 92, 90, 88, 86, 84, 82, 80, 78, 76.5, 75.2, 80, 84, 82, 80, 84, 88, 92, 96, 100, 104]);
+    return frame('CRT / Judas: sapuan range acuan', candles(rows)
+      + zone(76, 104, 'range acuan (D1/H4/Asia)', '#8b9dff')
+      + line(80, 'entry FVG 80', '#8b9dff')
+      + line(77, 'SL 77 · 30 pip', '#ff7b8a')
+      + line(100, 'TP2 100 · 200 pip', '#4ade9d')
+      + tag(120, 288, 'sweep low 75,2', '#ff7b8a')
+      + tag(214, 252, 'MSS + FVG', '#4ade9d')
+      + tag(340, 236, 'target sisi berlawanan range', '#4ade9d'),
+      'CRT/Judas: high/low candle acuan adalah kolam likuiditas. Tunggu satu sisi disapu, MSS M15/M5, lalu entry di FVG/OB — bukan di titik sapuan.');
+  }
+
+  function ocl() {
+    const rows = fromCloses([80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 96, 94, 92, 90, 88, 86, 88, 90, 92, 94, 96, 98, 100, 104, 108, 110]);
+    return frame('OCL / band close–open MSNR', candles(rows)
+      + zone(88, 90, 'band OCL 88–90', '#5eead4')
+      + line(89, 'entry retest 89', '#8b9dff')
+      + line(86, 'SL 86 · 30 pip', '#ff7b8a')
+      + line(109, 'TP2 109 · 200 pip', '#4ade9d')
+      + tag(60, 292, 'touch', '#5eead4')
+      + tag(180, 236, 'miss: balik sebelum level', 'var(--mut)')
+      + tag(300, 210, 'fresh retest', '#4ade9d'),
+      'OCL = pertemuan close dan open candle berikutnya. Sentuhan sah di tepi band; break baru sah bila close melewati tepi jauh.');
+  }
+
+  function smt() {
+    const body = '<rect x="40" y="42" width="642" height="104" rx="6" fill="#4ade9d" fill-opacity=".05" stroke="var(--line2)"/>'
+      + '<polyline points="60,128 120,108 180,132 240,112 300,84 360,98 420,62" fill="none" stroke="#4ade9d" stroke-width="2"/>'
+      + tag(430, 66, 'XAUUSD: higher high', '#4ade9d')
+      + '<rect x="40" y="170" width="642" height="104" rx="6" fill="#ff7b8a" fill-opacity=".05" stroke="var(--line2)"/>'
+      + '<polyline points="60,196 120,214 180,190 240,208 300,230 360,214 420,238" fill="none" stroke="#ff7b8a" stroke-width="2"/>'
+      + tag(430, 242, 'DXY: lower high', '#ff7b8a')
+      + tag(60, 286, 'SMT divergence → tunggu MSS M5 → entry FVG; SL 30 pip; TP2 200 pip.', 'var(--mut)');
+    return frame('SMT divergence: emas vs DXY / yield', body, 'Divergensi hanya petunjuk; entry tetap menunggu MSS/CHoCH + FVG/OB. Jangan entry hanya karena dua chart berbeda.');
+  }
+
+  function risk() {
+    const sy = function (v) { return Math.round((280 - (v - 3490) * 6.3) * 10) / 10; };
+    const body = '<line x1="60" y1="' + sy(3520) + '" x2="500" y2="' + sy(3520) + '" stroke="#4ade9d" stroke-width="1.4" stroke-dasharray="5 4"/>'
+      + '<text x="508" y="' + (sy(3520) + 4) + '" fill="#4ade9d" font-size="12" font-family="sans-serif">TP2 3520 · +200 pip</text>'
+      + '<line x1="60" y1="' + sy(3500) + '" x2="500" y2="' + sy(3500) + '" stroke="#8b9dff" stroke-width="1.4"/>'
+      + '<text x="508" y="' + (sy(3500) + 4) + '" fill="#8b9dff" font-size="12" font-family="sans-serif">entry LIMIT 3500</text>'
+      + '<line x1="60" y1="' + sy(3497) + '" x2="500" y2="' + sy(3497) + '" stroke="#ff7b8a" stroke-width="1.4" stroke-dasharray="5 4"/>'
+      + '<text x="508" y="' + (sy(3497) + 4) + '" fill="#ff7b8a" font-size="12" font-family="sans-serif">SL 3497 · 30 pip</text>'
+      + '<rect x="60" y="128" width="280" height="64" rx="8" fill="var(--bg)" stroke="var(--line2)"/>'
+      + '<text x="72" y="152" fill="var(--tx)" font-size="12" font-weight="700" font-family="sans-serif">R:R = 200 / 30 = 1:6,7</text>'
+      + '<text x="72" y="172" fill="var(--mut)" font-size="11" font-family="sans-serif">lot = risiko $ ÷ (30 pip × nilai pip per lot)</text>'
+      + '<rect x="360" y="128" width="322" height="64" rx="8" fill="var(--bg)" stroke="var(--line2)"/>'
+      + '<text x="372" y="152" fill="var(--tx)" font-size="12" font-weight="700" font-family="sans-serif">Risiko 0,5–1% ekuitas</text>'
+      + '<text x="372" y="172" fill="var(--mut)" font-size="11" font-family="sans-serif">SL 30 pip tidak dilebarkan; TP2 minimal 200 pip.</text>';
+    return frame('Menempatkan entry, SL, dan TP secara presisi', body, 'Entry selalu LIMIT di POI. Jika level invalidasi struktur lebih dari 30 pip, tunggu entry lebih dekat atau batalkan — jangan melebarkan SL.');
+  }
+
+  function ipda() {
+    const rows = fromCloses([88, 90, 88, 86, 88, 90, 92, 90, 88, 86, 88, 90, 88, 86, 84, 82, 80, 78, 76, 80, 84, 88, 92, 96, 100, 104, 108]);
+    return frame('IPDA / Power of Three: accumulation → manipulation → distribution', candles(rows)
+      + zone(80, 96, 'accumulation (range)', '#8b9dff')
+      + line(76, 'manipulation / sweep 76', '#ff7b8a')
+      + line(108, 'distribution → DOL 108', '#4ade9d')
+      + tag(64, 214, 'accumulation', '#8b9dff')
+      + tag(150, 292, 'manipulation', '#ff7b8a')
+      + tag(300, 180, 'distribution', '#4ade9d'),
+      'Power of Three: range (accumulation) → sapuan (manipulation) → arah (distribution). Entry setelah manipulation selesai dan MSS/FVG muncul.');
+  }
+
+  function engulfing() {
+    const rows = [
+      [90, 88, 91, 87], [88, 86, 89, 85], [86, 84, 87, 83], [84, 82, 85, 81],
+      [82, 80, 83, 79], [80, 78, 81, 77.5], [78, 84, 86, 77.8], [84, 82, 85, 81],
+      [82, 80, 83, 79.5], [80, 86, 88, 79.8], [86, 90, 92, 85], [90, 94, 96, 89],
+      [94, 98, 100, 93], [98, 102, 104, 97]
+    ];
+    return frame('Engulfing zone di SBR/RBS', candles(rows)
+      + zone(78, 84, 'engulfing zone 78–84', '#5eead4')
+      + line(81, 'entry 50% 81', '#8b9dff')
+      + line(78, 'SL 78 · 30 pip', '#ff7b8a')
+      + line(101, 'TP2 101 · 200 pip', '#4ade9d')
+      + tag(96, 232, 'bearish candle', '#ff7b8a')
+      + tag(200, 196, 'bullish engulfing', '#4ade9d')
+      + tag(260, 272, 'retest 50% candle', '#5eead4'),
+      'Engulfing = candle bullish menelan body candle bearish sebelumnya. Entry di retest 50% candle engulfing; SL 30 pip di luar low; dua kali gagal = buang zona.');
+  }
+
+  function breaker() {
+    const rows = fromCloses([96, 94, 92, 90, 88, 86, 84, 82, 84, 88, 92, 90, 90, 94, 98, 102, 106, 110]);
+    return frame('Breaker block setelah struktur berubah', candles(rows)
+      + zone(88, 92, 'breaker 88–92 (OB gagal)', '#5eead4')
+      + line(90, 'entry retest 90', '#8b9dff')
+      + line(87, 'SL 87 · 30 pip', '#ff7b8a')
+      + line(110, 'TP2 110 · 200 pip', '#4ade9d')
+      + tag(60, 262, 'OB bearish gagal', '#ff7b8a')
+      + tag(180, 214, 'break di atas OB', '#4ade9d')
+      + tag(300, 240, 'retest dari atas', '#5eead4'),
+      'Breaker = order block yang gagal lalu dipakai dari arah berlawanan. Entry di retest breaker setelah BOS/MSS; SL 30 pip di luar breaker.');
+  }
+
+  function third() {
+    const rows = fromCloses([86, 84, 82, 80, 82, 84, 82, 80, 82, 86, 84, 82, 80, 82, 86, 90, 94, 98, 102]);
+    return frame('Third touch + konfluensi HTF', candles(rows)
+      + line(80, 'level support 80', '#8b9dff')
+      + line(81, 'entry 81', '#5eead4')
+      + line(78, 'SL 78 · 30 pip', '#ff7b8a')
+      + line(101, 'TP2 101 · 200 pip', '#4ade9d')
+      + tag(70, 276, 'touch 1', 'var(--mut)')
+      + tag(160, 276, 'touch 2', 'var(--mut)')
+      + tag(240, 276, 'touch 3 → entry', '#4ade9d'),
+      'Sentuhan ketiga yang masih fresh dan searah storyline adalah kandidat entry. Entry setelah candle reaksi; SL 30 pip di luar band; TP external liquidity.');
+  }
+
+  return { sweep: sweep, flow: function () { return sweep('Alur gabungan: arah → POI → sweep → MSS → FVG → LIMIT', 'Enam langkah yang sama dipakai mesin Signal: HTF → POI → sweep → MSS/CHoCH → FVG/OB → LIMIT. SL 30 pip, TP2 ≥200 pip.'); }, ob: ob, premium: premium, bos: bos, qm: qm, crt: crt, ocl: ocl, smt: smt, risk: risk, ipda: ipda, engulfing: engulfing, breaker: breaker, third: third };
+})();
+
+const ALCH_SVG_MAP = {
+  sweep: 'sweep', silver: 'sweep', ob: 'ob', breaker: 'breaker', engulfing: 'engulfing',
+  premium: 'premium', ote: 'premium', bos: 'bos', third: 'third', qm: 'qm',
+  crt: 'crt', judas: 'crt', ocl: 'ocl', smt: 'smt', macro: 'smt',
+  ipda: 'ipda', risk: 'risk', execution: 'risk'
+};
+function alSvgFor(key) {
+  const fn = ALCH_SVG[ALCH_SVG_MAP[key] || 'sweep'];
+  return typeof fn === 'function' ? fn() : ALCH_SVG.sweep();
+}
+function alCaseSvg(key) {
+  return '<div class="rb-term-chart">' + alSvgFor(key) + '</div>';
+}
+/* Tab Istilah memuat 18 chart. Placeholder dulu; SVG baru dibuat saat
+   section-nya terlihat sehingga tab tetap ringan. */
+function alCaseChartSlot(key) {
+  return '<div class="rb-term-chart" data-alch-chart="' + alEsc(key) + '" aria-busy="true"></div>';
+}
+let ALCH_CHART_TICK = 0, ALCH_CHART_BOUND = false, ALCH_CHART_POLL = 0;
+function alTermDraw(el) {
+  if (!el || el.getAttribute('data-alch-on')) return;
+  el.setAttribute('data-alch-on', '1');
+  el.innerHTML = alSvgFor(el.getAttribute('data-alch-chart'));
+  el.removeAttribute('aria-busy');
+}
+function alTermPaintVisible() {
+  ALCH_CHART_TICK = 0;
+  const vh = window.innerHeight || 800;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-alch-chart]:not([data-alch-on])'), function (el) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom > -400 && r.top < vh + 400) alTermDraw(el);
+  });
+}
+function alTermSchedule() {
+  if (ALCH_CHART_TICK) return;
+  /* setTimeout, bukan requestAnimationFrame: tetap jalan saat tab/panel
+     tidak aktif atau tidak menggambar frame. */
+  ALCH_CHART_TICK = setTimeout(alTermPaintVisible, 60);
+}
+function alTermMount() {
+  if (!document.querySelector('[data-alch-chart]:not([data-alch-on])')) return;
+  if (!ALCH_CHART_BOUND) {
+    ALCH_CHART_BOUND = true;
+    document.addEventListener('scroll', alTermSchedule, true);
+    window.addEventListener('resize', alTermSchedule);
+  }
+  alTermPaintVisible();
+  setTimeout(alTermPaintVisible, 250);
+  /* Jaring pengaman: sebagian browser/panel tidak mengirim event scroll
+     (mis. render ditunda). Polling ringan berhenti sendiri setelah semua
+     chart tergambar atau tab ditinggalkan. */
+  if (!ALCH_CHART_POLL) {
+    ALCH_CHART_POLL = setInterval(function () {
+      if (!document.querySelector('[data-alch-chart]:not([data-alch-on])')) {
+        clearInterval(ALCH_CHART_POLL);
+        ALCH_CHART_POLL = 0;
+        return;
+      }
+      alTermPaintVisible();
+    }, 500);
+  }
+}
+
+function alEntryGuideHtml() {
+  const steps = [
+    ['1. Arah HTF', 'D1/H4: BOS searah tren atau CHoCH yang disertai displacement. Hasilnya hanya satu arah: BUY atau SELL.'],
+    ['2. POI', 'Tandai OB/FVG H4/H1 yang fresh. Untuk BUY, harga entry harus di discount (≤50% dealing range); untuk SELL di premium (≥50%).'],
+    ['3. Sweep', 'Tunggu EQH/EQL, PDH/PDL, PWH/PWL, atau high/low sesi disapu. Sweep adalah bahan bakar, bukan sinyal entry.'],
+    ['4. Konfirmasi', 'CHoCH/MSS di M15/M5 + displacement (body besar, meninggalkan FVG). Tanpa displacement, setup belum sah.'],
+    ['5. Zona entry', 'Tandai FVG/OB dari dorongan tersebut. Entry di 50% FVG (CE) atau proximal OB — bukan di tengah range.'],
+    ['6. LIMIT + SL/TP', 'Pasang LIMIT di zona. SL 30 pip di luar struktur; TP2 minimal 200 pip; R:R minimal 1:2. Jangan market chase.'],
+    ['7. Batal', 'M5 close melewati zona, sweep gagal, tidak ada retrace, spread melebar, atau rilis High impact ≤30 menit.']
+  ];
+  const rules = [
+    ['SL 30 pip', 'Tidak diubah. Jika level invalidasi struktur lebih dari 30 pip, tunggu entry lebih dekat atau batalkan — jangan lebarkan SL.'],
+    ['TP2 ≥200 pip', 'TP2 tetap minimal 200 pip; TPmax ke likuiditas nyata (EQL/EQH, PDH/PDL, PWH/PWL, sesi).'],
+    ['R:R ≥1:2', 'Dengan SL 30 dan TP2 200, R:R = 1:6,7. Jika TP2 tidak mencapai 200 pip, setup tidak dipakai.'],
+    ['Risiko 0,5–1%', 'Lot dihitung dari jarak SL, bukan dari target. Jangan menambah lot setelah rugi.'],
+    ['Konfluensi ≥3', 'HTF + POI + sweep/MSS + FVG/OB. Kurang dari tiga alasan independen = tunggu.'],
+    ['News blackout', 'Tidak entry 30 menit sebelum/sesudah rilis High impact (CPI/NFP/PPI/FOMC).']
+  ];
+  return '<div class="card"><div class="rb-card-head"><h3>🧩 Gabungkan semua istilah → satu entry valid</h3><span class="rb-pill">Alchemist</span></div>'
+    + '<div class="rb-note">Urutan ini sama dengan mesin Signal Entry: <b>arah dulu, level kedua, entry terakhir</b>. Timeframe kecil hanya mempertajam entry; tidak boleh melawan bias D1/H4.</div>'
+    + ALCH_SVG.flow()
+    + alSteps(steps)
+    + '<div class="rb-term-rules">' + rules.map(function (r) { return '<div class="rb-term-rule"><b>' + alEsc(r[0]) + '</b>' + alEsc(r[1]) + '</div>'; }).join('') + '</div>'
+    + '<div class="rb-callout warn" style="margin-top:10px"><b>Aturan entry paling penting:</b> LIMIT di 50% FVG atau proximal OB, SL 30 pip di luar struktur, TP2 ≥200 pip. Jika invalidasi struktur lebih jauh dari 30 pip, jangan paksakan — tunggu entry yang lebih dekat.</div></div>';
+}
+
+function alRealChartsHtml() {
+  const figures = [
+    ['metode%20amd.jpg', 'AMD / Power of Three — XAUUSD 30m', 'Chart nyata: <b>Accumulation</b> (range) → <b>Manipulation</b> (sapuan) → <b>Distribution</b> (arah). Ini dasar IPDA/Po3 dan CRT.'],
+    ['metode%20ict%20simple.jpg', 'BOS, CHoCH, likuiditas — XAUUSD 15m', 'Chart nyata: <b>BOS</b> searah tren, <b>CHoCH</b> saat struktur berubah, dan <b>liquidity</b> di high/low. Perhatikan urutan break-nya.'],
+    ['metode%20entry%20m5.jpg', 'Peta timeframe dari materi Anda', '1D–4H: direction, liquidity, supply/demand. 1H–15m: trend, breakout, reversal, OB, FVG, liquidity. 5m–1m: confirmation dan entry.']
+  ];
+  return '<div class="card"><div class="rb-card-head"><h3>📸 Contoh chart nyata</h3><span class="rb-pill">materi XAUUSD</span></div>'
+    + '<div class="rb-note">Tiga gambar dari materi Anda, bukan chart karangan. Gunakan untuk mencocokkan istilah dengan bentuk candle sebenarnya; chart live ada di tombol setiap kelompok istilah.</div>'
+    + '<div class="rb-term-gallery">' + figures.map(function (f) {
+      return '<figure class="rb-term-photo"><img src="' + f[0] + '" alt="' + alEsc(f[1]) + '" loading="lazy"><figcaption><b>' + alEsc(f[1]) + '</b><br>' + f[2] + '</figcaption></figure>';
+    }).join('') + '</div></div>';
+}
+
+function alTermsHtml() {
+  const q = rb26Norm(ALCH.term);
+  const groups = new Map();
+  ALCH_TERMS.forEach(function (t, i) {
+    if (q && rb26Norm(t.join(' ')).indexOf(q) < 0) return;
+    const key = alTermCase(t).key;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ t: t, i: i });
+  });
+  const order = ['sweep', 'ob', 'premium', 'bos', 'qm', 'crt', 'ocl', 'smt', 'ipda', 'risk', 'execution', 'macro', 'third', 'breaker', 'ote', 'judas', 'silver', 'engulfing'];
+  const keys = order.filter(function (k) { return groups.has(k); });
+  groups.forEach(function (_, k) { if (order.indexOf(k) < 0) keys.push(k); });
+  const index = keys.map(function (k) {
+    const c = ALCH_CHART_CASES[k] || ALCH_CHART_CASES.sweep;
+    return '<button type="button" class="x" onclick="document.getElementById(\'alchsec-' + k + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + alEsc(c.title.split('·')[0].trim()) + '</button>';
+  }).join('');
+  const sections = keys.map(function (k) {
+    const c = ALCH_CHART_CASES[k] || ALCH_CHART_CASES.sweep;
+    const rows = groups.get(k);
+    const first = rows[0].i;
+    return '<section class="card rb-term-sec" id="alchsec-' + k + '">'
+      + '<div class="rb-card-head"><h3>' + alEsc(c.title) + '</h3><span class="rb-pill">' + alEsc(c.tf) + ' · ' + rows.length + ' istilah</span></div>'
+      + alCaseChartSlot(k)
+      + '<div class="rb-chart-levels"><div><span>Entry — kenapa di situ</span><b>' + alEsc(c.entry) + '</b></div><div><span>Stop loss — 30 pip</span><b>' + alEsc(c.sl) + '</b></div><div><span>Take profit — TP2 200 pip</span><b>' + alEsc(c.tp) + '</b></div></div>'
+      + '<div class="rb-note" style="margin-top:8px"><b>Alasan:</b> ' + alEsc(c.why) + '</div>'
+      + '<div class="rb-callout warn" style="margin-top:6px"><b>Invalidasi:</b> ' + alEsc(c.invalid) + '</div>'
+      + '<div class="rb-terms">' + rows.map(function (r) {
+        const t = r.t, tc = alTermCase(t);
+        return '<div class="rb-term"><span class="rb-term-abbr">' + alEsc(t[1]) + '</span><b>' + alEsc(t[0]) + '</b>'
+          + '<p>' + alEsc(t[2]) + '</p><div class="rb-term-use"><b>Dipakai:</b> ' + alEsc(t[3]) + '</div>'
+          + '<div class="small mut" style="margin-top:4px"><b>TF:</b> ' + alEsc(tc.tf) + '</div>'
+          + '<button type="button" class="x" style="margin-top:8px" onclick="alTermChart(' + r.i + ')">📈 Chart XAUUSD real-time</button></div>';
+      }).join('') + '</div>'
+      + '<button class="x" type="button" style="margin-top:8px" onclick="alTermChart(' + first + ')">📈 Buka chart real-time kelompok ini</button>'
+      + '</section>';
+  }).join('');
+  return alEntryGuideHtml() + alRealChartsHtml()
+    + '<div class="card"><div class="rb-card-head"><h3>📚 Daftar istilah (' + ALCH_TERMS.length + ')</h3><span class="rb-pill">' + keys.length + ' kelompok</span></div>'
+    + '<div class="rb-note">Cari istilah, lalu baca arti, TF pemakaian, dan chart anatominya. Setiap kelompok punya tombol chart XAUUSD real-time. Skema di bawah adalah anatomi pola; angka entry/SL/TP mengikuti mesin: SL 30 pip, TP2 ≥200 pip.</div>'
+    + '<input placeholder="Cari istilah (mis. FVG, OB, MSS, premium)..." autocomplete="off" value="' + alEsc(ALCH.term) + '" oninput="alTerm(this.value)" style="margin:8px 0">'
+    + '<div class="rb-pill-row rb-term-index">' + index + '</div></div>'
+    + (sections || '<div class="rb-muted-box">Istilah tidak ditemukan.</div>');
+}
+
 function alTvInterval(tf) {
   const s = String(tf || '').toUpperCase();
   if (/M5/.test(s)) return '5';
@@ -886,4 +1329,5 @@ function pAlchemist() {
     + '<div>' + body + '</div>'
     + '<div class="card"><h3>⚠️ Batas &amp; etika</h3><div class="rb-note">Materi ini edukasi, bukan sinyal atau saran finansial. Tidak ada strategi yang selalu benar: setiap level bisa gagal. Uji di akun demo, catat di jurnal, dan batasi risiko per trade. Sumber konsep: material publik MSNR/Alchemist, ICT/SMC, Candle Range Theory, dan Quasimodo.</div></div>';
   if (ALCH.tab === 'kalkulator' && typeof alCalc === 'function') setTimeout(alCalc, 0);
+  alTermMount();
 }
