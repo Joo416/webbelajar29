@@ -1531,11 +1531,15 @@
 
   function panelCard(j) {
     const p = j.aiPanel;
-    if (!p || !p.ok) return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">tidak tersedia</span></div><div class="warn">${XE((p && p.error) || 'Panel AI tidak memberi jawaban valid. Arah mesin tetap dipakai.')}</div></div>`;
+    if (!p || !p.total) {
+      const errs = (p && p.errors || []).slice(0, 6);
+      return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">0/${XE((p && p.attempts) || 8)} valid</span></div><div class="warn">Panel AI tidak memberi jawaban JSON valid. Arah mesin tetap dipakai; ringkasan di bawah disusun dari data mesin.</div>${errs.length ? `<div class="small mut" style="margin-top:5px">${errs.map(x => '• ' + XE(x)).join('<br>')}</div>` : ''}</div>`;
+    }
     return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel ${XE(p.total)} AI independen</h3><span class="rb-pill y">${p.consensus === 'SPLIT' ? 'terbelah' : 'mayoritas ' + XE(p.consensus)} · ${XE(p.agreement)}%</span></div>
       <div class="small mut">${XE(p.note)} ${p.distinctProviders ? '· ' + p.distinctProviders + ' penyedia berbeda' : ''}${p.avgConfidence != null ? ' · rata-rata keyakinan ' + p.avgConfidence + '%' : ''}</div>
       <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill" style="color:var(--ok)">BUY ${p.votes.BUY}</span><span class="rb-pill" style="color:var(--no)">SELL ${p.votes.SELL}</span></div>
-      ${p.total < 8 ? `<div class="small mut" style="margin-top:4px">${p.total} dari 8 panelis menjawab; sisanya tidak tersedia saat ini. Panel tetap menampilkan suara yang valid.</div>` : ''}
+      ${p.total < (p.attempts || 8) ? `<div class="small mut" style="margin-top:4px">${p.total} dari ${XE(p.attempts || 8)} panelis menjawab; ${XE(p.invalid || 0)} balasan tidak valid/terpotong. Panel tetap menampilkan suara yang valid.</div>` : ''}
+      ${(p.errors || []).length ? `<details class="exp" style="margin-top:5px;color:var(--tx)"><summary class="small" style="color:var(--warn)">Alasan ${XE(p.errors.length)} panelis gagal</summary>${p.errors.map(x => `<div class="small mut">• ${XE(x)}</div>`).join('')}</details>` : ''}
       ${p.items.map(x => `<div class="exp" style="margin-top:8px;color:var(--tx)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(x.id)} · <span style="color:${x.direction === 'BUY' ? 'var(--ok)' : 'var(--no)'}">${XE(x.direction)}</span></b><span class="small mut">${XE(x.model || x.provider)} · ${XE(x.confidence)}%</span></div>
         <div class="small" style="margin-top:3px">${XE(x.focus_read)}</div>
         ${(x.reasons || []).map(r => `<div class="small" style="margin-top:2px">• ${XE(r)}</div>`).join('')}
@@ -1550,7 +1554,9 @@
     const w = f.wire, fx = f.fx || {};
     const col = w && w.goldBias === 'BULLISH' ? 'var(--ok)' : w && w.goldBias === 'BEARISH' ? 'var(--no)' : 'var(--warn)';
     const fred = (f.macro || []).filter(x => /DFII10|DTWEXBGS|T10YIE/.test(String(x.id))).slice(0, 3);
-    return `<div class="card"><div class="rb-card-head"><h3>🌍 Fundamental XAUUSD — semua sumber</h3><span class="rb-pill ${f.ok ? 'y' : ''}">${w && w.coverage ? XE(w.coverage.distinctSources) + ' sumber · ' + XE(w.coverage.fresh24h) + ' fresh' : 'FRED + pasar'}</span></div>
+    const fk = f.focus || {};
+    return `<div class="card"><div class="rb-card-head"><h3>🌍 Fundamental XAUUSD — fokus ${XE(fk.tag || j.focus)}</h3><span class="rb-pill ${f.ok ? 'y' : ''}">${w && w.coverage ? XE(w.coverage.distinctSources) + ' sumber · ' + XE(w.coverage.fresh24h) + ' fresh' : 'FRED + pasar'}</span></div>
+      <div class="small" style="margin-top:4px"><b>Fokus:</b> ${XE(fk.title || (j.event && j.event.title) || j.focus)}. ${XE(fk.note || 'Data global adalah konteks untuk rilis fokus, bukan arah rilis lain.')}</div>
       <div class="small" style="margin-top:4px">${w ? `Wire emas/USD: <b style="color:${col}">${XE(w.goldBias)}</b> · skor ${XE(w.score)} · ${XE(w.note)}` : 'Wire emas/USD tidak tersedia; fundamental memakai FRED dan pasar.'}</div>
       <div class="small mut" style="margin-top:3px">DXY 1 jam ${fx.dxy1h == null ? '—' : (fx.dxy1h > 0 ? '+' : '') + XE(fx.dxy1h) + '%'} · Yield 10Y 1 jam ${fx.yield10_1h == null ? '—' : (fx.yield10_1h > 0 ? '+' : '') + XE(fx.yield10_1h) + ' pp'} · Emas 1 jam ${fx.gold1hPips == null ? '—' : (fx.gold1hPips > 0 ? '+' : '') + XE(fx.gold1hPips) + ' pip'}</div>
       ${fred.map(x => `<div class="item"><span>${XE(x.label)} <span class="small mut">${XE(x.date)} · ${XE(x.source)}</span></span><span><b>${XE(x.value)}${XE(x.unit)}</b> <span class="small" style="color:${x.chg5 == null ? 'var(--mut)' : x.chg5 >= 0 ? 'var(--ok)' : 'var(--no)'}">${x.chg5 == null ? '' : '5 obs ' + (x.chg5 > 0 ? '+' : '') + XE(x.chg5) + XE(x.unit)}</span></span></div>`).join('')}
@@ -1603,6 +1609,7 @@
       </div>
       <div class="small" style="margin-top:7px">${e.actualOfficial != null ? `✅ Angka resmi: <b>${XE(e.actualOfficial)}</b> <span class="mut">· ${XE(e.actualSource || 'FRED')} · periode ${XE(e.officialPeriod || '—')}</span>` : released && e.actual ? `Aktual kalender: <b>${XE(e.actual)}</b>${e.period ? ' · periode ' + XE(e.period) : ''}` : '<span class="mut">Belum ada angka aktual resmi untuk rilis ini.</span>'}</div>
       ${e.actualPending ? `<div class="warn" style="margin-top:8px">Angka aktual rilis ini belum keluar. Arah di bawah adalah prakiraan pra-rilis dari data terakhir + pasar, bukan hasil rilis.</div>` : ''}
+      ${(e.related || []).length ? `<div class="small" style="margin-top:6px;color:var(--warn)"><b>Komponen fokus ${XE(e.tag || j.focus)} pada jam yang sama:</b> ${e.related.map(x => XE(x.title) + (x.forecast ? ' (konsensus ' + XE(x.forecast) + ')' : '')).join(' · ')}. Ini bagian dari fokus yang dipilih, bukan rilis kedua.</div>` : ''}
       ${e.lastRelease ? `<div class="exp" style="margin-top:8px;color:var(--tx)"><b>📊 Data rilis terakhir</b> <span class="small mut">${e.lastRelease.when ? when(e.lastRelease.when) : ''}${e.lastRelease.source ? ' · ' + XE(e.lastRelease.source) : ''}</span>
         <div class="small" style="margin-top:3px">Aktual <b>${XE(e.lastRelease.actual || '—')}</b>${e.lastRelease.unit ? ' ' + XE(e.lastRelease.unit) : ''} · konsensus ${XE(e.lastRelease.forecast || '—')} · sebelumnya ${XE(e.lastRelease.previous || '—')}</div>
         ${lrDir ? `<div class="small mut">Arah data terakhir: ${lrDir} (bukan aktual rilis berikutnya).</div>` : ''}
@@ -1645,10 +1652,39 @@
       <div class="small mut" style="margin-top:7px">Arah rilis berikutnya masih pra-rilis selama aktualnya belum terbit; panel AI dan data resmi tidak boleh dianggap sebagai hasil rilis.</div></div>`;
   }
 
+  /* Checklist rilis: komponen yang benar-benar dihitung, proxy pra-rilis,
+     respons pasar, dan sumber primer. Tidak ada baris yang diisi angka baru. */
+  function releaseCard(j) {
+    const r = j.release;
+    if (!r) return '';
+    const g = r.guide || {};
+    const c = r.coverage || {};
+    const w = r.watch || {};
+    const cOk = Number(c.ok) || 0, cTot = Number(c.total) || 0;
+    const fmt = x => x == null ? '—' : XE(x);
+    const n1 = (v, u) => v == null ? '—' : (v > 0 ? '+' : '') + XE(v) + XE(u || '');
+    return `<div class="card"><div class="rb-card-head"><h3>🧪 Checklist rilis ${XE(r.tag || j.focus)}</h3><span class="rb-pill ${c.pct >= 70 ? 'y' : ''}">${cOk}/${cTot} komponen · ${XE(c.pct || 0)}%</span></div>
+      <div class="small mut">${XE(r.note || '')}</div>
+      ${(g.read || []).length ? `<div style="margin-top:8px"><b class="small">Urutan baca rilis</b>${g.read.map((x, i) => `<div class="small" style="margin-top:2px">${i + 1}. ${XE(x)}</div>`).join('')}</div>` : ''}
+      <div style="margin-top:9px"><b class="small">Komponen terhitung (FRED/BLS)</b>${(r.components || []).map(x => `<div class="item"><span>${x.ok ? '✅' : '⚠️'} ${XE(x.k)} <span class="small mut">${XE(x.source)} · ${XE(x.period || '—')}</span></span><span style="text-align:right"><b>${fmt(x.value)}${XE(x.unit || '')}</b><div class="small mut">prev ${fmt(x.prev)}${x.change == null ? '' : ' · Δ ' + (x.change > 0 ? '+' : '') + XE(x.change)}</div></span></div>`).join('') || '<div class="small mut">Belum ada komponen yang terbaca.</div>'}</div>
+      ${(r.pre || []).length ? `<div style="margin-top:9px"><b class="small">Data sebelum rilis</b>${r.pre.map(x => `<div class="item"><span>${x.ok ? '✅' : '⚠️'} ${x.url ? `<a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.k)}</a>` : XE(x.k)}${x.manual ? ' <span class="small mut">(cek manual)</span>' : ''}<div class="small mut">${XE(x.d)}</div></span><span class="small mut" style="text-align:right">${XE(x.source)}</span></div>`).join('')}</div>` : ''}
+      <div style="margin-top:9px"><b class="small">Respons pasar (XAUUSD, DXY, yield, riil)</b>
+        <div class="small" style="color:${w.state === 'MENDUKUNG' ? 'var(--ok)' : w.state === 'MELAWAN' ? 'var(--no)' : 'var(--warn)'}"><b>${XE(w.state || 'BELUM CUKUP')}</b> · emas 1j ${n1(w.gold && w.gold.h1Pips, ' pip')} · emas 1d ${n1(w.gold && w.gold.d1Pct, '%')} · DXY 1j ${n1(w.dxy && w.dxy.h1Pct, '%')} · yield 10Y 1j ${n1(w.us10 && w.us10.h1Pp, ' pp')}${w.real ? ' · yield riil ' + XE(w.real.value) + '% (5 obs ' + n1(w.real.chg5, ' pp') + ')' : ''}</div>
+        <div class="small mut">${XE(w.note || '')}</div></div>
+      ${(g.rules || []).length ? `<div style="margin-top:9px"><b class="small">Aturan tafsir</b>${g.rules.map(x => `<div class="small" style="margin-top:2px">• ${XE(x)}</div>`).join('')}</div>` : ''}
+      ${(g.reaction || []).length ? `<div class="small mut" style="margin-top:6px"><b>Yang harus mengonfirmasi:</b> ${XE(g.reaction.join(' · '))}</div>` : ''}
+      ${(r.sources || []).length ? `<details class="exp" style="margin-top:8px;color:var(--tx)"><summary class="small"><b>Sumber primer rilis (${r.sources.length})</b></summary>${r.sources.map(x => `<div class="small" style="margin-top:3px"><a href="${XE(x.url)}" target="_blank" rel="noopener" style="color:var(--b)">${XE(x.name)}</a> — ${XE(x.use)}</div>`).join('')}</details>` : ''}
+      <div class="small mut" style="margin-top:6px">Checklist ini hanya untuk rilis fokus ${XE(r.tag || j.focus)}; rilis lain di jam yang sama tetap risiko gabungan, bukan arah kedua.</div></div>`;
+  }
+
   function docCard(j) {
     const d = j.doc;
-    if (!d) return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan AI</h3><span class="rb-pill">${j.ai && j.ai.ok ? 'AI siap' : 'AI tidak tersedia'}</span></div><div class="warn">${j.ai && j.ai.ok ? 'AI tidak mengirim dokumen valid.' : 'AI gagal: ' + XE((j.ai && j.ai.error) || 'tidak ada key aktif') + '. Arah & spike tetap dihitung mesin dari data.'}</div></div>`;
-    return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan AI</h3><span class="rb-pill">${XE((j.ai && j.ai.provider) || 'AI')}</span></div>
+    const ai = j.ai || {};
+    if (!d) return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan AI</h3><span class="rb-pill">${ai.ok ? 'AI siap' : 'AI tidak tersedia'}</span></div><div class="warn">${ai.ok ? 'AI tidak mengirim dokumen valid.' : 'AI gagal: ' + XE(ai.error || 'tidak ada key aktif') + '. Arah & spike tetap dihitung mesin dari data.'}</div></div>`;
+    const fallback = !!(ai.fallback || d.fallback);
+    return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan ${fallback ? 'mesin' : 'AI'}</h3><span class="rb-pill ${fallback ? '' : 'y'}">${fallback ? 'fallback deterministik' : XE(ai.provider || 'AI')}</span></div>
+      ${fallback ? `<div class="warn" style="margin-bottom:8px">⚠️ AI gagal memberi JSON valid: ${XE(ai.error || d.fallback_reason || 'balasan tidak valid')}. Ringkasan ini disusun mesin dari data yang sama; tidak ada angka atau arah baru. Panel AI di atas menunjukkan penyedia yang gagal.</div>` : ''}
+      ${!fallback && ai.repaired ? `<div class="small" style="color:var(--warn);margin-bottom:6px">Jawaban AI terpotong dan berhasil diperbaiki parser; periksa angka penting di panel Validitas.</div>` : ''}
       <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;line-height:1.35;margin-bottom:6px">${XE(d.headline || '')}</div>
       <div class="exp" style="color:var(--tx);line-height:1.6">${XE(d.summary || '')}</div>
       ${d.focus_what ? `<div style="margin-top:8px"><b class="small">Apa yang diukur</b><div class="small" style="line-height:1.55">${XE(d.focus_what)}</div></div>` : ''}
@@ -1702,7 +1738,8 @@
     const pa = j.priceAudit || {};
     return `<div class="card"><div class="rb-card-head"><h3>✅ Validitas & sumber</h3>${q ? `<span class="rb-pill ${q.score >= 80 ? 'y' : ''}">${XE(q.score)}% sumber siap</span>` : ''}</div>
       <div class="rb-note">Setiap angka punya sumber dan periode. Data resmi (FRED/BLS/BEA/Treasury) dipisahkan dari kalender agregator.</div>
-      ${q ? `<div style="margin-top:6px">${q.checks.map(c => `<div class="item"><span>${c.ok ? '✅' : '⚠️'} ${XE(c.k)}</span></div>`).join('')}</div>` : ''}
+      ${q ? `<div style="margin-top:6px">${q.checks.map(c => `<div class="item"><span>${c.ok ? '✅' : '⚠️'} ${XE(c.k)}${c.d ? `<div class="small mut">${XE(c.d)}</div>` : ''}</span></div>`).join('')}</div>` : ''}
+      ${pa.freshMinutes != null && pa.freshMinutes > 20 ? `<div class="warn" style="margin-top:6px">⚠️ Candle M5 terakhir ${XE(pa.freshMinutes > 120 ? Math.round(pa.freshMinutes / 60) + ' jam' : pa.freshMinutes + ' menit')} lalu. Data berita bisa tetap baru, tetapi harga/level tidak boleh disebut entry live sampai candle segar muncul.</div>` : ''}
       <div class="price-audit"><div><span>Harga acuan</span><b>${num(j.price)}</b><small>${XE(j.priceSource || '—')}</small></div><div><span>TradingView</span><b>${pa.tv ? num(pa.tv.price) : '—'}</b><small>${pa.tv ? new Date(pa.tv.at).toLocaleString('id-ID') : 'tidak tersedia'}</small></div><div><span>Spot gold-api</span><b>${pa.spot ? num(pa.spot.price) : '—'}</b><small>${pa.differencePips == null ? 'pembanding tidak tersedia' : pa.differencePips + ' pip dari TV'}</small></div><div><span>Candle</span><b>${pa.candle ? XE(pa.candle.source || '—') : '—'}</b><small>${pa.freshMinutes == null ? 'waktu tidak tersedia' : pa.freshMinutes + ' menit lalu'}</small></div></div>
       <div class="small mut" style="margin-top:6px">${XE(pa.brokerNote || '')}</div>
       ${val && val.ok ? `<div class="exp" style="color:var(--tx);margin-top:6px"><b>${XE(val.label)}</b> · nilai <b>${XE(val.value)}</b>${val.prev != null ? ' · sebelumnya ' + XE(val.prev) : ''} · periode ${XE(val.period)} <div class="small mut">${XE(val.source)}</div>${(val.extra || []).map(x => `<div class="small mut">${XE(x.metric)}: ${XE(x.latest)}${x.previous != null ? ' (sebelumnya ' + XE(x.previous) + ')' : ''}</div>`).join('')}</div>` : `<div class="warn" style="margin-top:6px">Angka resmi FRED belum terbaca: ${XE((val && val.error) || '—')}</div>`}
@@ -1745,7 +1782,7 @@
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
     if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Server mencoba ulang otomatis; data tersimpan per akun tetap dipertahankan bila sudah ada.</div></div>`; return; }
-    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
+    out.innerHTML = verdictCard(j) + timingCard(j) + releaseCompareCard(j) + eventCard(j) + releaseCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
     startNewsClock(j.event && j.event.when);
   }
 
@@ -1945,7 +1982,9 @@
     return `<div class="card" style="border-left:5px solid ${buy ? 'var(--ok)' : 'var(--no)'}">
       <div class="rb-card-head"><h3>🎯 Rencana entry M5</h3><span class="rb-pill ${p.status === 'SIAP' || p.status === 'PENDING' ? 'y' : ''}">${XE(p.status)} · ${XE(p.style)}</span></div>
       <div class="rb-pill-row" style="margin-top:8px">${modes}</div>
-      <div class="rb-pill-row" style="margin-top:6px"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">RR 1:${XE(p.rr)}</span><span class="rb-pill y">${XE(p.order || p.type)}</span>${p.entryDistancePips != null ? `<span class="rb-pill ${p.tooClose ? '' : 'y'}">Jarak ${XE(p.entryDistancePips)} pip${p.minEntryPips != null ? ' · min ' + XE(p.minEntryPips) : ''}</span>` : ''}</div>
+      <div class="rb-pill-row" style="margin-top:6px"><span class="rb-pill y">Entry M5</span><span class="rb-pill">SL 30 pip</span><span class="rb-pill">RR 1:${XE(p.rr)}</span><span class="rb-pill y">${XE(p.order || p.type)}</span><span class="rb-pill ${p.slClear === false || p.zoneWide ? '' : 'y'}">${XE(p.entryPolicy || 'PROXIMAL')} · ${p.slClear === false ? 'SL dalam zona' : 'SL di luar zona'}${p.zoneWidthPips != null ? ' · zona ' + XE(p.zoneWidthPips) + ' pip' : ''}${p.zoneWide ? ' · zona lebar' : ''}</span>${p.entryDistancePips != null ? `<span class="rb-pill ${p.tooClose ? '' : 'y'}">Jarak ${XE(p.entryDistancePips)} pip${p.minEntryPips != null ? ' · min ' + XE(p.minEntryPips) : ''}</span>` : ''}</div>
+      ${p.sequence ? `<div class="small" style="margin-top:6px;color:${p.sequence.ok ? 'var(--ok)' : 'var(--warn)'}"><b>Alur ${XE(p.sequenceModel)} ${XE(p.sequenceStatus)} (${XE(p.sequence.done)}/${XE(p.sequence.total)}):</b> ${(p.sequence.steps || []).map(x => `<span style="color:${x.ok ? 'var(--ok)' : 'var(--warn)'}">${x.ok ? '✅' : '⛔'} ${XE(x.k)}</span>`).join(' · ')}<div class="small mut" style="margin-top:2px">${XE(p.sequence.note)}</div></div>` : ''}
+      ${(p.cancel || []).length ? `<div class="small" style="margin-top:4px"><b>Aturan batal:</b> ${p.cancel.map(x => `<span style="color:${x.ok ? 'var(--ok)' : 'var(--no)'}">${x.ok ? '✅' : '⛔'} ${XE(x.k)}</span>`).join(' · ')}</div>` : ''}
       <div class="rb-lv-grid" style="margin-top:8px">
         <div class="rb-lv"><span>Entry</span><b>${num(p.entry)}</b></div>
         <div class="rb-lv"><span>SL · 30 pip</span><b style="color:var(--no)">${num(p.sl)}</b></div>
@@ -1967,7 +2006,7 @@
       <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? `<span class="rb-pill ${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin <= 10 ? 'y' : ''}">${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin > 10 ? 'Candle tertunda ' + XE(j.freshness.candleAgeMin) + ' mnt' : 'Candle TradingView real-time'}</span>` : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
       ${j.freshness ? `<div class="small mut" style="margin-top:6px">Harga ${j.freshness.priceAt ? new Date(j.freshness.priceAt).toLocaleTimeString('id-ID') : '—'} · candle M5 ${j.freshness.candleAgeMin != null ? (j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') : '—'} lalu · ${XE(j.freshness.candleSource)}</div>` : ''}
       ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Bias dominan ${XE(j.direction)} dan trigger M5 ${XE(j.m5TriggerDir || '—')} berbeda. Arah final tetap bias dominan; trigger M5 yang melawan hanya pullback, bukan alasan membalik entry. Setup ditampilkan sebagai PENDING/LIMIT sampai trigger searah — bukan entry melawan tren.</div>` : ''}
-      ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda. Semua setup berstatus TUNGGU sampai candle M5 baru muncul — bukan sinyal untuk entry sekarang.</div>` : ''}
+      ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda${j.freshness && j.freshness.candleAgeMin != null ? ' (' + XE(j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') + ')' : ''}. Status setup dipaksa TUNGGU; level hanya rencana untuk pembukaan, bukan sinyal entry sekarang.</div>` : ''}
       ${j.smcGate ? `<div class="${j.smcGate.ok ? 'small' : 'warn'}" style="margin-top:8px">${j.smcGate.ok ? '✅' : '⛔'} <b>SMC:</b> ${XE(j.smcGate.note)}${j.smcGate.ok && !j.smcGate.executable ? ' Rencana LIMIT valid tetap ditampilkan (PENDING); status SIAP menunggu syarat eksekusi.' : ''}</div>` : ''}
       ${j.eventRisk && j.eventRisk.level !== 'RENDAH' ? `<div class="warn" style="margin-top:8px">⚠️ ${XE(j.eventRisk.note)}</div>` : ''}
       ${j.adr ? `<div class="small mut" style="margin-top:6px">ADR ${XE(j.adr.avgPips)} pip · hari ini ${XE(j.adr.todayPips)} pip · sisa rata-rata ${XE(j.adr.remainingPips)} pip</div>` : ''}
@@ -2002,12 +2041,17 @@
      tidak lagi memakai alias ganda (mis. CHoCH vs CHOCH) atau singkatan yang
      bisa salah dibaca. */
   const CHART_TERMS = {
-    BOS: 'Break of Structure / RBS-SBR', CHoCH: 'Change of Character = MSS', CHOCH: 'Change of Character = MSS',
+    BOS: 'Break of Structure / RBS-SBR', CHoCH: 'Change of Character (perubahan karakter struktur)', CHOCH: 'Change of Character (perubahan karakter struktur)',
+    MSS: 'Market Structure Shift (CHoCH + displacement)',
     SWEEP: 'Liquidity sweep / sapuan SNR', FVG: 'Fair Value Gap (BISI/SIBI)', OB: 'Order Block (candle reversal terakhir)',
     SNR: 'Support/Resistance & liquidity', SND: 'Supply/Demand zone', MB: 'Mitigation block', OTE: 'Optimal Trade Entry 61.8–78.6%',
-    PDH: 'Previous Day High', PDL: 'Previous Day Low', LIQ: 'Liquidity pool', EQH: 'Equal Highs', EQL: 'Equal Lows',
+    PDH: 'Previous Day High', PDL: 'Previous Day Low', PWH: 'Previous Week High', PWL: 'Previous Week Low', LIQ: 'Liquidity pool', EQH: 'Equal Highs', EQL: 'Equal Lows',
+    BSL: 'Buy-side liquidity (di atas high penting)', SSL: 'Sell-side liquidity (di bawah low penting)', DOL: 'Draw on Liquidity — hipotesis tujuan harga',
+    LONDON: 'High/low sesi London hari ini', NY: 'High/low sesi New York hari ini',
+    KZ: 'Killzone / jendela sesi', RR: 'Rasio hasil terhadap risiko', BE: 'Break-even',
     JUDAS: 'Judas swing (manipulasi sesi)', ASIA: 'Asian range', DO: 'Daily open', WO: 'Weekly open', PD: 'Premium/Discount 50%',
     SMT: 'SMT divergence', POI: 'Point of Interest', WICK: 'Wick entry (pucuk wick M5)', FVG50: 'FVG 50% entry',
+    DISTAL: 'Entry di tepi distal zona; SL 30 pip di luar zona',
     BPR: 'Balanced Price Range', REJECT: 'Rejection block', IFVG: 'Inversion FVG', ERL: 'External Range Liquidity',
     DISP: 'Displacement', ENGULF: 'Engulfing', IDM: 'Inducement / IDM', AMD: 'AMD / Power of 3', FIB: 'Fibonacci golden ratio',
     HTF: 'Bias 1D–4H (arah, likuiditas, supply/demand)', CONFIRM: 'Konfirmasi 5m–1m (entry LIMIT)'
@@ -2046,7 +2090,7 @@
       <div class="rb-pill-row" style="margin-top:6px;align-items:center"><span class="small mut">Layer TF:</span>${['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].map(tf => `<button class="x" type="button" onclick="pChartTF('${tf}')" style="${chartTF === tf ? 'border-color:var(--b);color:var(--b)' : ''}">${tf}</button>`).join('')}<a class="x" href="https://www.tradingview.com/chart/?symbol=FOREXCOM%3AXAUUSD&interval=${chartTF === 'M1' ? '1' : chartTF === 'M15' ? '15' : chartTF === 'H1' ? '60' : chartTF === 'H4' ? '240' : chartTF === 'D1' ? 'D' : chartTF === 'W1' ? 'W' : '5'}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Buka TradingView</a></div>
       <div class="small mut" id="sigLabelNote" style="margin-top:6px">${chartLabelAll ? 'Semua ' + nAll + ' label ditampilkan; pada chart padat beberapa label bisa berdekatan.' : 'Menampilkan ' + nShow + ' dari ' + nAll + ' label: satu per istilah + TF (maks 32), lalu yang terdekat. Tombol <b>Semua label</b> membuka seluruhnya.'} Label TF lama yang di luar window ${XE(chartTF === 'ALL' ? 'M5' : chartTF)} tampil di tepi kanan sebagai label level, bukan ditempel ke candle palsu.</div>
       <div class="rb-pill-row" style="margin-top:8px">${Object.keys(types).map(t => `<span class="rb-pill" title="${XE(chartTerm(t))}">${XE(t)}${chartTerm(t) ? ' · ' + XE(chartTerm(t)) : ''} · ${types[t]}</span>`).join('')}</div>
-      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle ${XE(chartTF === 'ALL' ? 'M5' : chartTF)} dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). Semua label digambar langsung di chart halaman ini dan mengikuti harga real-time; tidak ada ekspor/download. Istilah memakai glosarium yang sama dengan mesin: BOS/RBS-SBR, CHoCH/MSS, SNR/liquidity, SND/supply-demand, OB, FVG/BISI-SIBI, OTE, PDH/PDL.</div></div>`;
+      <div class="small mut" style="margin-top:6px">Setiap istilah membawa TF asalnya (mis. <b>BOS M5</b>, <b>FVG M15</b>, <b>OB H4</b>, <b>PDH D1</b>, <b>WO W1</b>) dan titik penanda memakai timestamp candle asal dari server—bukan candle terdekat yang kebetulan menyentuh harga. Eksekusi tetap <b>entry M5</b>; HTF hanya konteks/POI. Candle ${XE(chartTF === 'ALL' ? 'M5' : chartTF)} dari ${j.freshness ? XE(j.freshness.candleSource) : 'TradingView'}; semua dihitung ulang dari candle terbaru dan di-anchor ke harga TradingView (${j.chart ? XE(j.chart.anchor) : '—'}). Semua label digambar langsung di chart halaman ini dan mengikuti harga real-time; tidak ada ekspor/download. Istilah memakai glosarium yang sama dengan mesin: BOS/RBS-SBR, CHoCH (perubahan karakter, bukan sinonim BOS), MSS (CHoCH + displacement), SNR/liquidity, SND/supply-demand, OB, FVG/BISI-SIBI, OTE, PDH/PDL.</div></div>`;
   }
 
   function marksCard(j) {
@@ -2059,8 +2103,10 @@
     const ss = j.setups || [];
     return `<div class="card"><div class="rb-card-head"><h3>🎯 ${ss.length} setup satu arah (${XE(j.direction)})</h3><span class="rb-pill">SL 30 pip</span></div>
       ${ss.map(s => `        <div class="exp" style="color:var(--tx);margin-top:6px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${XE(s.style)} · ${XE(s.dir)}</b><span class="small" style="color:${s.status === 'SIAP' ? 'var(--ok)' : s.status === 'PENDING' ? 'var(--warn)' : 'var(--mut)'}">${XE(s.status)}${s.status === 'PENDING' ? ' · limit valid' : ''}</span></div>
-        <div class="small">${XE(s.order || s.type)} · entry ${XE(s.entryTf || 'M5')} ${num(s.entry)} (${XE(s.entryMode === 'WICK' ? 'pucuk wick M5' : s.entryMode === 'FVG50' ? '50% FVG M5' : 'tepi POI M5')}) · POI ${XE(s.poiTf || '—')} · SL ${num(s.sl)} · TP2 ${num(s.tp2)} · TPmax ${num(s.tpMax)} (${XE(s.tpMaxPips)} pip)</div>
+        <div class="small">${XE(s.order || s.type)} · entry ${XE(s.entryTf || 'M5')} ${num(s.entry)} (${XE(s.entryMode === 'WICK' ? 'pucuk wick M5' : s.entryMode === 'FVG50' ? '50% FVG M5' : s.entryMode === 'DISTAL' ? 'tepi distal zona' : 'tepi POI M5')}) · POI ${XE(s.poiTf || '—')}${s.zoneWidthPips != null ? ' · zona ' + XE(s.zoneWidthPips) + ' pip' + (s.zoneWide ? ' (lebar)' : '') : ''} · SL ${num(s.sl)} (${s.slClear === false ? 'MASIH dalam zona' : 'di luar zona'}) · TP2 ${num(s.tp2)} · TPmax ${num(s.tpMax)} (${XE(s.tpMaxPips)} pip)</div>
         ${s.pattern ? `<div class="small" style="color:var(--ok)">🧩 ${XE(s.pattern.label)}</div>` : ''}
+        ${s.sequence ? `<div class="small" style="margin-top:3px;color:${s.sequence.ok ? 'var(--ok)' : 'var(--warn)'}"><b>Alur ${XE(s.sequenceModel)} ${XE(s.sequenceStatus)} (${XE(s.sequence.done)}/${XE(s.sequence.total)}):</b> ${(s.sequence.steps || []).map(x => `${x.ok ? '✅' : '⛔'} ${XE(x.k)}`).join(' · ')}</div>` : ''}
+        ${(s.cancel || []).length ? `<div class="small" style="color:${(s.cancelBlocked || []).length ? 'var(--no)' : 'var(--ok)'}"><b>${(s.cancelBlocked || []).length ? '⛔ Aturan batal dilanggar' : '✅ Aturan batal terpenuhi'}:</b> ${(s.cancelBlocked || []).length ? XE((s.cancelBlocked || []).join(' · ')) : XE((s.cancel || []).map(x => x.k).join(' · '))}</div>` : ''}
         ${(s.confluence || []).length ? `<div class="small mut">🔗 Konfluensi: ${XE((s.confluence || []).join(' · '))}</div>` : ''}
         ${s.wick ? `<div class="small" style="color:var(--warn)">📍 ${XE(s.wick.note)}</div>` : s.fvg50 ? `<div class="small" style="color:var(--warn)">📍 ${XE(s.fvg50.note)}</div>` : ''}
         ${s.statusWhy ? `<div class="small" style="color:${s.tooClose ? 'var(--warn)' : 'var(--mut)'}">${XE(s.statusWhy)}</div>` : ''}
@@ -2069,6 +2115,38 @@
         ${(s.entrySteps || []).length ? `<div class="small" style="margin-top:4px;color:var(--tx)"><b>Cara entry:</b>${s.entrySteps.map(x => `<div style="margin-top:2px">${XE(x)}</div>`).join('')}</div>` : ''}
         ${s.learning ? `<div class="small" style="color:${s.learning.blocked ? 'var(--no)' : 'var(--warn)'}"><b>${s.learning.blocked ? '⛔ Pembelajaran menahan entry' : '⚠️ Pola berisiko'}:</b> ${XE(s.learning.label)} · ${XE(s.learning.losses)} SL / ${XE(s.learning.wins)} TP${(s.learning.reasons || []).length ? ' · ' + XE((s.learning.reasons || []).join('; ')) : ''}</div>` : ''}
         <div class="small mut">${XE(s.why)}</div></div>`).join('') || '<div class="warn">Belum ada setup yang lolos filter. Bias HTF, POI, atau trigger M5 belum searah; jangan paksa entry di luar rencana.</div>'}</div>`;
+  }
+
+  /* Peta likuiditas: BSL/SSL, EQH/EQL, PDH/PDL, PWH/PWL, high/low sesi,
+     dan DOL. Semua level berasal dari candle; tidak ada level karangan. */
+  function liquidityCard(j) {
+    const l = j.liquidity;
+    if (!l || !(l.levels || []).length) return '';
+    const rows = l.levels.slice(0, 10);
+    const du = l.dol && l.dol.up, dd = l.dol && l.dol.down;
+    return `<div class="card"><div class="rb-card-head"><h3>💧 Peta likuiditas & DOL</h3><span class="rb-pill">${XE(rows.length)} level terdekat</span></div>
+      <div class="small mut">${XE(l.note)}</div>
+      ${rows.map(x => `<div class="item"><span><b>${XE(x.kind)}</b> · ${XE(x.tf)} <span class="small mut">${XE(x.bias || '')}${x.swept ? ' · sudah disapu' : ''}</span><div class="small mut">${XE(x.note)}</div></span><span style="text-align:right"><b>${num(x.level)}</b><div class="small mut">${x.distPips > 0 ? '+' : ''}${XE(x.distPips)} pip</div></span></div>`).join('')}
+      <div class="small mut" style="margin-top:6px">DOL atas ${du ? XE(du.kind) + ' ' + num(du.level) : '—'} · DOL bawah ${dd ? XE(dd.kind) + ' ' + num(dd.level) : '—'}. BSL = potensi likuiditas di atas harga; SSL = di bawah. DOL tetap hipotesis tujuan, bukan jaminan; EQH/EQL tidak harus sama persis satu tick.</div></div>`;
+  }
+
+  /* Gaya trading + urutan konfirmasi + glosarium resmi yang dipakai mesin. */
+  function styleCard(j) {
+    const sg = j.styleGuide || [];
+    const terms = j.terms || {};
+    const steps = [
+      'POI HTF layak diamati (Daily/H4/H1) dan harga di premium/discount sesuai arah.',
+      'Sweep likuiditas: EQL/low untuk BUY, EQH/high untuk SELL (model reversal).',
+      'Reclaim: candle M5 close kembali di sisi semula level yang disapu.',
+      'Displacement searah + break swing kecil (MSS/BOS); belum tentu reversal penuh.',
+      'Tandai FVG/OB yang terbentuk dari dorongan tersebut.',
+      'Tunggu retrace ke FVG/OB dan pasang LIMIT; SL 30 pip di luar zona, TP2 ≥200 pip.'
+    ];
+    return `<div class="card"><div class="rb-card-head"><h3>📚 Gaya trading & alur entry</h3><span class="rb-pill">glosarium resmi</span></div>
+      ${sg.map(x => `<div class="item"><span><b>${XE(x.k)}</b> · ${XE(x.tfs)} <span class="small mut">${x.mode ? 'setup M5' : 'konteks, bukan trigger'}</span><div class="small mut">${XE(x.use)}</div></span></div>`).join('')}
+      <div style="margin-top:8px"><b class="small">Urutan konfirmasi (reversal)</b>${steps.map((x, i) => `<div class="small" style="margin-top:2px">${i + 1}. ${XE(x)}</div>`).join('')}</div>
+      <div class="small mut" style="margin-top:5px">Model kelanjutan: HTF searah → pullback ke POI → reaksi/displacement → BOS searah → FVG/OB → retrace; tidak perlu sweep. Jika HTF dan pemicu kecil berlawanan, status konflik dan lebih baik menunggu.</div>
+      <details class="exp" style="margin-top:8px;color:var(--tx)"><summary class="small"><b>Glosarium istilah chart (${Object.keys(terms).length})</b></summary>${Object.keys(terms).map(k => `<div class="small" style="margin-top:3px"><b>${XE(k)}</b> — ${XE(terms[k])}</div>`).join('')}</details></div>`;
   }
 
   function smcCard(j) {
@@ -2179,7 +2257,7 @@
     const chip = X$('tvPrice');
     if (chip) chip.textContent = 'harga ' + num(j.price) + ' · ' + new Date(j.generatedAt || Date.now()).toLocaleTimeString('id-ID');
     learnApply(j);
-    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + smcCard(j) + methodCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
+    out.innerHTML = signalVerdict(j) + planCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + styleCard(j) + smcCard(j) + methodCard(j) + liquidityCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
     drawChart(j);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
@@ -2298,7 +2376,7 @@
       g.fillStyle = color; g.fillText(text, box.x + 1, ly);
       g.restore();
     };
-    const colors = { BOS: '#f59e0b', CHoCH: '#a78bfa', CHOCH: '#a78bfa', SWEEP: '#38bdf8', FVG: '#34d399', OB: '#fb7185', SNR: '#94a3b8', SND: '#38bdf8', MB: '#c084fc', OTE: '#facc15', PDH: '#f472b6', PDL: '#f472b6', LIQ: '#22d3ee', EQH: '#f97316', EQL: '#f97316', JUDAS: '#e879f9', ASIA: '#64748b', DO: '#e2e8f0', WO: '#e2e8f0', PD: '#fbbf24', SMT: '#f43f5e', POI: '#ffffff', WICK: '#fde047', FVG50: '#fbbf24', BPR: '#22d3ee', REJECT: '#fb7185', IFVG: '#2dd4bf', ERL: '#818cf8', DISP: '#f59e0b', ENGULF: '#c084fc', IDM: '#fbbf24', AMD: '#f59e0b', FIB: '#facc15', HTF: '#60a5fa', CONFIRM: '#f0abfc' };
+    const colors = { BOS: '#f59e0b', CHoCH: '#a78bfa', CHOCH: '#a78bfa', SWEEP: '#38bdf8', FVG: '#34d399', OB: '#fb7185', SNR: '#94a3b8', SND: '#38bdf8', MB: '#c084fc', OTE: '#facc15', PDH: '#f472b6', PDL: '#f472b6', PWH: '#f472b6', PWL: '#f472b6', LIQ: '#22d3ee', EQH: '#f97316', EQL: '#f97316', JUDAS: '#e879f9', ASIA: '#64748b', LONDON: '#60a5fa', NY: '#818cf8', DOL: '#facc15', BSL: '#22d3ee', SSL: '#2dd4bf', DO: '#e2e8f0', WO: '#e2e8f0', PD: '#fbbf24', SMT: '#f43f5e', POI: '#ffffff', WICK: '#fde047', FVG50: '#fbbf24', BPR: '#22d3ee', REJECT: '#fb7185', IFVG: '#2dd4bf', ERL: '#818cf8', DISP: '#f59e0b', ENGULF: '#c084fc', IDM: '#fbbf24', AMD: '#f59e0b', FIB: '#facc15', HTF: '#60a5fa', CONFIRM: '#f0abfc' };
     /* Hanya label + teks + titik penanda. Titik memakai timestamp candle asal
        dari server (m.at); fallback ke candle yang menyentuh level hanya bila
        candle asal berada di luar window chart. */
@@ -2394,7 +2472,7 @@
     });
     msShown.forEach(markerTag);
     if (ap) {
-      level(ap.entry, '#e2e8f0', (ap.order || (ap.dir === 'BUY' ? 'LIMIT BUY' : 'LIMIT SELL')) + ' ' + Number(ap.entry).toFixed(2), false);
+      level(ap.entry, '#e2e8f0', (ap.order || (ap.dir === 'BUY' ? 'LIMIT BUY' : 'LIMIT SELL')) + ' ' + Number(ap.entry).toFixed(2) + (ap.entryPolicy === 'DISTAL' ? ' · distal' : ''), false);
       level(ap.sl, '#ef4444', 'SL ' + Number(ap.sl).toFixed(2), false);
       level(ap.tp2, '#22c55e', 'TP2 ' + Number(ap.tp2).toFixed(2), true);
       if (ap.tpMax && ap.tpMax !== ap.tp2) level(ap.tpMax, '#86efac', 'TPmax ' + Number(ap.tpMax).toFixed(2), true);

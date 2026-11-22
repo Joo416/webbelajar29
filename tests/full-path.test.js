@@ -281,7 +281,35 @@ test('News: fokus CPI memakai kalender, FRED, wire, YouTube, dan 8 panelis mock'
   assert.equal(j.fundamental && j.fundamental.ok, true);
   assert.ok(j.fundamental.macro.length >= 3, 'FRED harus masuk fundamental');
   assert.ok(j.fundamental.calendar.length >= 1, 'kalender harus masuk fundamental');
+  assert.ok(j.release && j.release.guide, 'panduan rilis fokus wajib dikirim');
+  assert.ok(Array.isArray(j.release.guide.read) && j.release.guide.read.length >= 4, 'komponen baca rilis wajib lengkap');
+  assert.ok(Array.isArray(j.release.components) && j.release.components.length >= 4, 'checklist komponen wajib ada');
+  assert.ok(j.release.components.some(c => c.ok), 'minimal satu komponen FRED terbaca');
+  assert.ok(Array.isArray(j.release.pre) && j.release.pre.length >= 2, 'proxy pra-rilis wajib ada');
+  assert.ok(j.release.watch && j.release.watch.note && j.release.watch.state, 'respons pasar wajib dihitung');
+  assert.ok(Array.isArray(j.release.sources) && j.release.sources.length >= 3, 'sumber primer rilis wajib ada');
   } finally { global.fetch = savedFetch; }
+});
+
+test('News fallback: JSON AI terpotong tetap menghasilkan ringkasan mesin, bukan panel kosong', async () => {
+  const brokenDoc = (system, user, opts) => /SATU dokumen ringkasan/.test(String(system || ''))
+    ? { text: 'bukan JSON valid sama sekali', provider: 'mock-ai', model: 'mock-1', ms: 1 }
+    : fakeAi(system, user, opts);
+  C.setDeps({ llm: brokenDoc });
+  try {
+    const res = await call(N.newsHandler, { focus: 'CPI', fresh: true });
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body).slice(0, 800));
+    const j = res.body;
+    assert.equal(j.ok, true);
+    assert.equal(j.ai && j.ai.fallback, true, 'status fallback harus jujur');
+    assert.ok(j.doc && j.doc.fallback === true, 'dokumen fallback wajib ada');
+    assert.match(String(j.doc.headline), /CPI/i);
+    assert.ok(String(j.doc.summary).length > 30, 'ringkasan mesin tidak boleh kosong');
+    assert.ok(Array.isArray(j.doc.data_chain) && j.doc.data_chain.length > 0, 'rantai data harus terisi');
+    assert.ok(j.aiPanel && j.aiPanel.total === 8, 'panel valid yang lain tetap dipakai');
+  } finally {
+    C.setDeps({ llm: fakeAi });
+  }
 });
 
 test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', async () => {
@@ -303,15 +331,26 @@ test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', a
     assert.equal(s.order, s.dir === 'BUY' ? 'LIMIT BUY' : 'LIMIT SELL', s.style + ' harus punya arah limit');
     assert.equal(s.slPips, 30, s.style + ' SL wajib 30 pip');
     assert.ok(s.tp2Pips >= 200, s.style + ' TP2 wajib minimal 200 pip');
+    assert.notEqual(s.slClear, false, s.style + ' SL tidak boleh berada di dalam zona');
+    assert.ok(['PROXIMAL', 'DISTAL'].includes(s.entryPolicy), s.style + ' wajib punya kebijakan entry yang jelas');
     assert.ok(['SIAP', 'PENDING', 'TUNGGU'].includes(s.status));
     assert.ok(Array.isArray(s.entrySteps) && s.entrySteps.length > 0, 'langkah entry wajib ada');
     assert.ok(s.mtf && s.mtf.gate, 'setiap setup wajib membawa gate multi-TF');
-    assert.equal(s.status === 'SIAP', !!s.mtf.gate.ok, 'SIAP hanya boleh bila gate multi-TF lengkap');
+    assert.ok(s.status !== 'SIAP' || s.mtf.gate.ok, 'SIAP hanya boleh bila gate multi-TF lengkap');
+    assert.ok(s.sequence && Array.isArray(s.sequence.steps) && s.sequence.steps.length === 6, 'alur 6 langkah wajib ada');
+    assert.ok(['REVERSAL', 'KELANJUTAN'].includes(s.sequenceModel), 'model alur wajib jelas');
+    assert.ok(Array.isArray(s.cancel) && s.cancel.length >= 5, 'aturan batal wajib dihitung');
+    assert.ok(s.invalidationLevel != null, 'level invalidasi wajib ada');
+    assert.ok(s.status !== 'SIAP' || s.sequence.ok, 'SIAP hanya bila alur entry lengkap');
     assert.ok(/1D–4H/.test(s.entrySteps.join(' ')) && /5m–1m/.test(s.entrySteps.join(' ')), 'langkah entry wajib memuat urutan 1D–4H dan 5m–1m');
   });
   assert.ok(j.ai && j.ai.ok, 'catatan AI harus terpasang');
   assert.ok(j.ai.annotated > 0, 'AI harus menganotasi minimal satu tanda');
   assert.ok(j.markers.some(m => m.ai && m.ai.note), 'catatan tanda harus menempel');
+  assert.ok(j.liquidity && Array.isArray(j.liquidity.levels) && j.liquidity.levels.length > 0, 'peta likuiditas wajib ada');
+  assert.ok(j.liquidity.dol && (j.liquidity.dol.up || j.liquidity.dol.down), 'DOL wajib menunjuk level nyata');
+  assert.ok(j.terms && j.terms.EQH && j.terms.BSL && j.terms.DOL, 'glosarium istilah wajib dikirim');
+  assert.ok(Array.isArray(j.styleGuide) && j.styleGuide.length >= 5, 'gaya trading wajib lengkap');
 });
 
 test('Radar: horizon 30 menit, sumber beralasan, arah dari fundamental', async () => {
