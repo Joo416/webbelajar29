@@ -1,66 +1,112 @@
 rules_version = '2';
+/* ==========================================================================
+   RUANG BELAJAR — aturan Firestore lengkap.
+
+   Prinsip:
+   1. Semua data pengguna bisa disimpan permanen tanpa ditolak, selama pemilik
+      yang menulis: soal, hasil, chat, catatan, kata, jurnal, papan peringkat.
+   2. Data yang menentukan status/izin (status, admin, trading, pelajaran)
+      HANYA bisa diubah admin. Pemilik tidak bisa menaikkan haknya sendiri.
+   3. Admin (daftar email di bawah atau field admin=true) boleh mengelola
+      pengguna, izin Trading, dan akses pelajaran spesial (Psikologi/Sosiologi).
+   4. Selain aturan di bawah, akses ditolak (default deny).
+   ========================================================================== */
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() {
+      return request.auth != null;
+    }
+    function verified() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
     function mail() {
       return request.auth.token.email.lower();
     }
-    function isAdmin() {
-      return signedIn() && mail() in ['amoraarik6@gmail.com'];
+    function adminEmails() {
+      return ['amoraarik6@gmail.com'];
     }
-    function userPath() {
-      return /databases/$(database)/documents/pengguna/$(mail());
+    function isAdmin() {
+      return verified() && mail() in adminEmails();
+    }
+    function userDoc(email) {
+      return /databases/$(database)/documents/pengguna/$(email);
+    }
+    function me() {
+      return userDoc(mail());
     }
     function isActive() {
-      return signedIn()
-        && exists(userPath())
-        && get(userPath()).data.status == 'aktif';
+      return verified() && exists(me()) && get(me()).data.status == 'aktif';
+    }
+    function izinDoc(email) {
+      return /databases/$(database)/documents/izin_trading/$(email);
     }
     function hasTrading() {
       return isAdmin() || (isActive()
-        && exists(/databases/$(database)/documents/izin_trading/$(mail()))
-        && get(/databases/$(database)/documents/izin_trading/$(mail())).data.status == 'disetujui');
+        && exists(izinDoc(mail()))
+        && get(izinDoc(mail())).data.status == 'disetujui');
+    }
+    /* Akun yang boleh menyimpan data belajar: admin atau status aktif. */
+    function canLearn() {
+      return isAdmin() || isActive();
+    }
+    function isOwnerUid() {
+      return request.auth != null && request.resource != null
+        && request.resource.data.uid == request.auth.uid;
     }
 
+    /* ---------------- pengguna (profil, status, izin) ---------------- */
     match /pengguna/{id} {
-      allow get: if isAdmin() || (signedIn() && id == mail());
+      allow get: if isAdmin() || (verified() && id == mail());
       allow list: if isAdmin();
-      allow create: if signedIn() && id == mail()
-                    && request.resource.data.email == mail()
-                    && request.resource.data.status == 'menunggu'
-                    && !request.resource.data.keys().hasAny(['admin','trading']);
-      // Pemilik boleh memperbarui profilnya sendiri (nama/foto/uid) tanpa bisa
-      // mengubah status, izin, atau menambah field admin/trading.
-      allow update: if signedIn() && id == mail()
-                    && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama','foto','uid']);
+
+      /* Akun baru mendaftar sendiri dengan status menunggu. Field hak akses
+         dilarang ada di dokumen baru. */
+      allow create: if verified()
+        && id == mail()
+        && request.resource.data.email == mail()
+        && request.resource.data.status == 'menunggu'
+        && !request.resource.data.keys().hasAny(['admin', 'trading', 'pelajaran', 'akses']);
+
+      /* Pemilik boleh memperbarui profilnya (nama/foto/uid/waktu terakhir),
+         tetapi tidak boleh mengubah status, admin, trading, atau pelajaran. */
+      allow update: if verified()
+        && id == mail()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nama', 'foto', 'uid', 'terakhir']);
+
       allow create, update, delete: if isAdmin();
     }
 
+    /* ---------------- izin Trading ---------------- */
     match /izin_trading/{id} {
-      allow get: if isAdmin() || (signedIn() && id == mail());
-      // Pemilik hanya melihat dokumen izinnya sendiri.
-      allow list: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow create: if signedIn() && id == mail()
-                    && request.resource.data.email == mail()
-                    && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.status == 'menunggu'
-                    && request.resource.data.keys().hasOnly(['email','uid','status','pesan','dibuat']);
-      allow update: if isAdmin() || (signedIn() && id == mail()
-                    && resource.data.status in ['ditolak','dicabut']
-                    && request.resource.data.status == 'menunggu'
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','pesan','diminta']));
+      allow get: if isAdmin() || (verified() && id == mail());
+      allow list: if isAdmin()
+        || (verified() && resource.data.uid == request.auth.uid);
+
+      allow create: if verified()
+        && id == mail()
+        && request.resource.data.email == mail()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'menunggu'
+        && request.resource.data.keys().hasOnly(['email', 'uid', 'status', 'pesan', 'dibuat']);
+
+      /* Pemilik hanya bisa mengajukan ulang setelah ditolak/dicabut. */
+      allow update: if isAdmin() || (verified()
+        && id == mail()
+        && resource.data.status in ['ditolak', 'dicabut']
+        && request.resource.data.status == 'menunggu'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'pesan', 'diminta', 'uid', 'email', 'dibuat']));
+
       allow delete: if isAdmin();
     }
 
-    // V21: papan peringkat. Dibaca semua pengguna aktif, ditulis hanya oleh pemiliknya.
-    // Field yang divalidasi sama dengan yang ditulis index.html (v21WriteBoard).
+    /* ---------------- papan peringkat ---------------- */
     match /papan/{uid} {
-      allow get, list: if isActive();
-      allow create, update: if isActive()
+      allow get, list: if canLearn();
+      allow create, update: if canLearn()
         && uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.nama is string
@@ -79,36 +125,55 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['uBenar']) || (request.resource.data.uBenar is int && request.resource.data.uBenar >= 0))
         && (!request.resource.data.keys().hasAny(['uSalah']) || (request.resource.data.uSalah is int && request.resource.data.uSalah >= 0))
         && (!request.resource.data.keys().hasAny(['uTotal']) || (request.resource.data.uTotal is int && request.resource.data.uTotal >= 0))
-        && request.resource.data.keys().hasOnly(['uid','nama','foto','xp','streak','today','target','minggu','updated','sBenar','sSalah','sTotal','tBenar','tSalah','tTotal','uBenar','uSalah','uTotal']);
+        && request.resource.data.keys().hasOnly(['uid', 'nama', 'foto', 'xp', 'streak', 'today', 'target', 'minggu', 'updated',
+             'sBenar', 'sSalah', 'sTotal', 'tBenar', 'tSalah', 'tTotal', 'uBenar', 'uSalah', 'uTotal']);
       allow delete: if isAdmin();
     }
 
+    /* ---------------- data belajar & jurnal ---------------- */
     match /{col}/{docId} {
-      allow read, update, delete: if col in ['soal','hasil','chat','catatan','kata']
-                                  && isActive() && resource.data.uid == request.auth.uid;
-      allow create: if col in ['soal','hasil','chat','catatan','kata']
-                    && isActive() && request.resource.data.uid == request.auth.uid;
 
-      // Riwayat signal, state, dan tombstone memakai koleksi jurnal.
-      // resource == null hanya untuk get dokumen yang belum ada agar
-      // transaksi create (tx.get -> tx.set) tidak ditolak; tidak membuka
-      // dokumen pengguna lain karena query/read dokumen yang ada tetap
-      // wajib uid == auth.uid.
+      /* soal, hasil, chat, catatan, kata — milik satu akun. */
+      allow read: if col in ['soal', 'hasil', 'chat', 'catatan', 'kata']
+        && canLearn()
+        && resource.data.uid == request.auth.uid;
+
+      allow create: if col in ['soal', 'hasil', 'chat', 'catatan', 'kata']
+        && canLearn()
+        && isOwnerUid();
+
+      allow update: if col in ['soal', 'hasil', 'chat', 'catatan', 'kata']
+        && canLearn()
+        && resource.data.uid == request.auth.uid
+        && isOwnerUid();
+
+      allow delete: if col in ['soal', 'hasil', 'chat', 'catatan', 'kata']
+        && canLearn()
+        && resource.data.uid == request.auth.uid;
+
+      /* jurnal: riwayat signal, state, dan tombstone.
+         get dokumen yang belum ada diizinkan hanya bila id berawalan uid
+         sendiri, supaya transaksi create (tx.get -> tx.set) tidak ditolak.
+         Dokumen yang sudah ada tetap wajib milik sendiri. */
       allow get: if col == 'jurnal' && hasTrading()
-                  && ((resource != null && resource.data.uid == request.auth.uid)
-                      || (resource == null && docId.matches(request.auth.uid + '_.*')));
+        && ((resource != null && resource.data.uid == request.auth.uid)
+            || (resource == null && docId.matches(request.auth.uid + '_.*')));
+
       allow list: if col == 'jurnal' && hasTrading()
-                  && resource.data.uid == request.auth.uid;
+        && resource.data.uid == request.auth.uid;
+
       allow create: if col == 'jurnal'
-                    && hasTrading()
-                    && request.resource.data.uid == request.auth.uid;
+        && hasTrading()
+        && isOwnerUid();
+
       allow update: if col == 'jurnal'
-                    && hasTrading()
-                    && resource.data.uid == request.auth.uid
-                    && request.resource.data.uid == request.auth.uid;
+        && hasTrading()
+        && resource.data.uid == request.auth.uid
+        && isOwnerUid();
+
       allow delete: if col == 'jurnal'
-                    && hasTrading()
-                    && resource.data.uid == request.auth.uid;
+        && hasTrading()
+        && resource.data.uid == request.auth.uid;
     }
   }
 }
