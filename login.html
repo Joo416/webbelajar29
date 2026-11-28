@@ -265,17 +265,28 @@ html[data-theme=light] .auth-card{background:linear-gradient(168deg,#fff,#fbfcff
     location.replace('index.html');
   }
 
+  function isMobile() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
+
   window.rbAuthLogin = async function () {
     if (!auth) return renderFatal('Firebase Auth tidak tersedia.');
     var err = $('authErr');
     if (err) err.textContent = '';
     setBusy(true);
+    var provider = new firebase.auth.GoogleAuthProvider();
     try {
-      await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      /* Popup Google sering diblokir di hp; redirect adalah jalur resmi seluler. */
+      if (isMobile()) { await auth.signInWithRedirect(provider); return; }
+      await auth.signInWithPopup(provider);
       /* onAuthStateChanged akan memeriksa izin dan membuka aplikasi. */
     } catch (e) {
+      var m = String(e && e.message || e), code = String(e && e.code || '');
+      if (/popup-blocked|operation-not-supported/i.test(code + ' ' + m)) {
+        try { await auth.signInWithRedirect(provider); return; }
+        catch (e2) { m = String(e2 && e2.message || e2); }
+      }
       setBusy(false);
-      var m = String(e && e.message || e);
       if (/popup-closed-by-user|cancelled-popup-request/i.test(m)) m = 'Jendela Google ditutup sebelum selesai. Coba lagi.';
       else if (/popup-blocked/i.test(m)) m = 'Popup Google diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.';
       else if (/network-request-failed/i.test(m)) m = 'Koneksi gagal. Periksa internet lalu coba lagi.';
@@ -299,15 +310,28 @@ html[data-theme=light] .auth-card{background:linear-gradient(168deg,#fff,#fbfcff
 
   /* Logika izin ada di rb-auth.js agar halaman masuk dan isi aplikasi
      memakai aturan yang sama persis (tidak ada dua versi cek akses). */
+  var checkRun = 0;
   async function checkAccess() {
-    if (!user || busy || redirecting) return;
+    /* Guard sendiri: onAuthStateChanged mengosongkan busy, jadi tanpa ini dua
+       pemeriksaan bisa berjalan bersamaan dan saling menimpa tampilan. */
+    if (!user || redirecting || checkRun) return;
+    if (!window.RBAuth || typeof window.RBAuth.check !== 'function') {
+      return renderFatal('Modul pemeriksaan akses (rb-auth.js) tidak termuat. Muat ulang halaman.');
+    }
+    checkRun++;
     setBusy(true);
     renderChecking('Membaca status akun dan izin Trading…');
-    var r = await window.RBAuth.check(user, { db: db });
+    var r;
+    try {
+      r = await window.RBAuth.check(user, { db: db });
+    } catch (e) {
+      r = { ok: false, status: 'error', message: 'Gagal memeriksa izin: ' + String((e && e.message) || e) };
+    }
+    checkRun--;
     setBusy(false);
     if (redirecting) return;
-    if (r.ok) return goApp();
-    renderStatus(r.status || 'error', r.message || '');
+    if (r && r.ok) return goApp();
+    renderStatus((r && r.status) || 'error', (r && r.message) || '');
   }
 
   function boot() {
@@ -322,7 +346,24 @@ html[data-theme=light] .auth-card{background:linear-gradient(168deg,#fff,#fbfcff
     }
     var st = new URLSearchParams(location.search).get('state');
     var sm = storedMsg();
+    /* Hasil signInWithRedirect: tanpa ini kegagalan redirect tampil sebagai
+       "Memeriksa sesi…" tanpa penjelasan. */
+    auth.getRedirectResult().catch(function (e) {
+      var c = String(e && e.code || '');
+      if (/popup-closed|cancelled-popup|no-auth-event/i.test(c)) return;
+      var m = String((e && e.message) || e);
+      if ($('authErr')) $('authErr').textContent = 'Gagal masuk: ' + m;
+      else renderLogin('Gagal masuk: ' + m);
+    });
+    /* Firebase tanpa jaringan bisa tidak pernah memanggil callback sesi. */
+    var seenState = false;
+    var stateTimer = setTimeout(function () {
+      if (seenState) return;
+      renderLogin('Pemeriksaan sesi terlalu lama. Periksa koneksi lalu tekan Masuk dengan Google.');
+    }, 15000);
     auth.onAuthStateChanged(function (u) {
+      seenState = true;
+      clearTimeout(stateTimer);
       user = u || null;
       /* Popup login masih berstatus sibuk saat callback ini dipanggil.
          Reset dulu supaya checkAccess tidak keluar karena guard busy. */

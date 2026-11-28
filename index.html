@@ -253,7 +253,11 @@ function rbShowShell(){
 function loginView(){rbGoLogin();}
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi login(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){$('lerr').textContent='Gagal masuk: '+e.message}}
+/* Sesi Firebase bisa menggantung saat jaringan memblokir auth, membuat splash
+   tidak pernah selesai. Batas waktu mengarahkan ke halaman masuk. */
+let rbGateTimer=setTimeout(function(){rbGateTimer=0;if(document.getElementById('rbShell').hidden)rbGoLogin('error','Sesi belum terbaca dalam 15 detik. Periksa koneksi lalu masuk lagi.')},15000);
 if(auth)auth.onAuthStateChanged(u=>{
+  clearTimeout(rbGateTimer);
   user=u;if(!u){S.admin=false;return loginView()}
   const _splashMsg=document.getElementById('rbSplashMsg');if(_splashMsg)_splashMsg.textContent='Memeriksa izin akses…';
   document.querySelector('.tabs').style.display='none';
@@ -793,7 +797,8 @@ async function gate(u){
   $('app').innerHTML='<div class="card">⏳ Memeriksa izin akses...</div>';
   /* Satu sumber aturan izin (rb-auth.js) dipakai halaman login dan isi
      aplikasi, supaya tidak ada dua versi cek akses yang bisa berbeda. */
-  const r=await window.RBAuth.check(u,{db:db});
+  if(!window.RBAuth||typeof window.RBAuth.check!=='function')return deniedView('error','Modul pemeriksaan akses tidak termuat. Muat ulang halaman.');
+  let r;try{r=await window.RBAuth.check(u,{db:db})}catch(e){r={ok:false,status:'error',message:'Gagal memeriksa izin: '+((e&&e.message)||e)}}
   if(r.ok){S.admin=!!r.admin;return enter()}
   deniedView(r.status||'error',r.message||'')
 }
@@ -892,8 +897,6 @@ function kurLatLevel(){
   if(S.lvl&&lvs.includes(S.lvl))return S.lvl;
   const g=lvs.filter(l=>/Kelas|TKA/.test(l));return g[0]||lvs[0];
 }
-function kurLatKey(){return 'kur20_'+S.mapel+'_'+kurLatLevel()}
-function kurLatCached(){try{const c=JSON.parse(localStorage.getItem(kurLatKey())||'null');return c&&Date.now()-c.t<12*3600e3?c.v:null}catch(e){return null}}
 function kurLatHtml(k){
   const b=$('kurLat');if(!b)return;
   if(!k){b.innerHTML='<div class="mut small" style="margin-top:6px">Materi acuan belum diperiksa. Tekan tombol di atas untuk mencocokkan latihan dengan kurikulum resmi terbaru.</div>';return}
@@ -925,7 +928,7 @@ function pLatihan(){
     ${isUmum()?'':`<div class="card"><div class="rb-card-head"><h3>📚 Kurikulum & materi real-time</h3><span class="rb-pill">Kemendikdasmen/BSKAP</span></div><div class="mut small">Materi acuan ${esc(S.mapel)} untuk ${esc(kurLatLevel()||'tingkat ini')} dicek ke situs resmi, lalu dipakai saat membuat soal baru.</div><div class="row" style="margin-top:8px"><button class="btn alt full" onclick="kurLatFetch(false)">🔍 Periksa materi terbaru</button><button class="btn full" onclick="S.tab='buat';home()">✍️ Buat soal sesuai kurikulum</button></div><div id="kurLat"></div></div>`}
     <div class="card"><h3>📊 Statistik <span class="mut small">(ketuk untuk detail)</span></h3><div id="stat" class="mut">Memuat...</div></div>
     <div class="card"><h3>🕘 Riwayat <span class="mut small">(ketuk untuk lihat soal)</span></h3><div id="hist" class="mut">Memuat...</div></div>`;
-  if(!isUmum())kurLatHtml(kurLatCached());
+  if(!isUmum())kurLatFetch(false);
   loadHist();
 }
 async function loadQs2(n){
@@ -2561,14 +2564,14 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa-jp-data.js?v=20261121a"></script>
 <script src="bahasa-jp-data2.js?v=20261121a"></script>
 <script src="bahasa-jp-grammar.js?v=20261121a"></script>
-<script src="bahasa.js?v=20261127a"></script>
+<script src="bahasa.js?v=20261128a"></script>
 <script src="rb-core.js?v=20261121a"></script>
 <script src="rb-content.js?v=20261122h"></script>
 <script src="rb-ui.js?v=20261121a"></script>
 <script src="rb-alch.js?v=20261122h"></script>
 <script src="rb-alch-live.js?v=20261122h"></script>
 <script src="rb-v33.js?v=20261121a"></script>
-<script src="rb-xau.js?v=20261127c"></script>
+<script src="rb-xau.js?v=20261128a"></script>
 <script src="rb-admin.js?v=20261121a"></script>
 <link rel="stylesheet" href="rb-v35.css?v=20261127b">
 </body>

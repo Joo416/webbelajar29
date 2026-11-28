@@ -29,9 +29,21 @@
   }
   function errorText(e) {
     var m = String((e && e.message) || e || '');
+    if (/melebihi/i.test(m)) return 'Server izin tidak menjawab dalam batas waktu. Jaringanmu mungkin memblokir Firestore; ganti jaringan atau matikan VPN lalu tekan Cek lagi.';
     if (/permission|insufficient/i.test(m)) return 'Izin Firestore menolak pembacaan status. Hubungi admin agar aturan akses dipasang.';
     if (/network|offline|unavailable|failed to get/i.test(m)) return 'Koneksi ke server gagal. Periksa internet lalu tekan Cek lagi.';
     return m ? m.slice(0, 220) : 'Status akses tidak dapat dibaca.';
+  }
+  /* Firestore bisa menggantung tanpa batas ketika jaringan memblokir
+     firestore.googleapis.com. Tanpa batas waktu, halaman masuk berhenti
+     selamanya di "Memeriksa izin akses…". */
+  function guard(p, ms) {
+    return Promise.race([
+      p,
+      new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error('Pemeriksaan izin melebihi ' + Math.round(ms / 1000) + ' detik')); }, ms);
+      })
+    ]);
   }
 
   /* Hasil:
@@ -52,22 +64,22 @@
         foto: (user && user.photoURL) || '',
         uid: (user && user.uid) || ''
       };
-      var snap = await ref.get();
+      var snap = await guard(ref.get(), 18000);
       if (!snap.exists) {
-        await ref.set({ ...base, status: 'menunggu', dibuat: serverTime() });
-        snap = await ref.get();
+        await guard(ref.set({ ...base, status: 'menunggu', dibuat: serverTime() }), 12000);
+        snap = await guard(ref.get(), 12000);
       }
       var data = (snap && snap.data()) || {};
       if (isAdmin(email, data)) {
         /* Admin boleh menulis statusnya sendiri. Bila aturan Firestore belum
            mengizinkan update, akses tetap diberikan: penanda admin tetap sah. */
         try {
-          await ref.set({
+          await guard(ref.set({
             ...base,
             nama: (user && user.displayName) || data.nama || '',
             foto: (user && user.photoURL) || data.foto || '',
             status: 'aktif', admin: true, terakhir: serverTime()
-          }, { merge: true });
+          }, { merge: true }), 12000);
         } catch (e) { }
         return { ok: true, admin: true, email: email, data: data };
       }

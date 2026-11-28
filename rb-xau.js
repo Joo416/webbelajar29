@@ -46,7 +46,7 @@
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY', sigChartBars = 100, sigHistAt = 0;
   let sigRetryAt = 0, sigWake = false, sigBootGen = 0;
   let chartLabelAll = false, chartTF = 'ALL';
-  let chartFreshAt = 0, chartFreshBusy = false, chartAge = null, chartHoverIdx = -1, chartRowsN = 0, chartTags = [];
+  let chartFreshAt = 0, chartFreshBusy = false, chartHoverIdx = -1, chartRowsN = 0, chartTags = [];
   try { chartLabelAll = localStorage.getItem('rb_xau_chart_labels') === 'all'; } catch (e) { }
   try { const tf = localStorage.getItem('rb_xau_chart_tf'); if (['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf)) chartTF = tf; } catch (e) { }
   let sigCd = null;
@@ -2438,12 +2438,16 @@
     try {
       const c = await tcall({ action: 'xauCandles', tf: tf, limit: Math.max(80, Math.min(320, sigChartBars + 40)) });
       if (!sigData || !c || !c.ok || !Array.isArray(c.rows) || !c.rows.length) return;
+      /* Candle payload sudah digeser ke harga acuan (chart.shift); candle
+         refresh dari xauCandles masih mentah. Tanpa geseran yang sama, chart
+         dan label level memakai dua skala harga sehingga terlihat bergeser. */
+      const shift = Number(sigData.chart && sigData.chart.shift) || 0;
+      const rows = shift ? c.rows.map(r => ({ t: r.t, o: r.o + shift, h: r.h + shift, l: r.l + shift, c: r.c + shift, v: r.v })) : c.rows;
       sigData.chart = sigData.chart || {};
-      sigData.chart[key] = c.rows;
+      sigData.chart[key] = rows;
       chartFreshAt = Date.now();
-      chartAge = { tf: tf, at: c.generatedAt || new Date().toISOString(), source: c.source || '' };
       drawChart(sigData);
-      const stamp = X$('sigStamp'), lastT = c.rows[c.rows.length - 1].t;
+      const stamp = X$('sigStamp'), lastT = rows[rows.length - 1].t;
       if (stamp) stamp.textContent = 'candle ' + tf + ' · ' + new Date(lastT).toLocaleTimeString('id-ID');
     } catch (e) { } finally { chartFreshBusy = false; }
   }

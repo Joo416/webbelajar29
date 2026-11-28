@@ -194,17 +194,6 @@ function lbTrEnHtml(q) {
     return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(v.v1) + '</b><span>' + lbEsc(v.v2) + ' · ' + lbEsc(v.v3) + '</span><em>' + (v.arti ? lbEsc(v.arti) : '<i class="mut">arti belum ada</i>') + '</em></div>' + lbAudioBtn(v.v1, 'en') + '</div>';
   }).join('');
 }
-function lbEnTransCard() {
-  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus luring</div><h3>Terjemahan cepat EN ↔ ID</h3></div><span class="lb-count">tanpa AI</span></div>' +
-    '<div class="lb-search"><span>🔁</span><input type="search" autocomplete="off" placeholder="written / pergi / menerima..." value="' + lbEsc(LB.trEn || '') + '" oninput="lbTrEn(this.value)"></div>' +
-    '<div id="lbtrout" class="lb-trans-out">' + lbTrEnHtml(LB.trEn || '') + '</div>' +
-    '<div class="mut small" style="margin-top:8px">Dua arah: ketik kata Inggris (V1/V2/V3) atau arti Indonesia. Hasil diambil dari kamus bawaan, jadi terjemahannya tetap sama setiap kali dibuka.</div></div>';
-}
-function lbTrEn(v) {
-  LB.trEn = v;
-  const box = $('lbtrout');
-  if (box) box.innerHTML = lbTrEnHtml(v);
-}
 function lbJpLookup(q) {
   const n = lbNormQ(q);
   if (!n) return [];
@@ -231,17 +220,30 @@ function lbTrJpHtml(q) {
     return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(r.v.k) + '</b><span>' + lbEsc(lbRomaji(r.v.on.split(',')[0])) + ' · ' + lbEsc(lbRomaji(r.v.kun.split(',')[0])) + '</span><em>' + lbEsc(r.v.arti) + '</em></div>' + lbAudioBtn(r.v.k, 'jp') + '</div>';
   }).join('');
 }
-function lbJpTransCard() {
-  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus luring</div><h3>Terjemahan cepat JP ↔ ID</h3></div><span class="lb-count">tanpa AI</span></div>' +
-    '<div class="lb-search"><span>🔁</span><input type="search" autocomplete="off" placeholder="たべる / taberu / makan..." value="' + lbEsc(LB.trJp || '') + '" oninput="lbTrJp(this.value)"></div>' +
-    '<div id="lbtroutjp" class="lb-trans-out">' + lbTrJpHtml(LB.trJp || '') + '</div>' +
-    '<div class="mut small" style="margin-top:8px">Tiga arah: tulisan Jepang, romaji, atau arti Indonesia. Setiap hasil menampilkan romaji dan tombol dengar.</div></div>';
+/* Dua kartu kamus memakai satu pembangun: hanya judul, placeholder, dan
+   fungsi hasil yang berbeda. */
+const LB_TR_CARD = {
+  en: { out: 'lbtrout', state: 'trEn', setter: 'lbTrEn', title: 'Terjemahan cepat EN ↔ ID', ph: 'written / pergi / menerima...', hint: 'Dua arah: ketik kata Inggris (V1/V2/V3) atau arti Indonesia. Hasil diambil dari kamus bawaan, jadi terjemahannya tetap sama setiap kali dibuka.' },
+  jp: { out: 'lbtroutjp', state: 'trJp', setter: 'lbTrJp', title: 'Terjemahan cepat JP ↔ ID', ph: 'たべる / taberu / makan...', hint: 'Tiga arah: tulisan Jepang, romaji, atau arti Indonesia. Setiap hasil menampilkan romaji dan tombol dengar.' }
+};
+function lbTrBody(lang, q) { return lang === 'jp' ? lbTrJpHtml(q) : lbTrEnHtml(q); }
+function lbTransCard(lang) {
+  const c = LB_TR_CARD[lang];
+  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus luring</div><h3>' + c.title + '</h3></div><span class="lb-count">tanpa AI</span></div>' +
+    '<div class="lb-search"><span>🔁</span><input type="search" autocomplete="off" placeholder="' + c.ph + '" value="' + lbEsc(LB[c.state] || '') + '" oninput="' + c.setter + '(this.value)"></div>' +
+    '<div id="' + c.out + '" class="lb-trans-out">' + lbTrBody(lang, LB[c.state] || '') + '</div>' +
+    '<div class="mut small" style="margin-top:8px">' + c.hint + '</div></div>';
 }
-function lbTrJp(v) {
-  LB.trJp = v;
-  const box = $('lbtroutjp');
-  if (box) box.innerHTML = lbTrJpHtml(v);
+function lbTransSet(lang, v) {
+  const c = LB_TR_CARD[lang];
+  LB[c.state] = v;
+  const box = $(c.out);
+  if (box) box.innerHTML = lbTrBody(lang, v);
 }
+function lbEnTransCard() { return lbTransCard('en'); }
+function lbTrEn(v) { lbTransSet('en', v); }
+function lbJpTransCard() { return lbTransCard('jp'); }
+function lbTrJp(v) { lbTransSet('jp', v); }
 
 function lbNeed(lang) {
   return '<div class="card lb-empty"><div class="lb-empty-ico">📭</div><b>Data belum termuat</b><div class="mut small">Muat ulang halaman untuk memuat kamus bahasa.</div></div>';
