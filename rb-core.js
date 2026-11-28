@@ -322,7 +322,7 @@ function homeBase() {
   if (S.sec === 'trading') {
     S.mapel = 'Trading';
     if (['xau', 'radar', 'signal', 'alchemist', 'tutor', 'jurnal'].indexOf(S.tab) < 0) S.tab = 'xau';
-    const T = [['xau', ' News Analisis'], ['radar', ' Radar 30m'], ['signal', ' Signal Entry'], ['alchemist', ' Strategi Alchemist'], ['tutor', ' Tutor'], ['jurnal', ' Jurnal']];
+    const T = [['xau', '📰 News Analisis'], ['radar', '🛰️ Radar 30m'], ['signal', '🎯 Signal Entry'], ['alchemist', '🧪 Strategi Alchemist'], ['tutor', '💬 Tutor'], ['jurnal', '📒 Jurnal']];
     $('app').innerHTML = '<div class="stabs">' + T.map(function (x) {
       return '<button class="' + (S.tab === x[0] ? 'on' : '') + '" onclick="S.tab=\'' + x[0] + '\';home()">' + x[1] + '</button>';
     }).join('') + '</div><div id="pane"></div>';
@@ -330,7 +330,7 @@ function homeBase() {
   }
   if (S.mapel === 'Trading') S.mapel = (MAPEL.sekolah && MAPEL.sekolah[0]) || 'Bahasa Indonesia';
   if (['latihan', 'tryout', 'tutor', 'soal', 'buat', 'bank'].indexOf(S.tab) < 0) S.tab = 'latihan';
-  const T = [['latihan', ' Latihan'], ['tryout', ' Tryout'], ['tutor', ' Tutor'], ['soal', ' Belajar Soal'], ['buat', ' Buat Soal'], ['bank', ' Bank']];
+  const T = [['latihan', '🎯 Latihan'], ['tryout', '📝 Tryout'], ['tutor', '💬 Tutor'], ['soal', '📘 Belajar Soal'], ['buat', '✨ Buat Soal'], ['bank', '🗂️ Bank Soal']];
   $('app').innerHTML = '<div class="card v21-pick"><label style="margin-top:0">Pelajaran / topik</label>'
     + '<select onchange="S.mapel=this.value;S.gen=[];S.sub=\'\';pane()">' + mapelOptions() + '</select></div>'
     + '<div class="stabs">' + T.map(function (x) {
@@ -521,7 +521,7 @@ function pBeranda() {
         + '<div style="margin-top:14px"><div class="rb-card-head"><h3 style="font-size:.94rem">🕒 Jam dunia</h3><button class="x" onclick="pKalender()">Detail ›</button></div>' + rb26ClocksHtml() + '</div>'
       + '</div>'
 
-      + '<div class="card"><div class="rb-card-head"><h3> 7 hari terakhir</h3><span class="rb-pill">' + rb26Num((typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0)) + ' soal</span></div>'
+      + '<div class="card"><div class="rb-card-head"><h3>📊 7 hari terakhir</h3><span class="rb-pill">' + rb26Num((typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0)) + ' soal</span></div>'
         + '<div class="v21-bars">' + rb26WeekBars() + '</div>'
         + '<div class="rb-note" style="margin-top:10px">' + rb26Num(sum) + ' soal total • ' + rb26Num(ok) + ' benar • streak terbaik ' + best + ' hari</div></div>'
 

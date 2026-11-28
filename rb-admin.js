@@ -22,15 +22,22 @@ function rbAdTradeLabel(tr) {
 function drawAdmin() {
   if (!S.admin) { $('app').innerHTML = '<div class="card">Halaman ini hanya untuk admin.</div>'; return; }
   const L = (AD.list || []), n = k => L.filter(x => x.status === k).length;
+  const TR = Object.values(AD.tr || {});
+  const trOk = TR.filter(function (x) { return x.status === 'disetujui'; }).length;
+  const trPend = TR.filter(function (x) { return x.status === 'menunggu'; }).length;
   $('app').innerHTML = trCard16()
     + '<div class="card">'
     + '<div class="ad-head"><div><h3>Kelola pengguna</h3>'
     + '<div class="mut small">Setujui akun baru, blokir akses, dan atur izin Trading per pengguna.</div></div>'
-    + '<span class="rb-pill">' + L.length + ' akun</span></div>'
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+    + '<span class="rb-pill">' + L.length + ' akun</span>'
+    + '<button class="x" type="button" onclick="adminView()">Muat ulang</button></div></div>'
     + '<div class="ad-sum">'
     + [['aktif', 'Aktif'], ['menunggu', 'Menunggu'], ['diblokir', 'Diblokir']].map(function (s) {
       return '<div class="ad-stat"><b>' + n(s[0]) + '</b><span>' + s[1] + '</span></div>';
     }).join('')
+    + '<div class="ad-stat"><b>' + trOk + '</b><span>Trading aktif</span></div>'
+    + '<div class="ad-stat"><b>' + trPend + '</b><span>Permintaan Trading</span></div>'
     + '</div>'
     + '<div class="ad-toolbar">'
     + '<div class="ad-filter">'
@@ -46,7 +53,12 @@ function drawAdmin() {
     + '<div class="card"><h3>Izinkan email tertentu</h3>'
     + '<div class="mut small" style="margin-bottom:10px">Daftarkan email sebelum orangnya masuk. Akun langsung berstatus aktif.</div>'
     + '<div class="ad-add"><input id="adem" type="email" placeholder="nama@gmail.com" autocomplete="off">'
-    + '<button class="btn" type="button" onclick="adAdd()">Izinkan</button></div></div>';
+    + '<button class="btn" type="button" onclick="adAdd()">Izinkan</button></div></div>'
+    + '<div class="card"><div class="rb-card-head"><h3>Alur kerja admin</h3></div>'
+    + '<div class="item"><span>1. Setujui akun baru</span><b>Izinkan</b></div>'
+    + '<div class="item"><span>2. Beri akses Trading bila perlu</span><b>Beri Trading</b></div>'
+    + '<div class="item"><span>3. Uji key AI setelah mengubah env Vercel</span><b>Uji semua key</b></div>'
+    + '<div class="rb-note" style="margin-top:10px">Perubahan izin berlaku maksimal satu menit setelah disimpan. Blokir dan hapus tidak menghapus riwayat belajar pengguna.</div></div>';
   drawAdList();
 }
 
