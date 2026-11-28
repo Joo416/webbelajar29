@@ -185,11 +185,45 @@ function lbEnLookup(q) {
   }
   return out.slice(0, 8);
 }
+/* Pecah kalimat menjadi kata agar pengguna tetap dapat hasil walau frasa
+   panjang belum ada di kamus. Hasil per kata ditandai jelas, bukan
+diklaim sebagai terjemahan kalimat jadi. */
+function lbTokRow(q, lang) {
+  const toks = lbNormQ(q).split(' ').filter(Boolean);
+  if (toks.length < 2) return '';
+  const rows = toks.slice(0, 14).map(function (t) {
+    if (lang === 'jp') {
+      const hit = lbJpLookup(t)[0];
+      const arti = hit ? (hit.t === 'vocab' ? hit.v.a : hit.v.arti) : '';
+      return '<span class="lb-tok' + (arti ? '' : ' miss') + '"><b>' + lbEsc(t) + '</b>' + (arti ? ' → ' + lbEsc(arti) : ' <i>tidak ada</i>') + '</span>';
+    }
+    const hit = lbEnLookup(t)[0];
+    return '<span class="lb-tok' + (hit && hit.arti ? '' : ' miss') + '"><b>' + lbEsc(t) + '</b>' + (hit && hit.arti ? ' → ' + lbEsc(hit.arti) : ' <i>tidak ada</i>') + '</span>';
+  }).join('');
+  return '<div class="lb-tokrow">' + rows + '</div>'
+    + '<div class="mut small" style="margin-top:6px">Terjemahan per kata. Urutan kata bisa berbeda dari kalimat asli; untuk kalimat utuh gunakan tab AI ' + (lang === 'jp' ? 'Jepang' : 'Inggris') + '.</div>';
+}
+function lbSuggest(q, lang) {
+  const n = lbNormQ(q);
+  if (!n) return '';
+  const base = n.slice(0, 3), out = [];
+  const push = function (s) { if (s && out.indexOf(s) < 0 && out.length < 6) out.push(s); };
+  if (lang === 'jp') {
+    LB_JP_VOCAB.forEach(function (v) { if (out.length < 6 && (lbNormQ(v.r).indexOf(base) === 0 || lbNormQ(v.a).indexOf(base) === 0)) push(v.r + ' · ' + v.a); });
+  } else {
+    LB_VERBS.forEach(function (v) { if (out.length < 6 && lbNormQ(v.v1).indexOf(base) === 0) push(v.v1 + ' · ' + (v.arti || '')); });
+  }
+  if (!out.length) return '';
+  return '<div class="mut small" style="margin-top:8px">Mungkin maksudmu: ' + out.map(function (s) { return '<button class="lb-sug" onclick="lbSugPick(\'' + lbEsc(s.split(' · ')[0]).replace(/'/g, "\\'") + '\',\'' + lang + '\')">' + lbEsc(s) + '</button>'; }).join(' ') + '</div>';
+}
+function lbSugPick(word, lang) {
+  if (lang === 'jp') { LB.trJp = word; lbRender(); } else { LB.trEn = word; lbRender(); }
+}
 function lbTrEnHtml(q) {
   const n = lbNormQ(q);
   if (!n) return '<div class="mut small">Ketik kata Inggris atau arti Indonesia. Contoh: <b>written</b> (Inggris) atau <b>pergi</b> (Indonesia).</div>';
   const found = lbEnLookup(q);
-  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba bentuk dasar (write), V2/V3 (wrote/written), atau arti lain.</div>';
+  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba bentuk dasar (write), V2/V3 (wrote/written), atau arti lain.</div>' + lbSuggest(q, 'en') + lbTokRow(q, 'en');
   return found.map(function (v) {
     return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(v.v1) + '</b><span>' + lbEsc(v.v2) + ' · ' + lbEsc(v.v3) + '</span><em>' + (v.arti ? lbEsc(v.arti) : '<i class="mut">arti belum ada</i>') + '</em></div>' + lbAudioBtn(v.v1, 'en') + '</div>';
   }).join('');
@@ -212,7 +246,7 @@ function lbTrJpHtml(q) {
   const n = lbNormQ(q);
   if (!n) return '<div class="mut small">Ketik kana/kanji, romaji, atau arti Indonesia. Contoh: <b>たべる</b>, <b>taberu</b>, <b>makan</b>.</div>';
   const found = lbJpLookup(q);
-  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba romaji tanpa spasi (ohayou) atau arti lain.</div>';
+  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba romaji tanpa spasi (ohayou) atau arti lain.</div>' + lbSuggest(q, 'jp') + lbTokRow(q, 'jp');
   return found.map(function (r) {
     if (r.t === 'vocab') {
       return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(r.v.k) + '</b><span>' + lbEsc(r.v.r) + ' · ' + lbEsc(lbRomaji(r.v.k)) + '</span><em>' + lbEsc(r.v.a) + '</em></div>' + lbAudioBtn(r.v.k, 'jp') + '</div>';
@@ -262,8 +296,8 @@ function langHome() {
     jp: { flag: '🇯🇵', name: 'Bahasa Jepang', sub: 'Hiragana, katakana, kanji, kosakata, tata bahasa, kuis.' }
   }[lang];
   const nav = lang === 'en'
-    ? [['verbs', '📚 Kamus Verb'], ['flash', '🎴 Flashcard'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Inggris'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']]
-    : [['kana', 'あ Kana'], ['kanji', '漢 Kanji'], ['vocab', '📗 Kosakata'], ['grammar', '🧩 Tata Bahasa'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Jepang'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']];
+    ? [['verbs', '📚 Kamus Verb'], ['trans', '🔁 Terjemahan'], ['flash', '🎴 Flashcard'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Inggris'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']]
+    : [['kana', 'あ Kana'], ['kanji', '漢 Kanji'], ['vocab', '📗 Kosakata'], ['trans', '🔁 Terjemahan'], ['grammar', '🧩 Tata Bahasa'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Jepang'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']];
   const app = $('app');
   app.innerHTML =
     '<div class="lb-hero">' +
@@ -305,8 +339,8 @@ function lbRender() {
   const box = $('lbmain'); if (!box) return;
   const lang = LB.lang, tab = lbCurTab();
   const V = {
-    en: { verbs: lbEnVerbs, flash: lbEnFlash, quiz: lbEnQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbEnAI, stats: lbEnStats, guide: lbGuide },
-    jp: { kana: lbJpKana, kanji: lbJpKanji, vocab: lbJpVocab, grammar: lbJpGrammar, quiz: lbJpQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbJpAI, stats: lbJpStats, guide: lbGuide }
+    en: { verbs: lbEnVerbs, trans: lbEnTransCard, flash: lbEnFlash, quiz: lbEnQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbEnAI, stats: lbEnStats, guide: lbGuide },
+    jp: { kana: lbJpKana, kanji: lbJpKanji, vocab: lbJpVocab, trans: lbJpTransCard, grammar: lbJpGrammar, quiz: lbJpQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbJpAI, stats: lbJpStats, guide: lbGuide }
   }[lang];
   const f = V && V[tab];
   box.innerHTML = f ? f() : lbNeed(lang);
@@ -520,6 +554,15 @@ html[data-theme=light] .lb-switch{background:var(--field)}
 .lb-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
 .lb-card-face{position:relative;min-height:190px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(160deg,var(--card2),var(--field));display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;cursor:pointer;transition:border-color .18s,transform .18s}
 .lb-card-face:hover{border-color:var(--line2);transform:translateY(-1px)}
+.lb-tokrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.lb-tok{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;padding:5px 9px;border-radius:9px;
+  border:1px solid var(--line);background:var(--field);color:var(--tx);line-height:1.35}
+.lb-tok b{font-weight:700}
+.lb-tok.miss{border-style:dashed;opacity:.75}
+.lb-tok.miss i{color:var(--mut);font-style:normal}
+.lb-sug{font:inherit;font-size:.7rem;margin:2px;padding:4px 9px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--field);color:var(--accent)}
+.lb-sug:hover{border-color:var(--accent);background:var(--accent-soft)}
 .lb-face-front,.lb-face-back{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
 .lb-flash-word{font-size:2.1rem;font-weight:800;letter-spacing:-.04em;line-height:1.15}
 .lb-jpword{font-size:2.4rem}

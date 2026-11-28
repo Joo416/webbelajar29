@@ -334,8 +334,10 @@ function homeBase() {
     return pane();
   }
   if (S.mapel === 'Trading') S.mapel = (MAPEL.sekolah && MAPEL.sekolah[0]) || 'Bahasa Indonesia';
-  if (['latihan', 'tryout', 'tutor', 'soal', 'buat', 'bank'].indexOf(S.tab) < 0) S.tab = 'latihan';
-  const T = [['panduan', '📖 Panduan'], ['latihan', '🎯 Latihan'], ['tryout', '📝 Tryout'], ['tutor', '💬 Tutor'], ['soal', '📘 Belajar Soal'], ['buat', '✨ Buat Soal'], ['bank', '🗂️ Bank Soal']];
+  /* Pelajaran spesial hanya untuk admin / akun yang diizinkan admin. */
+  if (typeof rbCanSpecial === 'function' && !rbCanSpecial(S.mapel)) S.mapel = (MAPEL.sekolah && MAPEL.sekolah[0]) || 'Bahasa Indonesia';
+  if (['panduan', 'kurikulum', 'latihan', 'tryout', 'tutor', 'buat', 'bank'].indexOf(S.tab) < 0) S.tab = 'latihan';
+  const T = [['panduan', '📖 Panduan'], ['kurikulum', '🎓 Kurikulum'], ['latihan', '🎯 Latihan'], ['tryout', '📝 Tryout'], ['tutor', '💬 Tutor'], ['buat', '✨ Buat Soal'], ['bank', '🗂️ Bank Soal']];
   $('app').innerHTML = '<div class="card v21-pick"><label style="margin-top:0">Pelajaran / topik</label>'
     + '<select onchange="S.mapel=this.value;S.gen=[];S.sub=\'\';pane()">' + mapelOptions() + '</select></div>'
     + '<div class="stabs">' + T.map(function (x) {
@@ -347,7 +349,7 @@ function pane() {
   const map = {
     beranda: pBeranda, papan: pPapan, kalender: pKalender, panduan: pPanduan,
     latihan: pLatihan, tryout: pTryout, tutor: pTutor,
-    soal: (typeof pSoal === 'function' ? pSoal : pLatihan),
+    kurikulum: (typeof pKurikulum === 'function' ? pKurikulum : pLatihan),
     buat: pBuat, bank: pBank,
     jurnal: (typeof pJurnal === 'function' ? pJurnal : pLatihan),
     xau: (typeof pXauNews === 'function' ? pXauNews : pLatihan),
@@ -512,7 +514,7 @@ function pBeranda() {
     + '<div class="rb-actions">'
       + '<button class="btn" onclick="v21Go(\'latihan\')">🎯 Latihan</button>'
       + '<button class="btn alt" onclick="v21Go(\'tryout\')">📝 Tryout</button>'
-      + '<button class="btn alt" onclick="v21Go(\'soal\')">📘 Belajar Soal</button>'
+      + '<button class="btn alt" onclick="v21Go(\'kurikulum\')">🎓 Kurikulum</button>'
       + '<button class="btn alt" onclick="v21Go(\'tutor\')">💬 Tutor</button>'
     + '</div>'
     + '<div class="v21-target"><span>Target harian</span><select aria-label="Target harian" onchange="v21SetTarget(this.value)">'
@@ -550,7 +552,7 @@ function pPanduan() {
   try { localStorage.setItem('rb_panduan_seen', '1'); } catch (e) { }
   const mapel = rb26Safe(S.mapel || 'Bahasa Indonesia');
   const step = (n, title, body) => '<div class="rb-step"><b>' + n + '. ' + title + '</b>' + body + '</div>';
-  return '<div class="card rb-hero"><div class="rb-eyebrow">Panduan pemakaian</div>'
+  const html = '<div class="card rb-hero"><div class="rb-eyebrow">Panduan pemakaian</div>'
     + '<h2>Cara memakai Ruang Belajar dari awal sampai akhir</h2>'
     + '<div class="rb-note">Ikuti urutan ini sekali. Setelah terbiasa, kamu bisa langsung lompat ke tab yang dibutuhkan. Pelajaran aktif sekarang: <b>' + mapel + '</b>.</div>'
     + '<div class="rb-actions"><button class="btn" onclick="S.tab=\'latihan\';home()">🎯 Mulai latihan</button>'
@@ -564,7 +566,7 @@ function pPanduan() {
       + step(2, 'Siapkan soal lebih dulu bila bank masih kosong', '<div class="small mut">Buka <b>✨ Buat Soal</b>, isi topik (boleh kosong untuk acak), pilih jumlah, lalu tekan <b>Buat soal</b>. Soal buatan AI otomatis masuk ke bank dan bisa langsung dilatih. Tab <b>Latihan</b> mengambil soal dari bank ini, jadi tanpa soal latihan tidak bisa dimulai.</div>')
       + step(3, 'Latihan harian', '<div class="small mut">Di <b>🎯 Latihan</b> pilih subtopik, tingkat, jenis soal, dan jumlah soal. Biarkan <b>Utamakan soal yang belum pernah dikerjakan</b> tercentang agar soal tidak berulang. Mode ujian memberi timer dan pembahasan muncul setelah selesai. Tekan <b>Mulai ▶</b>.</div>')
       + step(4, 'Jawab, lalu baca pembahasan', '<div class="small mut">Setiap jawaban langsung dinilai. Baca <b>pembahasan</b> walau jawabanmu benar: di situ letak langkah berpikirnya. Bila latihan terputus, kartu <b>Latihan belum selesai</b> muncul dan bisa dilanjutkan.</div>')
-      + step(5, 'Belajar Soal dan tanya Tutor', '<div class="small mut">Tab <b>📘 Belajar Soal</b> menampilkan semua soalmu dalam mode daftar atau kartu. Buka satu soal untuk melihat kunci, minta <b>Jelaskan & cara berpikir</b>, atau kirim ke Tutor. Tab <b>💬 Tutor</b> dipakai untuk bertanya bebas tentang materi; tutor selalu memakai mesin lokal bila server AI sedang sibuk.</div>')
+      + step(5, 'Cek kurikulum dan tanya Tutor', '<div class="small mut">Tab <b>🎓 Kurikulum</b> menunjukkan materi acuan resmi untuk tingkatmu, peta topik, rencana 4 minggu, dan pelajaran spesial (Psikologi/Sosiologi) bila admin memberi izin. Tab <b>💬 Tutor</b> dipakai untuk bertanya bebas tentang materi; tutor selalu memakai mesin lokal bila server AI sedang sibuk.</div>')
       + step(6, 'Uji dengan Tryout', '<div class="small mut">Tab <b>📝 Tryout</b> membuat simulasi berwaktu. Pilih jumlah soal dan durasi, kerjakan soal mudah dulu, dan biarkan waktu habis bila perlu — jawaban otomatis dikumpulkan. Skor tryout masuk ke riwayat dan peringkat.</div>')
       + step(7, 'Cek hasil dan jaga streak', '<div class="small mut">Buka <b>🏠 Beranda</b> untuk melihat XP, akurasi, kalender konsistensi, dan papan peringkat. Tab <b>🗂️ Bank Soal</b> dipakai merapikan soal (cari, filter, hapus). Riwayat latihan ada di bagian bawah tab Latihan.</div>')
     + '</div></div>'
@@ -576,7 +578,7 @@ function pPanduan() {
         + '<tr><td>🎯 Latihan</td><td>Mengerjakan soal dari bank dengan filter dan timer opsional.</td></tr>'
         + '<tr><td>📝 Tryout</td><td>Simulasi ujian berwaktu, skor masuk riwayat.</td></tr>'
         + '<tr><td>💬 Tutor</td><td>Tanya jawab materi dengan AI + mesin lokal cadangan.</td></tr>'
-        + '<tr><td>📘 Belajar Soal</td><td>Membaca ulang soal, kunci, dan pembahasan; melatih soal terpilih.</td></tr>'
+        + '<tr><td>🎓 Kurikulum</td><td>Materi acuan resmi, peta topik, rencana belajar, dan pelajaran spesial.</td></tr>'
         + '<tr><td>✨ Buat Soal</td><td>Menambah soal baru sesuai topik dan kurikulum.</td></tr>'
         + '<tr><td>🗂️ Bank Soal</td><td>Mencari, memfilter, dan menghapus soal.</td></tr>'
         + '</tbody></table></div>'
@@ -603,9 +605,15 @@ function pPanduan() {
     + '<div class="card"><div class="rb-card-head"><h3>▶️ Mulai sekarang</h3></div><div class="rb-actions" style="margin-top:0">'
       + '<button class="btn" onclick="S.tab=\'buat\';home()">1. Buat soal</button>'
       + '<button class="btn alt" onclick="S.tab=\'latihan\';home()">2. Latihan</button>'
-      + '<button class="btn alt" onclick="S.tab=\'soal\';home()">3. Belajar soal</button>'
+      + '<button class="btn alt" onclick="S.tab=\'kurikulum\';home()">3. Kurikulum</button>'
       + '<button class="btn alt" onclick="S.tab=\'tutor\';home()">4. Tanya tutor</button>'
     + '</div></div>';
+  /* Dulu fungsi ini hanya mengembalikan string, padahal pane() memanggil
+     fungsi tanpa memakai nilai kembaliannya — akibatnya tab Panduan kosong.
+     Sekarang HTML ditulis langsung ke #pane. */
+  const box = document.getElementById('pane');
+  if (box) box.innerHTML = html;
+  return html;
 }
 
 function pKalender() {
@@ -818,7 +826,7 @@ function rb26LocalAnswer(mapel, question, reason) {
     out.push('1. Tuliskan apa yang sudah diketahui dan apa yang dicari.');
     out.push('2. Sebutkan rumus/kaidah yang mungkin dipakai.');
     out.push('3. Kerjakan satu langkah, lalu periksa ulang.');
-    out.push('4. Bandingkan dengan pembahasan soal serupa di tab ** Belajar Soal**.');
+    out.push('4. Bandingkan dengan pembahasan di tab **Tutor** atau **Kurikulum**.');
     out.push('');
     out.push('Kamu juga bisa memilih topik cepat: ' + ((RB26_KB[mapel] || RB26_KB['Umum (Trivia Dunia)']).slice(0, 4).map(function (x) { return '**' + x.t + '**'; }).join(', ')) + '.');
   }

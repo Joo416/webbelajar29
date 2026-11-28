@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "description": "Ruang Belajar + News/Signal XAUUSD",
+  "scripts": {
+    "test": "node --test tests/"
+  },
   "dependencies": {
     "ws": "^8.18.0"
   }

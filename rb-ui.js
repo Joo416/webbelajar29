@@ -154,7 +154,7 @@ var RB_GUIDE = [
     + '<li><b>Latihan</b> — jawab soal, lihat pembahasan, dan ulangi yang salah.</li>'
     + '<li><b>Tryout</b> — berwaktu, dengan navigasi nomor dan tombol ragu-ragu.</li>'
     + '<li><b>Tutor</b> — tanya materi; jawaban fokus pada pelajaran yang dipilih.</li>'
-    + '<li><b>Belajar Soal</b> — kumpulan soal yang sudah kamu buat, lengkap dengan pencarian, filter, latihan terpilih, dan acak 10.</li>'
+    + '<li><b>Kurikulum</b> — materi acuan resmi, peta topik, rencana 4 minggu, dan pelajaran spesial (Psikologi/Sosiologi) bila diizinkan admin.</li>'
     + '<li><b>Buat Soal</b> — buat soal baru dengan bantuan AI.</li>'
     + '<li><b>Bank</b> — kelola semua soalmu.</li></ul>'
     + '<h3>Tips latihan</h3><ul>'
@@ -170,16 +170,15 @@ var RB_GUIDE = [
     + '<li>Tutor tetap menjawab dari materi dan bank soal di aplikasi (badge <b>Tutor lokal</b>).</li>'
     + '<li>Jawaban essay juga dinilai secara lokal bila server tidak tersedia.</li></ul>'
     + '<div class="rb-gwarn">⚠️ AI bisa keliru. Untuk soal hitungan, periksa langkahnya; untuk fakta, cek sumber yang ditampilkan.</div>'],
-  ['soal', ' Belajar Soal & pembuatan soal',
-    '<p>Tab <b>Belajar Soal</b> ada di samping Tutor dan dipakai untuk mempelajari soal yang sudah kamu buat.</p>'
+  ['kurikulum', ' Kurikulum & pelajaran spesial',
+    '<p>Tab <b>Kurikulum</b> menunjukkan materi acuan resmi untuk tingkatmu, peta topik, dan rencana belajar 4 minggu.</p>'
     + '<h3>Yang bisa dilakukan</h3><ul>'
-    + '<li>Cari soal, filter tingkat dan jenis, lalu buka kartu untuk melihat kunci dan pembahasan.</li>'
-    + '<li>Centang beberapa soal lalu <b>Latih terpilih</b>, atau <b>Acak 10</b> untuk sesi cepat.</li>'
-    + '<li>Tombol <b>Penjelasan AI</b> membedah soal itu; <b>Tanya tutor</b> membuka tutor dengan soal sebagai konteks.</li></ul>'
-    + '<h3>Buat soal dengan AI di tab ini</h3><ul>'
-    + '<li>Isi topik (boleh kosong) dan jumlah soal, lalu tekan <b>Buat soal </b>.</li>'
-    + '<li>Soal yang dihasilkan langsung tersimpan ke bank dan muncul di daftar.</li>'
-    + '<li>Butuh <b>Generator lengkap</b>? Tombolnya ada di kanan judul kartu.</li></ul>'],
+    + '<li>Periksa materi terbaru ke sumber resmi Kemendikdasmen/BSKAP.</li>'
+    + '<li>Ketuk satu topik untuk langsung berlatih dengan subtopik itu, atau buat soal baru dari topik tersebut.</li>'
+    + '<li>Ikuti rencana 4 minggu: baca singkat, jelaskan dengan kata sendiri, kerjakan 5 soal, ulangi topik lemah dua hari kemudian.</li></ul>'
+    + '<h3>Pelajaran spesial</h3><ul>'
+    + '<li><b>Psikologi</b> dan <b>Sosiologi</b> hanya tampil di menu bila admin memberi izin pada akunmu.</li>'
+    + '<li>Admin selalu bisa membuka keduanya dan memberi/mencabut izin dari tab Admin.</li></ul>'],
   ['bahasa', ' Bahasa',
     '<h3>English Coach & Sakura Sensei</h3><ul>'
     + '<li>Dua tutor khusus: Inggris dan Jepang. Riwayat percakapan tersimpan di perangkat.</li>'

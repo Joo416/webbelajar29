@@ -174,6 +174,9 @@ const firebaseConfig = window.RB_FIREBASE_CONFIG || {};
 const MAPEL={
   sekolah:['Bahasa Indonesia','Matematika','IPA','IPS','Bahasa Inggris','Umum (Trivia Dunia)']
 };
+/* Pelajaran spesial: hanya admin dan pengguna yang diizinkan admin.
+   Akses disimpan di dokumen pengguna (field `pelajaran`), bukan di kode. */
+const SPECIAL_MAPEL=['Psikologi','Sosiologi'];
 const SAMPLE=[
   {kategori:'sekolah',mapel:'Matematika',q:'Hasil dari 3/4 + 1/8 adalah ...',o:['7/8','4/12','1','5/8'],a:0,e:'3/4 = 6/8, jadi 6/8 + 1/8 = 7/8.'},
   {kategori:'sekolah',mapel:'Bahasa Indonesia',q:'Kata baku yang tepat adalah ...',o:['Apotik','Apotek','Aphotek','Apotex'],a:1,e:'Menurut KBBI bentuk bakunya apotek.'},
@@ -193,6 +196,16 @@ function rbKnownMapel(m){
     return m==='Trading'||all.includes(m);
   }catch(e){return true}
 }
+/* Daftar mapel yang benar-benar boleh dibuka akun ini. Admin selalu boleh.
+   `S.akses` diisi dari dokumen pengguna saat gate() berhasil. */
+function rbSpecialAll(){ return SPECIAL_MAPEL.filter(rbCanSpecial); }
+function rbCanSpecial(m){
+  if(SPECIAL_MAPEL.indexOf(m)<0)return true;
+  if(S&&S.admin)return true;
+  const a=(S&&S.akses)||[];
+  try{if(a.indexOf(m)>=0||a.indexOf('semua')>=0)return true}catch(e){}
+  return false;
+}
 function rbSaveUi(){try{localStorage.setItem(RB_UI_KEY,JSON.stringify({sec:S.sec,tab:S.tab,mapel:S.mapel}))}catch(e){}}
 function rbRestoreUi(){
   try{
@@ -202,6 +215,9 @@ function rbRestoreUi(){
     /* Mapel dari sesi lama bisa sudah tidak ada (mis. nama berubah). Tanpa
        validasi, halaman Latihan terbuka kosong tanpa penjelasan. */
     if(typeof x.mapel==='string'&&x.mapel&&rbKnownMapel(x.mapel))S.mapel=x.mapel;
+    /* Mapel spesial dari sesi lama bisa sudah tidak diizinkan lagi. Jangan
+       biarkan tab Belajar terbuka pada pelajaran yang tidak bisa diakses. */
+    if(typeof rbCanSpecial==='function'&&!rbCanSpecial(S.mapel))S.mapel=(MAPEL.sekolah||['Bahasa Indonesia'])[0];
     if(S.sec==='admin'&&!S.admin)S.sec='beranda';
   }catch(e){}
 }
@@ -271,7 +287,7 @@ async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAu
 let rbGateTimer=setTimeout(function(){rbGateTimer=0;if(document.getElementById('rbShell').hidden)rbGoLogin('error','Sesi belum terbaca dalam 15 detik. Periksa koneksi lalu masuk lagi.')},15000);
 if(auth)auth.onAuthStateChanged(u=>{
   clearTimeout(rbGateTimer);
-  user=u;if(!u){S.admin=false;return loginView()}
+  user=u;window.user=u;window.rbUser=u;if(!u){S.admin=false;S.akses=[];try{window.rbUser=null}catch(e){};return loginView()}
   const _splashMsg=document.getElementById('rbSplashMsg');if(_splashMsg)_splashMsg.textContent='Memeriksa izin akses…';
   document.querySelector('.tabs').style.display='none';
   const mb=document.getElementById('rbMenuBtn');if(mb)mb.hidden=false;
@@ -812,7 +828,7 @@ async function gate(u){
      aplikasi, supaya tidak ada dua versi cek akses yang bisa berbeda. */
   if(!window.RBAuth||typeof window.RBAuth.check!=='function')return deniedView('error','Modul pemeriksaan akses tidak termuat. Muat ulang halaman.');
   let r;try{r=await window.RBAuth.check(u,{db:db})}catch(e){r={ok:false,status:'error',message:'Gagal memeriksa izin: '+((e&&e.message)||e)}}
-  if(r.ok){S.admin=!!r.admin;return enter()}
+  if(r.ok){S.admin=!!r.admin;S.akses=(r.data&&Array.isArray(r.data.pelajaran))?r.data.pelajaran:[];return enter()}
   deniedView(r.status||'error',r.message||'')
 }
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi deniedView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
@@ -874,7 +890,11 @@ const TOPICS={
  'SMC / ICT':['order block','fair value gap','break of structure vs CHoCH','liquidity sweep','premium dan discount','kill zone sesi London dan New York'],
  'Price Action':['pin bar dan engulfing','support dan resistance','trendline dan channel','breakout dan retest','struktur higher high / lower low','candlestick reversal'],
  'Risk Management':['ukuran lot dan risiko per trade','risk-reward ratio','drawdown dan recovery','stop loss berbasis struktur','korelasi antar pair','expectancy dan win rate'],
- 'Psikologi Trading':['FOMO dan revenge trading','disiplin mengikuti rencana','overtrading','menerima loss','jurnal trading','manajemen emosi saat drawdown']
+ 'Psikologi Trading':['FOMO dan revenge trading','disiplin mengikuti rencana','overtrading','menerima loss','jurnal trading','manajemen emosi saat drawdown'],
+ /* Dua pelajaran spesial. Susunannya mengikuti kerangka Kurikulum Merdeka
+    tingkat SMA (fase E–F), jadi topiknya bisa dipakai untuk kelas 10–12. */
+ 'Psikologi':['sejarah dan aliran psikologi','metode penelitian psikologi','persepsi, atensi, dan memori','belajar dan pengondisian','motivasi dan emosi','perkembangan manusia sepanjang hayat','kepribadian dan tes psikologi','psikologi sosial: konformitas dan pengaruh kelompok','kesehatan mental dan stres','psikologi industri dan organisasi','psikologi pendidikan','etika penelitian dan asesmen psikologi'],
+ 'Sosiologi':['sosiologi sebagai ilmu dan metode','interaksi sosial dan tindakan sosial','nilai, norma, dan lembaga sosial','stratifikasi dan diferensiasi sosial','mobilitas sosial','konflik dan integrasi sosial','perubahan sosial dan globalisasi','masalah sosial di Indonesia','penelitian sosial sederhana','masyarakat multikultural dan harmoni sosial','sosiologi pembangunan','ketimpangan digital dan masyarakat jaringan']
 };
 // ✏️ [TEKS BISA DIUBAH] Daftar teks SMK_GROUPS: Daftar mapel SMK per bidang keahlian (nama grup di menu, nama mapel, topik). Topik aman diubah/ditambah; nama mapel tersimpan di database dan harus sama persis dengan SMK_MAPEL di chat.js.
 const SMK_GROUPS=[{"g": "SMK — Kelompok Umum", "f": "umum", "m": [["Pendidikan Pancasila", ["Nilai-nilai Pancasila", "UUD 1945 dan konstitusi", "Bhinneka Tunggal Ika", "Hak dan kewajiban warga negara", "Sistem pemerintahan Indonesia"]], ["Pendidikan Agama dan Budi Pekerti", ["Akhlak dan etika kerja", "Toleransi dan kerukunan umat beragama", "Nilai ajaran agama dalam kehidupan", "Etika profesi"]], ["Sejarah", ["Kerajaan Hindu-Buddha dan Islam", "Kolonialisme di Indonesia", "Pergerakan nasional", "Proklamasi dan revolusi kemerdekaan", "Reformasi dan Indonesia modern"]], ["Informatika", ["Berpikir komputasional", "Jaringan komputer dan internet", "Analisis data", "Algoritma dan pemrograman", "Keamanan siber dan etika digital"]], ["IPAS", ["Ekosistem dan lingkungan", "Energi dan perubahannya", "Dinamika kependudukan", "Perubahan iklim", "Ekonomi dan masyarakat"]], ["Seni Budaya", ["Unsur seni rupa", "Seni musik", "Seni tari dan teater", "Seni budaya nusantara", "Apresiasi karya seni"]], ["PJOK", ["Kebugaran jasmani", "Permainan bola besar", "Atletik", "Senam", "Kesehatan dan gizi"]], ["Projek Kreatif dan Kewirausahaan", ["Ide usaha dan analisis peluang", "Rencana bisnis sederhana", "Pemasaran dan branding", "Keuangan usaha dasar", "Produk kreatif dan inovasi"]], ["Bahasa Jepang", ["Hiragana dan katakana", "Perkenalan diri (jikoshoukai)", "Angka, waktu, dan tanggal", "Kata kerja dasar", "Percakapan sehari-hari"]], ["Bahasa Mandarin", ["Pinyin dan nada", "Perkenalan diri", "Angka dan waktu", "Kosakata sehari-hari", "Percakapan dasar"]]]}, {"g": "SMK — Teknologi Informasi dan Multimedia", "f": "tik", "m": [["Teknik Jaringan Komputer dan Telekomunikasi (TJKT)", ["Model OSI dan TCP/IP", "Pengalamatan IP dan subnetting", "Routing dan switching", "Administrasi server Linux", "Keamanan jaringan", "Fiber optik dan telekomunikasi"]], ["Pengembangan Perangkat Lunak dan Gim (PPLG)", ["Algoritma dan pemrograman dasar", "Basis data dan SQL", "Pemrograman web", "Pemrograman berorientasi objek", "Aplikasi mobile", "Pengembangan gim", "Git dan version control"]], ["Sistem Informatika, Jaringan, dan Aplikasi (SIJA)", ["Jaringan dasar", "Administrasi sistem", "Pemrograman aplikasi", "Basis data", "Keamanan sistem informasi"]], ["Desain Komunikasi Visual (DKV)", ["Prinsip desain dan tipografi", "Teori warna", "Desain grafis vektor dan raster", "Branding dan identitas visual", "Fotografi dasar", "Desain UI/UX"]], ["Animasi", ["Prinsip dasar animasi", "Storyboard dan layout", "Animasi 2D", "Pemodelan dan animasi 3D", "Rigging dan rendering", "Efek visual dasar"]], ["Produksi Film dan Program Televisi", ["Pra-produksi dan skenario", "Teknik kamera dan pencahayaan", "Penyuntingan video", "Tata suara", "Produksi program televisi"]]]}, {"g": "SMK — Teknologi Manufaktur, Otomotif, dan Konstruksi", "f": "teknik", "m": [["Teknik Pemesinan", ["Gambar teknik dan toleransi", "Mesin bubut", "Mesin frais", "CNC dasar", "Alat ukur presisi", "K3 bengkel"]], ["Teknik Pengelasan dan Fabrikasi Logam", ["Las SMAW", "Las GMAW dan GTAW", "Simbol las dan gambar kerja", "Fabrikasi pelat", "Cacat las dan pengujian", "K3 pengelasan"]], ["Teknik Kendaraan Ringan Otomotif (TKRO)", ["Sistem mesin bensin dan diesel", "Sistem kelistrikan dan EFI", "Sistem pemindah tenaga", "Sistem rem", "Sistem suspensi dan kemudi", "Diagnosis dan servis berkala"]], ["Teknik dan Bisnis Sepeda Motor (TBSM)", ["Mesin sepeda motor 4 tak", "Sistem bahan bakar dan injeksi", "Kelistrikan sepeda motor", "Sistem rem dan suspensi", "Servis berkala", "Manajemen bengkel"]], ["Teknik Alat Berat", ["Sistem hidrolik", "Mesin diesel alat berat", "Sistem pemindah tenaga", "Undercarriage", "Perawatan berkala", "K3 alat berat"]], ["Teknik Elektronika Industri", ["Komponen elektronika", "Rangkaian analog dan digital", "Mikrokontroler", "Sensor dan aktuator", "PLC dasar", "Perbaikan peralatan elektronik"]], ["Teknik Instalasi Tenaga Listrik", ["Hukum Ohm dan rangkaian listrik", "Instalasi penerangan dan tenaga", "PUIL dan K3 listrik", "Motor listrik dan transformator", "Pengendali motor", "Pengukuran listrik"]], ["Teknik Otomasi Industri", ["PLC dan HMI", "Sensor industri", "Pneumatik dan hidrolik", "Sistem kendali", "Robotika dasar", "Jaringan industri"]], ["Teknik Audio Video", ["Sistem audio", "Sistem video dan penyiaran", "Perbaikan televisi dan perangkat", "Sound system", "Instalasi CCTV", "Elektronika dasar"]], ["Teknik Pendingin dan Tata Udara", ["Siklus refrigerasi", "Komponen AC dan kulkas", "Instalasi AC", "Pengisian dan kebocoran refrigeran", "Kelistrikan pendingin", "K3 refrigeran"]], ["Desain Pemodelan dan Informasi Bangunan (DPIB)", ["Gambar teknik bangunan", "AutoCAD", "Pemodelan BIM", "Struktur bangunan sederhana", "Estimasi biaya (RAB)", "Survei dan pemetaan dasar"]], ["Teknik Konstruksi dan Perumahan", ["Pekerjaan pondasi dan beton", "Pasangan dan plesteran", "Bekisting dan pembesian", "Membaca gambar kerja", "Manajemen proyek konstruksi", "K3 konstruksi"]], ["Teknik Geomatika dan Survei Pemetaan", ["Pengukuran jarak dan sudut", "Waterpass dan theodolit", "GPS dan GNSS", "Pemetaan digital", "Sistem informasi geografis", "Hitungan koordinat"]], ["Teknik Kimia Industri", ["Analisis kimia dasar", "Proses industri kimia", "Neraca massa dan energi", "Pengolahan limbah", "Instrumentasi proses", "K3 laboratorium kimia"]], ["Teknik Tekstil", ["Serat dan benang", "Proses pertenunan", "Proses perajutan", "Pencelupan dan finishing", "Uji mutu tekstil", "Mesin tekstil"]]]}, {"g": "SMK — Bisnis dan Manajemen", "f": "bisnis", "m": [["Akuntansi dan Keuangan Lembaga (AKL)", ["Persamaan dasar akuntansi", "Jurnal dan buku besar", "Laporan keuangan", "Akuntansi perusahaan dagang dan jasa", "Perpajakan dasar", "Aplikasi akuntansi (Excel/Accurate)"]], ["Manajemen Perkantoran dan Layanan Bisnis (MPLB)", ["Administrasi perkantoran", "Kearsipan", "Korespondensi bisnis", "Layanan prima", "Teknologi perkantoran", "Manajemen waktu dan rapat"]], ["Bisnis Digital dan Pemasaran", ["Dasar pemasaran", "Digital marketing dan media sosial", "E-commerce dan marketplace", "Riset pasar", "Layanan pelanggan", "Analisis penjualan"]], ["Perbankan dan Keuangan Mikro", ["Produk bank dan lembaga keuangan", "Layanan teller dan customer service", "Kredit mikro", "Literasi dan inklusi keuangan", "Regulasi OJK dan BI", "Manajemen risiko dasar"]], ["Manajemen Logistik", ["Pergudangan", "Pengelolaan persediaan", "Transportasi dan distribusi", "Dokumen ekspor-impor", "Rantai pasok", "Teknologi logistik"]]]}, {"g": "SMK — Pariwisata dan Kuliner", "f": "pariwisata", "m": [["Perhotelan", ["Layanan kantor depan (front office)", "Tata graha (housekeeping)", "Layanan makanan dan minuman", "Etika pelayanan dan komunikasi", "Reservasi dan sistem hotel", "K3 dan sanitasi hotel"]], ["Kuliner", ["Bahan makanan dan penyimpanan", "Teknik dasar memasak", "Masakan Indonesia dan internasional", "Pastry dan bakery", "Higiene dan sanitasi (HACCP)", "Penghitungan biaya masakan"]], ["Usaha Layanan Wisata", ["Destinasi wisata Indonesia", "Pemanduan wisata (tour guiding)", "Tour planning dan itinerary", "Ticketing dan reservasi", "Etika dan komunikasi wisata", "Pariwisata berkelanjutan"]], ["Busana", ["Pola dasar busana", "Teknik menjahit", "Bahan tekstil dan perawatan", "Desain busana", "Penyelesaian dan finishing", "Wirausaha busana"]], ["Kecantikan dan Spa", ["Anatomi kulit dan rambut", "Perawatan wajah", "Tata rias", "Perawatan rambut", "Spa dan pijat dasar", "Sanitasi dan K3 salon"]]]}, {"g": "SMK — Kesehatan", "f": "kesehatan", "m": [["Asisten Keperawatan", ["Anatomi dan fisiologi dasar", "Kebutuhan dasar manusia", "Pencegahan dan pengendalian infeksi", "Tanda-tanda vital", "Komunikasi terapeutik", "Pertolongan pertama"]], ["Farmasi Klinis dan Komunitas", ["Penggolongan obat", "Bentuk sediaan farmasi", "Perhitungan dosis", "Pelayanan resep dan swamedikasi", "Penyimpanan dan pengelolaan obat", "Regulasi BPOM"]], ["Teknologi Laboratorium Medik", ["Hematologi", "Kimia klinik", "Mikrobiologi dasar", "Urinalisis", "Pengambilan dan penanganan spesimen", "K3 laboratorium"]], ["Dental Asisten", ["Anatomi gigi dan mulut", "Alat dan bahan kedokteran gigi", "Sterilisasi instrumen", "Penyakit gigi dan mulut", "Pelayanan asuhan kesehatan gigi", "Radiografi dasar"]]]}, {"g": "SMK — Agribisnis dan Agroteknologi", "f": "agro", "m": [["Agribisnis Tanaman Pangan dan Hortikultura", ["Budidaya padi dan palawija", "Hortikultura sayur dan buah", "Pengolahan tanah dan pemupukan", "Hama dan penyakit tanaman", "Panen dan pascapanen", "Analisis usaha tani"]], ["Agribisnis Ternak", ["Ternak ruminansia", "Unggas dan petelur", "Pakan dan nutrisi ternak", "Kesehatan hewan dan biosekuriti", "Reproduksi ternak", "Analisis usaha peternakan"]], ["Agribisnis Perikanan", ["Budidaya ikan air tawar", "Budidaya ikan air payau dan laut", "Kualitas air", "Pakan dan penyakit ikan", "Pembenihan", "Analisis usaha perikanan"]], ["Teknologi Pengolahan Hasil Pertanian", ["Sifat bahan pangan", "Pengawetan pangan", "Pengolahan hasil nabati dan hewani", "Sanitasi dan keamanan pangan", "Pengemasan", "Pengendalian mutu pangan"]], ["Kehutanan", ["Silvikultur", "Pembibitan tanaman hutan", "Konservasi sumber daya hutan", "Pengukuran dan pemetaan hutan", "Hasil hutan bukan kayu", "Perlindungan hutan"]]]}, {"g": "SMK — Kemaritiman", "f": "maritim", "m": [["Nautika Kapal Niaga", ["Navigasi dan peta laut", "Peraturan pencegahan tabrakan (COLREG)", "Meteorologi maritim", "Stabilitas dan muatan kapal", "Penanganan muatan", "Keselamatan di laut (SOLAS)"]], ["Teknika Kapal Niaga", ["Mesin induk dan mesin bantu", "Sistem bahan bakar dan pelumas", "Sistem pendingin dan pompa", "Kelistrikan kapal", "Perawatan permesinan", "Pencegahan pencemaran (MARPOL)"]], ["Nautika Kapal Penangkap Ikan", ["Navigasi kapal ikan", "Alat penangkapan ikan", "Penanganan hasil tangkapan", "Keselamatan kerja di kapal ikan", "Meteorologi dan oseanografi", "Peraturan perikanan"]]]}, {"g": "SMK — Energi dan Pertambangan", "f": "energi", "m": [["Teknik Energi Surya, Hidro, dan Angin", ["Radiasi matahari dan panel surya", "Sistem PLTS on-grid dan off-grid", "Pembangkit listrik tenaga air", "Energi angin", "Baterai dan inverter", "Perawatan sistem energi terbarukan"]], ["Teknik Geologi Pertambangan", ["Mineral dan batuan", "Peta geologi", "Eksplorasi dan pengeboran inti", "Metode penambangan", "Reklamasi dan lingkungan", "K3 pertambangan"]], ["Teknik Pemboran Minyak dan Gas", ["Sistem pemboran", "Lumpur pemboran", "Peralatan pengeboran", "Pengendalian sumur (well control)", "Produksi migas dasar", "K3 migas"]]]}, {"g": "SMK — Seni dan Ekonomi Kreatif", "f": "seni", "m": [["Seni Musik", ["Teori musik dasar", "Membaca notasi", "Instrumen musik", "Ansambel dan aransemen sederhana", "Sejarah musik", "Produksi musik dan rekaman"]], ["Seni Tari", ["Unsur gerak tari", "Tari tradisional nusantara", "Koreografi", "Tata rias dan busana tari", "Iringan tari", "Apresiasi pertunjukan"]], ["Seni Karawitan", ["Laras dan pathet", "Instrumen gamelan", "Notasi karawitan", "Gending dan lagu daerah", "Sejarah karawitan", "Ansambel karawitan"]], ["Seni Rupa", ["Unsur dan prinsip seni rupa", "Menggambar dan melukis", "Seni patung dan kriya", "Teknik warna", "Sejarah seni rupa", "Pameran dan apresiasi"]], ["Kriya Kreatif Kayu dan Rotan", ["Jenis kayu dan rotan", "Teknik pengerjaan kayu", "Desain produk kriya", "Finishing", "Alat dan K3 kriya", "Pemasaran produk kriya"]], ["Kriya Kreatif Batik dan Tekstil", ["Sejarah dan motif batik", "Teknik batik tulis dan cap", "Pewarnaan dan pelorodan", "Desain motif", "Kain dan perawatan", "Pemasaran produk batik"]]]}];
@@ -882,7 +902,11 @@ const SMK_FIELD={};
 SMK_GROUPS.forEach(G=>G.m.forEach(([n,tp])=>{SMK_FIELD[n]=G.f;TOPICS[n]=tp;MAPEL.sekolah.push(n)}));
 function mapelOptions(){
   const opt=m=>`<option ${m===S.mapel?'selected':''}>${esc(m)}</option>`;
-  return `<optgroup label="Pelajaran utama">${MAPEL.sekolah.filter(m=>!SMK_FIELD[m]).map(opt).join('')}</optgroup>`+SMK_GROUPS.map(G=>`<optgroup label="${esc(G.g)}">${G.m.map(x=>opt(x[0])).join('')}</optgroup>`).join('');
+  const utama=MAPEL.sekolah.filter(m=>!SMK_FIELD[m]&&SPECIAL_MAPEL.indexOf(m)<0);
+  const khusus=rbSpecialAll();
+  return `<optgroup label="Pelajaran utama">${utama.map(opt).join('')}</optgroup>`
+    +(khusus.length?`<optgroup label="Pelajaran spesial (izin admin)">${khusus.map(opt).join('')}</optgroup>`:'')
+    +SMK_GROUPS.map(G=>`<optgroup label="${esc(G.g)}">${G.m.map(x=>opt(x[0])).join('')}</optgroup>`).join('');
 }
 const ANGLES=['soal cerita kehidupan sehari-hari','analisis data/tabel yang dituliskan dalam teks','penalaran logis langkah demi langkah','pemecahan masalah kontekstual','pemahaman konsep (mengapa/bagaimana)','penerapan aturan/rumus langsung','analisis kesalahan (temukan kekeliruan)','perbandingan dan klasifikasi','prediksi/simulasi sederhana','soal dengan pengecoh yang menguji miskonsepsi umum'];
 /* ---- soal yang sudah pernah dikerjakan (per perangkat) ---- */
@@ -910,8 +934,8 @@ function kurLatLevel(){
   if(S.lvl&&lvs.includes(S.lvl))return S.lvl;
   const g=lvs.filter(l=>/Kelas|TKA/.test(l));return g[0]||lvs[0];
 }
-function kurLatHtml(k){
-  const b=$('kurLat');if(!b)return;
+function kurLatHtml(k,boxId){
+  const b=$(boxId||'kurLat');if(!b)return;
   if(!k){b.innerHTML='<div class="mut small" style="margin-top:6px">Materi acuan belum diperiksa. Tekan tombol di atas untuk mencocokkan latihan dengan kurikulum resmi terbaru.</div>';return}
   if(k.ok===false){b.innerHTML='<div class="mut small" style="margin-top:6px">'+esc(k.reason||'Tingkat ini tidak memakai kurikulum sekolah.')+'</div>';return}
   const src=(k.sources||[]).filter(s=>/^https?:\/\//.test(s.uri)).slice(0,4);
@@ -921,10 +945,10 @@ function kurLatHtml(k){
     +(src.length?'<details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--b)">Sumber resmi ('+src.length+')</summary>'+src.map(s=>'<div class="small"><a href="'+esc(s.uri)+'" target="_blank" rel="noopener noreferrer" style="color:var(--b)">'+esc(s.title)+'</a></div>').join('')+'</details>':'')
     +'<div class="small mut" style="margin-top:6px">Diperiksa '+esc(k.fetchedAt?new Date(k.fetchedAt).toLocaleString('id-ID'):'-')+' • <a href="#" onclick="kurLatFetch(true);return false" style="color:var(--b)">Periksa ulang</a></div>';
 }
-async function kurLatFetch(force){
+async function kurLatFetch(force,boxId){
   if(typeof kurFetch20!=='function'||typeof user==='undefined'||!user)return;
-  const b=$('kurLat'),lv=kurLatLevel();if(b)b.innerHTML='<div class="mut small" style="margin-top:6px">⏳ Memeriksa kurikulum resmi terbaru…</div>';
-  try{const k=await kurFetch20(S.mapel,lv,force);applyKur20(S.mapel,lv,k);kurLatHtml(k)}catch(e){if(b)b.innerHTML='<div class="warn" style="margin-top:6px">⚠️ '+esc(e.message)+'</div>'}
+  const b=$(boxId||'kurLat'),lv=kurLatLevel();if(b)b.innerHTML='<div class="mut small" style="margin-top:6px">⏳ Memeriksa kurikulum resmi terbaru…</div>';
+  try{const k=await kurFetch20(S.mapel,lv,force);applyKur20(S.mapel,lv,k);kurLatHtml(k,boxId)}catch(e){if(b)b.innerHTML='<div class="warn" style="margin-top:6px">⚠️ '+esc(e.message)+'</div>'}
 }
 function pLatihan(){
   let pr=null;try{pr=JSON.parse(localStorage.getItem(progKey()))}catch(e){}
@@ -944,6 +968,66 @@ function pLatihan(){
     <div class="card"><h3>🕘 Riwayat <span class="mut small">(ketuk untuk lihat soal)</span></h3><div id="hist" class="mut">Memuat...</div></div>`;
   if(!isUmum())kurLatFetch(false);
   loadHist();
+}
+/* ==========================================================================
+   TAB KURIKULUM — peta materi, rencana belajar, dan pelajaran spesial.
+   Materi acuan dicek ke sumber resmi (kurFetch20) dan dipakai saat membuat
+   soal; pelajaran Psikologi/Sosiologi hanya terbuka untuk admin atau akun
+   yang diizinkan admin lewat dokumen pengguna.
+   ========================================================================== */
+const RB_SPECIAL_INFO={
+  Psikologi:{ico:'🧠',desc:'Ilmu tentang perilaku dan proses mental: persepsi, belajar, emosi, kepribadian, sampai psikologi sosial. Berguna untuk memahami diri, belajar lebih efisien, dan membaca perilaku orang lain.',pakai:'Cocok untuk siswa SMA (fase E–F), calon mahasiswa psikologi, dan siapa pun yang ingin belajar berpikir tentang perilaku secara ilmiah.'},
+  Sosiologi:{ico:'🏙️',desc:'Ilmu tentang masyarakat: interaksi, norma, stratifikasi, konflik, perubahan sosial, dan masalah sosial di Indonesia.',pakai:'Cocok untuk siswa SMA (fase E–F), persiapan olimpiade/UTBK soshum, dan pembaca yang ingin memahami isu sosial sehari-hari.'}
+};
+function rbSubStart(t,tab){
+  let sub=String(t||'');
+  try{sub=decodeURIComponent(sub)}catch(e){}
+  S.sub=sub;S.tab=tab||'latihan';home();
+}
+function pKurikulum(){
+  const lv=kurLatLevel()||'SMA Kelas 10';
+  const topics=isUmum()?[]:topicList(lv);
+  const fase16=/Kelas (10|11|12)|SMA|SMK/.test(lv)?'E–F':/Kelas (7|8|9)|SMP/.test(lv)?'D':/Kelas [1-6]|SD/.test(lv)?'A–C':'—';
+  const minggu=[[],[],[],[]];
+  topics.forEach((t,i)=>minggu[Math.min(3,Math.floor(i/Math.max(1,Math.ceil(topics.length/4))))].push(t));
+  const plan=minggu.filter(w=>w.length).map((w,i)=>`<div class="rb-step"><b>Minggu ${i+1}</b><div class="small mut">${w.map(esc).join(' • ')}</div><div class="row" style="margin-top:6px"><button class="btn alt" onclick="rbSubStart('${encodeURIComponent(w[0])}','buat')">✨ Buat soal topik ini</button></div></div>`).join('')
+    ||'<div class="rb-muted-box">Topik untuk tingkat ini belum tersedia di daftar lokal. Tekan “Periksa materi terbaru” untuk mengambil acuan resmi.</div>';
+  const khusus=SPECIAL_MAPEL.map(function(m){
+    const info=RB_SPECIAL_INFO[m],ok=rbCanSpecial(m);
+    if(!ok){
+      return '<div class="card" style="opacity:.92"><div class="rb-card-head"><h3>'+info.ico+' '+esc(m)+'</h3><span class="rb-pill">terkunci</span></div>'
+        +'<div class="small mut">Pelajaran spesial. Hanya admin dan akun yang diizinkan admin yang bisa membuka. Minta akses lewat menu Admin → Akses pelajaran spesial.</div></div>';
+    }
+    const tp=(TOPICS[m]||[]).slice(0,8);
+    return '<div class="card"><div class="rb-card-head"><h3>'+info.ico+' '+esc(m)+'</h3><span class="rb-pill y">izin aktif</span></div>'
+      +'<div class="small mut">'+esc(info.desc)+'</div>'
+      +'<div class="small" style="margin-top:6px"><b>Untuk siapa:</b> '+esc(info.pakai)+'</div>'
+      +'<div class="rb-pill-row" style="margin-top:8px">'+tp.map(function(t){return '<button class="x" onclick="rbSubStart(\''+encodeURIComponent(t)+'\',\'latihan\')">'+esc(t)+'</button>';}).join('')+'</div>'
+      +'<div class="row" style="margin-top:8px"><button class="btn full" onclick="S.mapel=\''+esc(m)+'\';S.tab=\'latihan\';S.sub=\'\';home()">🎯 Latihan '+esc(m)+'</button>'
+      +'<button class="btn alt full" onclick="S.mapel=\''+esc(m)+'\';S.tab=\'buat\';S.sub=\'\';home()">✨ Buat soal</button></div></div>';
+  }).join('');
+  $('pane').innerHTML=
+    '<div class="card rb-hero"><div class="rb-eyebrow">Kurikulum &amp; rencana belajar</div>'
+      +'<h2>'+esc(S.mapel)+' · '+esc(lv)+'</h2>'
+      +'<div class="rb-note">Acuan: Kurikulum Merdeka (fase '+fase16+'). Materi pokok diambil dari daftar resmi yang diperiksa ke situs Kemendikdasmen/BSKAP, lalu dipakai mesin untuk membuat soal. Data global dipakai hanya untuk konteks yang bisa diverifikasi.</div>'
+      +'<div class="rb-actions">'
+        +'<button class="btn" onclick="S.tab=\'latihan\';home()">🎯 Mulai latihan</button>'
+        +'<button class="btn alt" onclick="S.tab=\'buat\';home()">✨ Buat soal sesuai kurikulum</button>'
+        +'<button class="btn alt" onclick="S.tab=\'tutor\';home()">💬 Tanya tutor</button>'
+        +'<button class="btn alt" onclick="S.tab=\'panduan\';home()">📖 Panduan</button>'
+      +'</div></div>'
+    +(isUmum()?'':'<div class="card"><div class="rb-card-head"><h3>📚 Materi acuan real-time</h3><span class="rb-pill">sumber resmi</span></div><div class="mut small">Diperiksa otomatis saat tab ini dibuka. Hasilnya dipakai saat membuat soal baru agar sesuai kurikulum yang berlaku.</div><div class="row" style="margin-top:8px"><button class="btn alt full" onclick="kurLatFetch(true,\'kurTab\')">🔍 Periksa ulang materi</button></div><div id="kurTab"></div></div>')
+    +'<div class="rb-grid">'
+      +'<div class="card"><div class="rb-card-head"><h3>🗺️ Peta topik '+esc(lv)+'</h3><span class="rb-pill">'+topics.length+' topik</span></div>'
+        +(topics.length?topics.map(function(t){return '<button class="x" style="margin:3px" onclick="rbSubStart(\''+encodeURIComponent(t)+'\',\'latihan\')">'+esc(t)+'</button>';}).join(''):'<div class="rb-muted-box">Belum ada daftar topik lokal. Periksa materi terbaru di atas.</div>')
+        +'<div class="small mut" style="margin-top:8px">Menekan topik langsung membuka latihan dengan subtopik itu.</div></div>'
+      +'<div class="card"><div class="rb-card-head"><h3>🗓️ Rencana 4 minggu</h3><span class="rb-pill">dari daftar topik</span></div><div class="rb-flow">'+plan+'</div>'
+        +'<div class="rb-callout ok" style="margin-top:8px"><b>Pola yang terbukti:</b> baca singkat → tutup buku → jelaskan dengan kata sendiri → kerjakan 5 soal → ulangi topik lemah 2 hari kemudian.</div></div>'
+    +'</div>'
+    +'<div class="card"><div class="rb-card-head"><h3>🎓 Pelajaran spesial</h3><span class="rb-pill">izin admin</span></div>'
+      +'<div class="small mut" style="margin-bottom:8px">Dua pelajaran tambahan di luar mapel utama. Akses diberikan admin per akun; admin selalu bisa membuka.</div>'
+      +'<div class="rb-grid">'+khusus+'</div></div>';
+  if(!isUmum())kurLatFetch(false,'kurTab');
 }
 async function loadQs2(n){
   if(isUmum())return loadQs(n);
@@ -2598,16 +2682,16 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa-jp-data.js?v=20261121a"></script>
 <script src="bahasa-jp-data2.js?v=20261121a"></script>
 <script src="bahasa-jp-grammar.js?v=20261121a"></script>
-<script src="bahasa.js?v=20261128b"></script>
-<script src="rb-core.js?v=20261128f"></script>
+<script src="bahasa.js?v=20261128g"></script>
+<script src="rb-core.js?v=20261128g"></script>
 <script src="rb-content.js?v=20261122h"></script>
-<script src="rb-ui.js?v=20261121a"></script>
+<script src="rb-ui.js?v=20261128g"></script>
 <script src="rb-alch.js?v=20261122h"></script>
 <script src="rb-alch-live.js?v=20261122h"></script>
 <script src="rb-v33.js?v=20261121a"></script>
-<script src="rb-xau.js?v=20261128b"></script>
-<script src="rb-admin.js?v=20261128d"></script>
-<script src="rb-music.js?v=20261128c"></script>
-<link rel="stylesheet" href="rb-v35.css?v=20261128e">
+<script src="rb-xau.js?v=20261128g"></script>
+<script src="rb-admin.js?v=20261128g"></script>
+<script src="rb-music.js?v=20261128g"></script>
+<link rel="stylesheet" href="rb-v35.css?v=20261128i">
 </body>
 </html>

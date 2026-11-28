@@ -19,6 +19,65 @@ function rbAdTradeLabel(tr) {
   return 'Beri Trading';
 }
 
+/* ---------- akses pelajaran spesial (Psikologi / Sosiologi) ---------- */
+function rbAdSpecialList(x) {
+  const a = x && Array.isArray(x.pelajaran) ? x.pelajaran : [];
+  return a.filter(function (m) { return m === 'semua' || SPECIAL_MAPEL.indexOf(m) >= 0; });
+}
+function rbAdSpecialChips(x) {
+  if (x && x.admin) return '<span class="badge b-admin">Semua pelajaran</span>';
+  const a = rbAdSpecialList(x);
+  if (!a.length) return '';
+  if (a.indexOf('semua') >= 0) return '<span class="badge b-aktif">Psikologi + Sosiologi</span>';
+  return a.map(function (m) { return '<span class="badge b-aktif">' + esc(m) + '</span>'; }).join(' ');
+}
+function rbAdSpecialBtns(x) {
+  if (!x || x.admin) return '';
+  const a = rbAdSpecialList(x);
+  const all = a.indexOf('semua') >= 0;
+  return SPECIAL_MAPEL.map(function (m) {
+    const on = all || a.indexOf(m) >= 0;
+    return '<button class="ad-act ' + (on ? 'warn' : '') + '" type="button" data-id="' + esc(x.id) + '" data-m="' + esc(m) + '" data-on="' + (on ? '1' : '0') + '" onclick="adSpecial(this)">'
+      + (on ? 'Cabut ' : 'Beri ') + esc(m) + '</button>';
+  }).join('');
+}
+async function adSpecial(el) {
+  const id = el && el.dataset ? el.dataset.id : '';
+  const m = el && el.dataset ? el.dataset.m : '';
+  const on = el && el.dataset ? el.dataset.on === '1' : false;
+  if (!id || !m) return;
+  try {
+    const ref = db.collection('pengguna').doc(id);
+    const snap = await ref.get();
+    const cur = (snap.exists && Array.isArray(snap.data().pelajaran)) ? snap.data().pelajaran.slice() : [];
+    const next = on ? cur.filter(function (x) { return x !== m; }) : Array.from(new Set(cur.concat([m])));
+    await ref.set({ pelajaran: next }, { merge: true });
+    const row = (AD.list || []).find(function (x) { return x.id === id; });
+    if (row) row.pelajaran = next;
+    drawAdmin();
+  } catch (e) {
+    alert('Gagal menyimpan akses pelajaran: ' + ((e && e.message) || e) + '\nPastikan aturan Firestore terbaru sudah dipasang.');
+  }
+}
+async function adSpecialEmail() {
+  const em = String(($('adesp') || {}).value || '').trim().toLowerCase();
+  const m = String(($('adspec') || {}).value || '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return alert('Format email tidak valid');
+  const ref = db.collection('pengguna').doc(em);
+  try {
+    const snap = await ref.get();
+    const cur = (snap.exists && Array.isArray(snap.data().pelajaran)) ? snap.data().pelajaran.slice() : [];
+    const next = Array.from(new Set(cur.concat([m])));
+    await ref.set({ email: em, pelajaran: next }, { merge: true });
+    const row = (AD.list || []).find(function (x) { return x.id === em; });
+    if (row) row.pelajaran = next;
+    $('adesp').value = '';
+    drawAdmin();
+  } catch (e) {
+    alert('Gagal memberi akses: ' + ((e && e.message) || e));
+  }
+}
+
 function drawAdmin() {
   if (!S.admin) { $('app').innerHTML = '<div class="card">Halaman ini hanya untuk admin.</div>'; return; }
   const L = (AD.list || []), n = k => L.filter(x => x.status === k).length;
@@ -54,6 +113,12 @@ function drawAdmin() {
     + '<div class="mut small" style="margin-bottom:10px">Daftarkan email sebelum orangnya masuk. Akun langsung berstatus aktif.</div>'
     + '<div class="ad-add"><input id="adem" type="email" placeholder="nama@gmail.com" autocomplete="off">'
     + '<button class="btn" type="button" onclick="adAdd()">Izinkan</button></div></div>'
+    + '<div class="card"><div class="rb-card-head"><h3>🎓 Akses pelajaran spesial</h3><span class="rb-pill">Psikologi · Sosiologi</span></div>'
+    + '<div class="mut small" style="margin-bottom:10px">Dua pelajaran ini tidak tampil di menu pelajaran sampai admin memberi izin per akun. Admin selalu bisa membuka. Akses ikut terbaca saat pengguna memuat ulang halaman.</div>'
+    + '<div class="ad-add"><input id="adesp" type="email" placeholder="nama@gmail.com" autocomplete="off">'
+    + '<select id="adspec" aria-label="Pilih pelajaran">' + SPECIAL_MAPEL.map(function (m) { return '<option>' + esc(m) + '</option>'; }).join('') + '</select>'
+    + '<button class="btn" type="button" onclick="adSpecialEmail()">Beri akses</button></div>'
+    + '<div class="rb-note" style="margin-top:8px">Cabut akses lewat tombol di daftar pengguna (Beri/Cabut Psikologi atau Sosiologi).</div></div>'
     + '<div class="card"><div class="rb-card-head"><h3>Alur kerja admin</h3></div>'
     + '<div class="item"><span>1. Setujui akun baru</span><b>Izinkan</b></div>'
     + '<div class="item"><span>2. Beri akses Trading bila perlu</span><b>Beri Trading</b></div>'
@@ -88,6 +153,7 @@ function drawAdList() {
         : (x.status !== 'aktif' ? '<button class="ad-act ok" type="button" data-id="' + id + '" onclick="adSet(this,\'aktif\')">Izinkan</button>' : '')
         + (x.status !== 'diblokir' ? '<button class="ad-act danger" type="button" data-id="' + id + '" onclick="adSet(this,\'diblokir\')">Blokir</button>' : '')
         + (x.admin ? '' : '<button class="ad-act ' + (tr === 'disetujui' ? 'warn' : '') + '" type="button" data-id="' + id + '" onclick="adTrade(this,\'' + (tr === 'disetujui' ? 'dicabut' : 'disetujui') + '\')">' + rbAdTradeLabel(tr) + '</button>')
+        + rbAdSpecialBtns(x)
         + '<button class="ad-act danger" type="button" data-id="' + id + '" onclick="adDel(this)">Hapus</button>';
       const av = x.foto
         ? '<img src="' + esc(x.foto) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
@@ -98,7 +164,7 @@ function drawAdList() {
         + '<div class="ad-name">' + esc(x.nama || '(belum ada nama)') + '</div>'
         + '<div class="ad-mail">' + esc(x.email || x.id) + '</div>'
         + '</div><span class="badge b-' + esc(x.status) + '">' + esc(x.status) + '</span></div>'
-        + '<div class="ad-tags">' + rbAdTradeChip(x, tr) + '</div>'
+        + '<div class="ad-tags">' + rbAdTradeChip(x, tr) + rbAdSpecialChips(x) + '</div>'
         + '<div class="ad-acts">' + acts + '</div>'
         + '</div></div>';
     }).join('');

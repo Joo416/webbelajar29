@@ -1581,7 +1581,7 @@
     const p = j.aiPanel;
     if (!p || !p.total) {
       const errs = (p && p.errors || []).slice(0, 6);
-      return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">0/${XE((p && p.attempts) || 8)} valid</span></div><div class="warn">Panel AI tidak memberi jawaban JSON valid. Arah mesin tetap dipakai; ringkasan di bawah disusun dari data mesin.</div>${errs.length ? `<div class="small mut" style="margin-top:5px">${errs.map(x => '• ' + XE(x)).join('<br>')}</div>` : ''}</div>`;
+      return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">0/${XE((p && p.attempts) || 8)} valid</span></div><div class="warn">Panel AI belum menjawab (penyedia lambat, kuota habis, atau key belum dipasang). Arah mesin tetap dipakai; ringkasan di bawah disusun dari data mesin.</div>${errs.length ? `<div class="small mut" style="margin-top:5px">${errs.map(x => '• ' + XE(x)).join('<br>')}</div>` : ''}</div>`;
     }
     return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel ${XE(p.total)} AI independen</h3><span class="rb-pill y">${p.consensus === 'SPLIT' ? 'terbelah' : 'mayoritas ' + XE(p.consensus)} · ${XE(p.agreement)}%</span>${p.reused ? `<span class="rb-pill" title="Panel AI dipakai ulang untuk menghemat kuota">dipakai ulang${p.reusedAt ? ' · ' + XE(new Date(p.reusedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) : ''}</span>` : ''}</div>
       <div class="small mut">${XE(p.note)} ${p.distinctProviders ? '· ' + p.distinctProviders + ' penyedia berbeda' : ''}${p.avgConfidence != null ? ' · rata-rata keyakinan ' + p.avgConfidence + '%' : ''}</div>
@@ -1792,7 +1792,9 @@
     if (!d) return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan AI</h3><span class="rb-pill">${ai.ok ? 'AI siap' : 'AI tidak tersedia'}</span></div><div class="warn">${ai.ok ? 'AI tidak mengirim dokumen valid.' : 'AI gagal: ' + XE(ai.error || 'tidak ada key aktif') + '. Arah & spike tetap dihitung mesin dari data.'}</div></div>`;
     const fallback = !!(ai.fallback || d.fallback);
     return `<div class="card"><div class="rb-card-head"><h3>🧠 Ringkasan ${fallback ? 'mesin' : 'AI'}</h3><span class="rb-pill ${fallback ? '' : 'y'}">${fallback ? 'fallback deterministik' : XE(ai.provider || 'AI')}</span></div>
-      ${fallback ? `<div class="warn" style="margin-bottom:8px">⚠️ AI gagal memberi JSON valid: ${XE(ai.error || d.fallback_reason || 'balasan tidak valid')}. Ringkasan ini disusun mesin dari data yang sama; tidak ada angka atau arah baru. Panel AI di atas menunjukkan penyedia yang gagal.</div>` : ''}
+      ${fallback ? (ai.why === 'timeout' || ai.why === 'budget' || /batas waktu|waktu server|deadline/i.test(String(ai.error || d.fallback_reason || ''))
+        ? `<div class="warn" style="margin-bottom:8px">⏱️ Ringkasan AI dilewati karena batas waktu server. Ringkasan di bawah disusun mesin dari data yang sama: tidak ada angka atau arah baru. Muat ulang beberapa saat lagi bila ingin ringkasan AI.</div>`
+        : `<div class="warn" style="margin-bottom:8px">⚠️ Penyedia AI tidak mengirim JSON valid: ${XE(ai.error || d.fallback_reason || 'balasan tidak valid')}. Ringkasan ini disusun mesin dari data yang sama; tidak ada angka atau arah baru. Panel AI di atas menunjukkan penyedia yang gagal.</div>`) : ''}
       ${!fallback && ai.repaired ? `<div class="small" style="color:var(--warn);margin-bottom:6px">Jawaban AI terpotong dan berhasil diperbaiki parser; periksa angka penting di panel Validitas.</div>` : ''}
       <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;line-height:1.35;margin-bottom:6px">${XE(d.headline || '')}</div>
       <div class="exp" style="color:var(--tx);line-height:1.6">${XE(d.summary || '')}</div>
@@ -1914,8 +1916,9 @@
       </div>
       <div class="card">
         <div class="rb-card-head"><h3>📺 Chart TradingView — XAUUSD M5</h3><span class="rb-pill" id="tvPrice">real-time</span></div>
+        <div class="rb-pill-row" style="margin-top:8px"><button class="x" type="button" onclick="xTvSetSym('FOREXCOM:XAUUSD')">XAUUSD (Sen–Jum)</button><button class="x" type="button" onclick="xTvSetSym('BINANCE:PAXGUSDT')">Emas 24/7 (PAXG)</button></div>
         <div id="xTvHost" style="min-height:120px;border-radius:10px;overflow:hidden;margin-top:8px;background:#0f172a"><div class="small mut" style="padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:#cbd5e1">Chart TradingView dimuat terpisah supaya tab Signal tetap ringan dan tidak membeku di perangkat kelas bawah. Candle, harga, dan tanda Alchemist di bawah tetap memakai feed TradingView live.<button class="btn" type="button" onclick="xTvMount(true)">📺 Muat chart TradingView</button></div></div>
-        <div class="small mut" style="margin-top:6px">Chart TradingView live memakai feed publik yang benar-benar tersedia: FOREXCOM:XAUUSD. HFM:XAUUSD dan EXNESS:XAUUSD tidak tersedia di feed publik TradingView (scanner mengembalikan data kosong), jadi tidak dipakai sebagai klaim palsu. Candle, harga, struktur, dan tanda Alchemist dihitung dari feed live yang sama; chart di bawah bukan gambar statis.</div>
+        <div class="small mut" style="margin-top:6px">Pasar XAUUSD spot/forex tutup Sabtu–Minggu, jadi chart FOREXCOM:XAUUSD memang berhenti di akhir pekan. Untuk melihat gerak emas 24/7, pilih <b>Emas 24/7 (PAXG)</b>: PAXG adalah token emas 1:1 dengan emas fisik yang diperdagangkan terus di bursa kripto, harganya mengikuti spot XAU. HFM:XAUUSD dan EXNESS:XAUUSD tidak tersedia di feed publik TradingView, jadi tidak dipakai sebagai klaim palsu. Candle, harga, struktur, dan tanda Alchemist dihitung dari feed live; chart bukan gambar statis.</div>
       </div>
       <div id="sigOut"><div class="card" id="sigLoading"><div class="small mut">⏳ Memuat chart dan sinyal dari candle terbaru…</div></div></div>`;
     const bootGen = ++sigBootGen;
@@ -2403,12 +2406,23 @@
       sigRO.observe(X$('xSigChart'));
     }
   }
-  window.xTvMount = function (force) {
+  /* Pilihan chart: XAUUSD (mengikuti jam pasar) atau PAXG (emas 24/7).
+     Simbol disimpan per perangkat supaya tidak berubah setiap muat ulang. */
+  try { window.xTvChartSym = localStorage.getItem('xau_chart_sym') || 'FOREXCOM:XAUUSD'; } catch (e) { window.xTvChartSym = 'FOREXCOM:XAUUSD'; }
+  window.xTvSetSym = function (sym) {
+    if (!sym) return;
+    window.xTvChartSym = sym;
+    try { localStorage.setItem('xau_chart_sym', sym); } catch (e) { }
+    const host = X$('xTvHost');
+    if (host) { host.dataset.on = ''; host.innerHTML = ''; }
+    window.xTvMount(true);
+  };
+  window.xTvMount = function (force, symArg) {
     const host = X$('xTvHost');
     if (!host || host.dataset.on || !force) return;
     host.style.height = '420px';
     host.dataset.on = '1';
-    const sym = (sigData && sigData.tvSymbol) || 'FOREXCOM:XAUUSD';
+    const sym = symArg || window.xTvChartSym || (sigData && sigData.tvSymbol) || 'FOREXCOM:XAUUSD';
     host.innerHTML = '<div id="tvNote" class="small mut" style="padding:10px">Memuat chart TradingView real-time…</div>';
     const f = document.createElement('iframe');
     f.src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(sym) + '&interval=5&theme=dark&style=1&timezone=Asia%2FJakarta&locale=id&hidesidetoolbar=0&symboledit=1&saveimage=0&withdateranges=1&studies=%5B%5D';
