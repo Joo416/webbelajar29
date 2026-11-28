@@ -1914,11 +1914,10 @@
       </div>
       <div class="card">
         <div class="rb-card-head"><h3>📺 Chart TradingView — XAUUSD M5</h3><span class="rb-pill" id="tvPrice">real-time</span></div>
-        <div id="xTvHost" style="height:420px;border-radius:10px;overflow:hidden;margin-top:8px;background:#0f172a"></div>
+        <div id="xTvHost" style="min-height:120px;border-radius:10px;overflow:hidden;margin-top:8px;background:#0f172a"><div class="small mut" style="padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:#cbd5e1">Chart TradingView dimuat terpisah supaya tab Signal tetap ringan dan tidak membeku di perangkat kelas bawah. Candle, harga, dan tanda Alchemist di bawah tetap memakai feed TradingView live.<button class="btn" type="button" onclick="xTvMount(true)">📺 Muat chart TradingView</button></div></div>
         <div class="small mut" style="margin-top:6px">Chart TradingView live memakai feed publik yang benar-benar tersedia: FOREXCOM:XAUUSD. HFM:XAUUSD dan EXNESS:XAUUSD tidak tersedia di feed publik TradingView (scanner mengembalikan data kosong), jadi tidak dipakai sebagai klaim palsu. Candle, harga, struktur, dan tanda Alchemist dihitung dari feed live yang sama; chart di bawah bukan gambar statis.</div>
       </div>
       <div id="sigOut"><div class="card" id="sigLoading"><div class="small mut">⏳ Memuat chart dan sinyal dari candle terbaru…</div></div></div>`;
-    xTvMount();
     const bootGen = ++sigBootGen;
     const boot = (async function () {
       const m0 = X$('sigMsg'); if (m0) m0.textContent = 'Menyinkronkan state akun & hasil tersimpan…';
@@ -2404,9 +2403,10 @@
       sigRO.observe(X$('xSigChart'));
     }
   }
-  window.xTvMount = function () {
+  window.xTvMount = function (force) {
     const host = X$('xTvHost');
-    if (!host || host.dataset.on) return;
+    if (!host || host.dataset.on || !force) return;
+    host.style.height = '420px';
     host.dataset.on = '1';
     const sym = (sigData && sigData.tvSymbol) || 'FOREXCOM:XAUUSD';
     host.innerHTML = '<div id="tvNote" class="small mut" style="padding:10px">Memuat chart TradingView real-time…</div>';

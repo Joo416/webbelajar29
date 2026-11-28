@@ -497,10 +497,10 @@ function pBeranda() {
       + '<h2>' + (today.n >= tg ? 'Target hari ini tercapai ' : 'Selamat datang, ' + rb26Safe(rb26FirstName()) + ' ') + '</h2>'
       + '<div class="rb-note">' + (today.n >= tg ? 'Konsistensi terjaga. Lanjutkan dengan tryout atau ulangi soal yang salah.' : 'Sisakan ' + Math.max(0, tg - today.n) + ' soal lagi untuk menutup target hari ini.') + '</div>'
       + '<div class="rb-kpis">'
-        + '<div class="rb-kpi"><b> ' + st + '</b><span>streak hari</span></div>'
-        + '<div class="rb-kpi"><b> ' + rb26Num(a.xp || 0) + '</b><span>XP</span></div>'
-        + '<div class="rb-kpi"><b> ' + acc + '%</b><span>akurasi total</span></div>'
-        + '<div class="rb-kpi"><b> ' + cal.active + '</b><span>hari aktif bulan ini</span></div>'
+        + '<div class="rb-kpi"><b>🔥 ' + st + '</b><span>streak hari</span></div>'
+        + '<div class="rb-kpi"><b>⚡ ' + rb26Num(a.xp || 0) + '</b><span>XP</span></div>'
+        + '<div class="rb-kpi"><b>🎯 ' + acc + '%</b><span>akurasi total</span></div>'
+        + '<div class="rb-kpi"><b>📅 ' + cal.active + '</b><span>hari aktif bulan ini</span></div>'
       + '</div></div>'
       + '<div class="ring" style="--p:' + pct + '" aria-label="Target harian ' + pct + '%"><div class="ring-in"><b>' + today.n + '</b><span>/' + tg + '</span></div></div>'
     + '</div>'
@@ -561,7 +561,7 @@ function pKalender() {
     + '<div class="rb-grid">'
       + '<div class="card"><div class="rb-card-head"><h3>🕒 Jam dunia</h3><span class="rb-live">real time</span></div>' + rb26ClocksHtml()
         + '<div class="rb-note" style="margin-top:9px">Berguna untuk menyelaraskan jadwal belajar dengan sesi pasar (London/New York) atau kelas online.</div></div>'
-      + '<div class="card"><div class="rb-card-head"><h3> 14 hari terakhir</h3></div>' + list + '</div>'
+      + '<div class="card"><div class="rb-card-head"><h3>📅 14 hari terakhir</h3></div>' + list + '</div>'
     + '</div>';
   rb26StartClocks();
 }
@@ -591,7 +591,7 @@ async function pPapan() {
   if (mine) mine.innerHTML = '<div class="item"><span>🔥 Streak</span><b>' + st + ' hari</b></div>'
     + '<div class="item"><span>⚡ XP</span><b>' + rb26Num(a.xp || 0) + '</b></div>'
     + '<div class="item"><span>📅 Hari ini</span><b>' + t.n + ' / ' + (typeof v21Target === 'function' ? v21Target() : 20) + ' soal</b></div>'
-    + '<div class="item"><span> 7 hari</span><b>' + (typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0) + ' soal</b></div>'
+    + '<div class="item"><span>📅 7 hari</span><b>' + (typeof v21WeekSum === 'function' ? v21WeekSum(a) : 0) + ' soal</b></div>'
     + '<div class="item"><span>✅ Akurasi total</span><b>' + (sum ? Math.round(ok / sum * 100) : 0) + '%</b></div>';
 
   const all = await v21BoardList(250, v21BoardCat), b = $('v21board');
@@ -605,10 +605,10 @@ async function pPapan() {
   if (!l.length) { b.innerHTML = '<div class="mut small">Belum ada peserta.</div>'; return; }
   b.innerHTML = l.map(function (x, i) {
     const s = v21Stat(x, v21BoardCat);
-    return '<div class="v21-rank ' + (x.uid === me ? 'me' : '') + '"><span class="v21-pos">' + (i < 3 ? ['', '', ''][i] : i + 1) + '</span>'
+    return '<div class="v21-rank ' + (x.uid === me ? 'me' : '') + '"><span class="v21-pos">' + (i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1) + '</span>'
       + '<div class="v21-nm">' + rb26Safe(x.nama || 'Siswa') + (x.uid === me ? ' <i>(kamu)</i>' : '')
       + '<div class="v21-stat">✅ <b>' + s.b + '</b> benar • ❌ <b>' + s.s + '</b> salah • ' + v21Acc(s) + '%</div>'
-      + '<div class="mut small"> ' + (x.streak || 0) + ' hari • ' + (x.minggu || 0) + ' soal/7 hari</div></div>'
+      + '<div class="mut small">🔥 ' + (x.streak || 0) + ' hari • ' + (x.minggu || 0) + ' soal/7 hari</div></div>'
       + '<span class="v21-xp">' + rb26Num(x.xp || 0) + '<div class="mut small">XP</div></span></div>';
   }).join('');
 }
