@@ -126,6 +126,123 @@ const LB_VERBS = (function () {
   return out;
 })();
 
+/* ---------- romaji & kamus dua arah (luring, tanpa AI) ---------- */
+const LB_KANA_MAP = (function () {
+  const m = {};
+  try { lbKanaFlat('hira').forEach(function (x) { if (x.k) m[x.k] = x.r; }); } catch (e) { }
+  return m;
+})();
+function lbRomaji(s) {
+  const t = String(s == null ? '' : s).replace(/[ァ-ヶ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0x60); });
+  let out = '', i = 0;
+  while (i < t.length) {
+    const two = t.slice(i, i + 2), one = t[i];
+    if (one === 'ー') { out += out.slice(-1); i++; continue; }
+    if (one === 'っ') {
+      const nx = LB_KANA_MAP[t.slice(i + 1, i + 3)] || LB_KANA_MAP[t[i + 1]] || '';
+      out += nx ? nx[0] : ''; i++; continue;
+    }
+    if (LB_KANA_MAP[two]) { out += LB_KANA_MAP[two]; i += 2; continue; }
+    if (LB_KANA_MAP[one]) { out += LB_KANA_MAP[one]; i++; continue; }
+    if (one === 'ん') { out += 'n'; i++; continue; }
+    out += one; i++;
+  }
+  return out;
+}
+const LB_ARTI_REV = (function () {
+  const rev = {};
+  Object.keys(LB_ARTI).forEach(function (w) {
+    String(LB_ARTI[w] || '').split(/[,;/]/).forEach(function (m0) {
+      const k = m0.trim().toLowerCase();
+      if (!k) return;
+      rev[k] = rev[k] || [];
+      if (rev[k].indexOf(w) < 0) rev[k].push(w);
+    });
+  });
+  return rev;
+})();
+function lbNormQ(s) { return String(s == null ? '' : s).toLowerCase().replace(/[.,!?;:()"']/g, ' ').replace(/\s+/g, ' ').trim(); }
+function lbUniqOpts(list, answer) {
+  const seen = {}; seen[String(answer)] = 1;
+  const out = [];
+  list.forEach(function (x) { const s = String(x == null ? '' : x); if (!s || seen[s]) return; seen[s] = 1; out.push(s); });
+  return out.slice(0, 3);
+}
+function lbEnLookup(q) {
+  const n = lbNormQ(q);
+  if (!n) return [];
+  const out = [], seen = {};
+  const push = function (v) { if (v && !seen[v.v1]) { seen[v.v1] = 1; out.push(v); } };
+  LB_VERBS.forEach(function (v) {
+    if (lbNormQ(v.v1) === n || lbNormQ(v.v2) === n || lbNormQ(v.v3) === n) push(v);
+  });
+  (LB_ARTI_REV[n] || []).forEach(function (w) { push(LB_VERBS.filter(function (v) { return v.v1 === w; })[0]); });
+  if (out.length < 4) {
+    LB_VERBS.forEach(function (v) {
+      if (out.length >= 8) return;
+      if (lbNormQ(v.v1 + ' ' + v.arti).indexOf(n) >= 0) push(v);
+    });
+  }
+  return out.slice(0, 8);
+}
+function lbTrEnHtml(q) {
+  const n = lbNormQ(q);
+  if (!n) return '<div class="mut small">Ketik kata Inggris atau arti Indonesia. Contoh: <b>written</b> (Inggris) atau <b>pergi</b> (Indonesia).</div>';
+  const found = lbEnLookup(q);
+  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba bentuk dasar (write), V2/V3 (wrote/written), atau arti lain.</div>';
+  return found.map(function (v) {
+    return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(v.v1) + '</b><span>' + lbEsc(v.v2) + ' · ' + lbEsc(v.v3) + '</span><em>' + (v.arti ? lbEsc(v.arti) : '<i class="mut">arti belum ada</i>') + '</em></div>' + lbAudioBtn(v.v1, 'en') + '</div>';
+  }).join('');
+}
+function lbEnTransCard() {
+  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus luring</div><h3>Terjemahan cepat EN ↔ ID</h3></div><span class="lb-count">tanpa AI</span></div>' +
+    '<div class="lb-search"><span>🔁</span><input type="search" autocomplete="off" placeholder="written / pergi / menerima..." value="' + lbEsc(LB.trEn || '') + '" oninput="lbTrEn(this.value)"></div>' +
+    '<div id="lbtrout" class="lb-trans-out">' + lbTrEnHtml(LB.trEn || '') + '</div>' +
+    '<div class="mut small" style="margin-top:8px">Dua arah: ketik kata Inggris (V1/V2/V3) atau arti Indonesia. Hasil diambil dari kamus bawaan, jadi terjemahannya tetap sama setiap kali dibuka.</div></div>';
+}
+function lbTrEn(v) {
+  LB.trEn = v;
+  const box = $('lbtrout');
+  if (box) box.innerHTML = lbTrEnHtml(v);
+}
+function lbJpLookup(q) {
+  const n = lbNormQ(q);
+  if (!n) return [];
+  const out = [];
+  LB_JP_VOCAB.forEach(function (v) {
+    if (out.length >= 10) return;
+    if (lbNormQ(v.k).indexOf(n) >= 0 || lbNormQ(v.r).indexOf(n) >= 0 || lbNormQ(v.a).indexOf(n) >= 0) out.push({ t: 'vocab', v: v });
+  });
+  LB_KANJI.forEach(function (x) {
+    if (out.length >= 10) return;
+    if (String(x.k) === q.trim() || lbNormQ(x.arti).indexOf(n) >= 0) out.push({ t: 'kanji', v: x });
+  });
+  return out;
+}
+function lbTrJpHtml(q) {
+  const n = lbNormQ(q);
+  if (!n) return '<div class="mut small">Ketik kana/kanji, romaji, atau arti Indonesia. Contoh: <b>たべる</b>, <b>taberu</b>, <b>makan</b>.</div>';
+  const found = lbJpLookup(q);
+  if (!found.length) return '<div class="mut small">Tidak ada di kamus luring. Coba romaji tanpa spasi (ohayou) atau arti lain.</div>';
+  return found.map(function (r) {
+    if (r.t === 'vocab') {
+      return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(r.v.k) + '</b><span>' + lbEsc(r.v.r) + ' · ' + lbEsc(lbRomaji(r.v.k)) + '</span><em>' + lbEsc(r.v.a) + '</em></div>' + lbAudioBtn(r.v.k, 'jp') + '</div>';
+    }
+    return '<div class="lb-vocab"><div class="lb-vocab-main"><b>' + lbEsc(r.v.k) + '</b><span>' + lbEsc(lbRomaji(r.v.on.split(',')[0])) + ' · ' + lbEsc(lbRomaji(r.v.kun.split(',')[0])) + '</span><em>' + lbEsc(r.v.arti) + '</em></div>' + lbAudioBtn(r.v.k, 'jp') + '</div>';
+  }).join('');
+}
+function lbJpTransCard() {
+  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus luring</div><h3>Terjemahan cepat JP ↔ ID</h3></div><span class="lb-count">tanpa AI</span></div>' +
+    '<div class="lb-search"><span>🔁</span><input type="search" autocomplete="off" placeholder="たべる / taberu / makan..." value="' + lbEsc(LB.trJp || '') + '" oninput="lbTrJp(this.value)"></div>' +
+    '<div id="lbtroutjp" class="lb-trans-out">' + lbTrJpHtml(LB.trJp || '') + '</div>' +
+    '<div class="mut small" style="margin-top:8px">Tiga arah: tulisan Jepang, romaji, atau arti Indonesia. Setiap hasil menampilkan romaji dan tombol dengar.</div></div>';
+}
+function lbTrJp(v) {
+  LB.trJp = v;
+  const box = $('lbtroutjp');
+  if (box) box.innerHTML = lbTrJpHtml(v);
+}
+
 function lbNeed(lang) {
   return '<div class="card lb-empty"><div class="lb-empty-ico">📭</div><b>Data belum termuat</b><div class="mut small">Muat ulang halaman untuk memuat kamus bahasa.</div></div>';
 }
@@ -196,7 +313,7 @@ function lbRender() {
 }
 
 /* ---------- LATIHAN JEPANG ---------- */
-const LB_JP_MODES = [['kana', 'Kana'], ['kanji', 'Kanji'], ['vocab', 'Kosakata'], ['build', 'Susun kalimat'], ['mix', 'Campur']];
+const LB_JP_MODES = [['kana', 'Kana'], ['kanji', 'Kanji'], ['vocab', 'Arti ID→JP'], ['vocabRev', 'Arti JP→ID'], ['build', 'Susun kalimat'], ['mix', 'Campur']];
 function lbJpQuiz() {
   const q = LB.jq;
   const head = '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Latihan</div><h3>Uji kemampuan Jepangmu</h3></div><span class="lb-count">' + (q ? q.n + ' soal' : 'siap') + '</span></div>' +
@@ -209,24 +326,29 @@ function lbJpQuiz() {
 function lbJpStartQuiz(mode) {
   if (mode === 'build') { LB.tabJp = 'grammar'; lbBuildStart(); return; }
   const mix = mode === 'mix';
-  if (mix) mode = ['kana', 'kanji', 'vocab'][Math.floor(Math.random() * 3)];
+  if (mix) mode = ['kana', 'kanji', 'vocab', 'vocabRev'][Math.floor(Math.random() * 4)];
   const prev = LB.jq || { n: 0, score: 0 };
-  const q = { mode: mode, mix: mix, label: mix ? 'Campur' : { kana: 'Baca kana', kanji: 'Arti & baca kanji', vocab: 'Arti kosakata' }[mode], n: (prev.n || 0) + 1, score: prev.score || 0, done: false, ok: false };
+  const modes = { kana: 'Baca kana', kanji: 'Arti & baca kanji', vocab: 'Arti kosakata (ID→JP)', vocabRev: 'Arti kosakata (JP→ID)', build: 'Susun kalimat' };
+  const q = { mode: mode, mix: mix, label: mix ? 'Campur' : modes[mode], n: (prev.n || 0) + 1, score: prev.score || 0, done: false, ok: false };
   if (mode === 'kana') {
     const pool = lbKanaFlat(LB.ks === 'kata' ? 'kata' : 'hira');
     const uniq = [], seen = {};
     pool.forEach(function (x) { if (!seen[x.r]) { seen[x.r] = 1; uniq.push(x); } });
     const item = uniq[Math.floor(Math.random() * uniq.length)];
-    const others = lbShuffle(uniq.filter(function (x) { return x.r !== item.r; })).slice(0, 3).map(function (x) { return x.r; });
-    q.item = item; q.prompt = item.k; q.options = lbShuffle(others.concat([item.r])); q.answer = q.options.indexOf(item.r);
+    const opts = lbUniqOpts(uniq.map(function (x) { return x.r; }), item.r);
+    q.item = item; q.prompt = item.k; q.options = lbShuffle(opts.concat([item.r])); q.answer = q.options.indexOf(item.r);
   } else if (mode === 'kanji') {
     const item = LB_KANJI[Math.floor(Math.random() * LB_KANJI.length)];
-    const others = lbShuffle(LB_KANJI.filter(function (x) { return x.arti !== item.arti; })).slice(0, 3).map(function (x) { return x.arti; });
-    q.item = item; q.prompt = item.k; q.options = lbShuffle(others.concat([item.arti])); q.answer = q.options.indexOf(item.arti);
+    const opts = lbUniqOpts(LB_KANJI.map(function (x) { return x.arti; }), item.arti);
+    q.item = item; q.prompt = item.k; q.options = lbShuffle(opts.concat([item.arti])); q.answer = q.options.indexOf(item.arti);
+  } else if (mode === 'vocabRev') {
+    const item = LB_JP_VOCAB[Math.floor(Math.random() * LB_JP_VOCAB.length)];
+    const opts = lbUniqOpts(LB_JP_VOCAB.map(function (x) { return x.a; }), item.a);
+    q.item = item; q.prompt = item.k; q.options = lbShuffle(opts.concat([item.a])); q.answer = q.options.indexOf(item.a);
   } else {
     const item = LB_JP_VOCAB[Math.floor(Math.random() * LB_JP_VOCAB.length)];
-    const others = lbShuffle(LB_JP_VOCAB.filter(function (x) { return x.k !== item.k; })).slice(0, 3).map(function (x) { return x.k; });
-    q.item = item; q.prompt = item.a; q.options = lbShuffle(others.concat([item.k])); q.answer = q.options.indexOf(item.k);
+    const opts = lbUniqOpts(LB_JP_VOCAB.map(function (x) { return x.k; }), item.k);
+    q.item = item; q.prompt = item.a; q.options = lbShuffle(opts.concat([item.k])); q.answer = q.options.indexOf(item.k);
   }
   LB.jq = q;
   LB.tabJp = 'quiz';
@@ -236,6 +358,7 @@ function lbJqBox() {
   const q = LB.jq, it = q.item;
   const prompt = q.mode === 'kana' ? '<div class="lb-jp-prompt">' + lbEsc(q.prompt) + '</div><div class="mut small" style="margin-bottom:10px">Bagaimana cara membaca kana ini?</div>'
     : q.mode === 'kanji' ? '<div class="lb-jp-prompt lb-kanji-prompt">' + lbEsc(q.prompt) + '</div><div class="mut small" style="margin-bottom:10px">Apa arti kanji ini?</div>'
+    : q.mode === 'vocabRev' ? '<div class="lb-jp-prompt">' + lbEsc(q.prompt) + '</div><div class="mut small" style="margin-bottom:10px">Apa arti kata ini? (' + lbEsc(lbRomaji(q.prompt)) + ')</div>'
     : '<div class="lb-quiz-prompt">Bahasa Jepang dari <b>' + lbEsc(q.prompt) + '</b> adalah …</div>';
   return '<div class="card lb-quiz">' + prompt +
     q.options.map(function (o, k) {
@@ -244,7 +367,7 @@ function lbJqBox() {
       return '<button type="button" class="' + cls + '" ' + (q.done ? 'disabled' : '') + ' onclick="lbJqPick(' + k + ')">' + lbEsc(o) + '</button>';
     }).join('') +
     (q.done ? '<div class="lb-feedback ' + (q.ok ? 'ok' : 'no') + '"><b>' + (q.ok ? '✅ Benar!' : '❌ Belum tepat') + '</b>' +
-      '<div class="small" style="margin-top:4px">' + (q.mode === 'kanji' ? 'On\'yomi: ' + lbEsc(it.on) + ' · Kun\'yomi: ' + lbEsc(it.kun) : q.mode === 'vocab' ? lbEsc(it.k) + ' · ' + lbEsc(it.r) : lbEsc(it.k) + ' · ' + lbEsc(it.r)) + '</div>' +
+      '<div class="small" style="margin-top:4px">' + (q.mode === 'kanji' ? 'On\'yomi: ' + lbEsc(it.on) + ' (' + lbEsc(lbRomaji(it.on.split(',')[0])) + ') · Kun\'yomi: ' + lbEsc(it.kun) + ' (' + lbEsc(lbRomaji(it.kun.split(',')[0])) + ')' : q.mode === 'vocab' || q.mode === 'vocabRev' ? lbEsc(it.k) + ' · ' + lbEsc(it.r) + ' · ' + lbEsc(it.a) : lbEsc(it.k) + ' · ' + lbEsc(it.r)) + '</div>' +
       '<div class="lb-gex-jp" style="margin-top:6px">' + lbAudioBtn(q.mode === 'kanji' ? it.k : it.k, 'jp') + '</div>' +
       '<button class="btn full" style="margin-top:10px" onclick="lbJqNext()">Soal berikutnya ▶</button></div>' : '') +
   '</div>';
@@ -254,7 +377,7 @@ function lbJqPick(k) {
   q.pick = k; q.ok = k === q.answer; q.done = true;
   if (q.ok) q.score = (q.score || 0) + 1;
   lbAward('jp', q.ok ? 10 : 2, q.ok);
-  lbMarkMastery('jp', q.mode + ':' + (q.mode === 'kanji' ? q.item.k : q.mode === 'vocab' ? q.item.k : q.item.k), q.ok);
+  lbMarkMastery('jp', q.mode + ':' + q.item.k + ((q.mode === 'vocab' || q.mode === 'vocabRev') ? '|' + (q.item.a || '') : ''), q.ok);
   lbRender();
 }
 function lbJqNext() {
@@ -526,6 +649,7 @@ function lbEnVerbs() {
   const list = lbEnFiltered();
   const rows = list.slice(0, LB.ePage * 60);
   return '<div id="lben-detail">' + (LB.eDetail >= 0 ? lbEnDetailHtml(LB.eDetail) : '') + '</div>' +
+    lbEnTransCard() +
     '<div class="card lb-panel">' +
       '<div class="lb-panel-head"><div><div class="lb-eyebrow">Kamus</div><h3>Verb 1 · 2 · 3</h3></div><span class="lb-count" id="lben-count">' + list.length + ' verb</span></div>' +
       '<div class="lb-seg" role="group" aria-label="Filter verb">' +
@@ -814,7 +938,7 @@ function lbEnStart(mode) {
   const v = LB_VERBS[Math.floor(Math.random() * LB_VERBS.length)];
   const q = { mode: mode, mix: mix, modeLabel: { v2: 'Isi bentuk V2', v3: 'Isi bentuk V3', arti: 'Pilih arti yang tepat', dengar: 'Dengarkan lalu pilih verb' }[mode], v: v, n: (LB.q && LB.q.n) || 1, score: (LB.q && LB.q.score) || 0, done: false, ok: false, val: '' };
   if (mode === 'arti') {
-    const pool = lbShuffle(LB_VERBS.filter(function (x) { return x.arti && x.arti !== v.arti; })).slice(0, 3).map(function (x) { return x.arti; });
+    const pool = lbUniqOpts(LB_VERBS.map(function (x) { return x.arti; }), v.arti);
     q.options = lbShuffle(pool.concat([v.arti]));
     q.answer = q.options.indexOf(v.arti);
   } else if (mode === 'dengar') {
@@ -898,8 +1022,8 @@ function lbEnNext() {
 
 /* ---------- AI KHUSUS BAHASA ---------- */
 const LB_SYS = {
-  en: 'Kamu "English Coach", tutor bahasa Inggris khusus untuk pelajar Indonesia di aplikasi Ruang Belajar. Fokus HANYA pada bahasa Inggris: kosakata, verb 1-2-3, tata bahasa, pelafalan (IPA), ejaan, menulis, membaca, listening, dan persiapan TOEFL/IELTS dasar. Gaya: jawab inti langsung di awal, lalu penjelasan singkat berpoin, lalu 2-3 contoh kalimat dengan terjemahan Indonesia. Sebutkan IPA dalam / / untuk kata sulit. Jika pengguna salah, koreksi dengan sopan dan tunjukkan bentuk yang benar. Gunakan bahasa Indonesia sebagai bahasa penjelas. Jangan membahas topik di luar bahasa Inggris; arahkan kembali dengan singkat. Jangan mengarang aturan; bila ragu, katakan ragu. Format rapi, tanpa tabel lebar.',
-  jp: 'Kamu "Sakura Sensei", tutor bahasa Jepang khusus untuk pelajar Indonesia di aplikasi Ruang Belajar. Fokus HANYA pada bahasa Jepang: hiragana, katakana, kanji N5-N4, kosakata, partikel, pola kalimat, percakapan, pelafalan, dan budaya yang menempel pada bahasa. Selalu tulis kalimat Jepang dalam tulisan asli, lalu romaji, lalu terjemahan Indonesia. Jelaskan partikel dan urutan kata SOV. Beri 2-3 contoh pendek. Koreksi kesalahan dengan sopan. Gunakan bahasa Indonesia sebagai bahasa penjelas. Jangan membahas topik di luar bahasa Jepang. Jangan mengarang bacaan kanji; bila ragu, katakan ragu. Format rapi, tanpa tabel lebar.'
+  en: 'Kamu "English Coach", tutor bahasa Inggris khusus untuk pelajar Indonesia di aplikasi Ruang Belajar. Fokus HANYA pada bahasa Inggris: kosakata, verb 1-2-3, tata bahasa, pelafalan (IPA), ejaan, menulis, membaca, listening, dan persiapan TOEFL/IELTS dasar. Gaya: jawab inti langsung di awal, lalu penjelasan singkat berpoin, lalu 2-3 contoh kalimat dengan terjemahan Indonesia. Sebutkan IPA dalam / / untuk kata sulit. Jika pengguna salah, koreksi dengan sopan dan tunjukkan bentuk yang benar. Gunakan bahasa Indonesia sebagai bahasa penjelas. Jangan membahas topik di luar bahasa Inggris; arahkan kembali dengan singkat. Jangan mengarang aturan; bila ragu, katakan ragu. Format rapi, tanpa tabel lebar. ATURAN TERJEMAHAN: terjemahkan makna utuh, bukan kata per kata; pertahankan kiasan dan konteks; beri terjemahan paling wajar lebih dulu, lalu satu alternatif bila artinya bisa berbeda. Untuk kata bermakna ganda sebutkan kedua arti (mis. "bank" = bank/tepi sungai). Jangan menambah kata yang tidak ada di teks sumber. Bila kalimat sumber ambigu, tanyakan maksudnya daripada menebak.',
+  jp: 'Kamu "Sakura Sensei", tutor bahasa Jepang khusus untuk pelajar Indonesia di aplikasi Ruang Belajar. Fokus HANYA pada bahasa Jepang: hiragana, katakana, kanji N5-N4, kosakata, partikel, pola kalimat, percakapan, pelafalan, dan budaya yang menempel pada bahasa. Selalu tulis kalimat Jepang dalam tulisan asli, lalu romaji, lalu terjemahan Indonesia. Jelaskan partikel dan urutan kata SOV. Beri 2-3 contoh pendek. Koreksi kesalahan dengan sopan. Gunakan bahasa Indonesia sebagai bahasa penjelas. Jangan membahas topik di luar bahasa Jepang. Jangan mengarang bacaan kanji; bila ragu, katakan ragu. Format rapi, tanpa tabel lebar. ATURAN TERJEMAHAN: terjemahkan makna kalimat, bukan kata per kata; jangan membuang partikel は/が/を/に/で dalam penjelasan peran kata. Setiap kana/kanji yang kamu tulis harus disertai romaji yang benar (long vowel ditulis apa adanya: コーヒー = koohii). Untuk kata berhomofon sebutkan bedanya (はな = hana: bunga 花 / hidung 鼻). Jangan menambahkan informasi yang tidak ada di teks sumber; bila kalimat ambigu, tanyakan konteksnya.'
 };
 const LB_STARTERS = {
   en: ['Jelaskan perbedaan V2 dan V3 dengan contoh', 'Buat 5 kalimat present perfect', 'Kapan pakai have been vs had been?', 'Perbaiki kalimat saya: I am go to school yesterday'],
@@ -1071,7 +1195,8 @@ function lbVocabList() {
 function lbJpVocab() {
   const list = lbVocabList();
   if (LB.vf && LB.vf.on) return lbVocabFlashView();
-  return '<div class="card lb-panel">' +
+  return lbJpTransCard() +
+    '<div class="card lb-panel">' +
     '<div class="lb-panel-head"><div><div class="lb-eyebrow">Kosakata</div><h3>' + LB_JP_VOCAB.length + ' kata sehari-hari</h3></div><span class="lb-count">' + list.length + ' tampil</span></div>' +
     '<div class="lb-search"><span>🔎</span><input type="search" autocomplete="off" placeholder="Cari kata, romaji, atau arti..." value="' + lbEsc(LB.vq || '') + '" oninput="lbVocabSearch(this.value)"></div>' +
     '<div class="lb-chips lb-cats">' + ['Semua'].concat(lbVocabCats()).map(function (c) {
@@ -1120,7 +1245,7 @@ function lbVocabRate(ok) {
   const F = LB.vf; if (!F || !F.list[F.i]) return;
   if (ok) F.ok++;
   lbAward('jp', ok ? 6 : 2, ok);
-  lbMarkMastery('jp', F.list[F.i].k, ok);
+  lbMarkMastery('jp', 'flash:' + F.list[F.i].k + '|' + (F.list[F.i].a || ''), ok);
   F.i++; F.show = false; lbRender();
 }
 function lbVocabFlashStop() { LB.vf = null; lbRender(); }
@@ -1176,9 +1301,9 @@ function lbBuildCheck() {
 function lbKanjiDetail(x) {
   return '<div class="card lb-detail">' +
     '<div class="lb-detail-head"><div><div class="lb-eyebrow">Kanji</div><h2 class="lb-detail-title lb-kanji-big">' + lbEsc(x.k) + '</h2><div class="lb-arti">' + lbEsc(x.arti) + '</div></div><div class="lb-detail-actions">' + lbAudioBtn(x.k, 'jp', 'lg') + '<button type="button" class="lb-close" onclick="lbKanjiOpen(\'' + lbEsc(x.k) + '\')">Tutup</button></div></div>' +
-    '<div class="lb-kanji-read"><div><span>On\'yomi</span><b>' + lbEsc(x.on) + '</b></div><div><span>Kun\'yomi</span><b>' + lbEsc(x.kun) + '</b></div></div>' +
+    '<div class="lb-kanji-read"><div><span>On\'yomi</span><b>' + lbEsc(x.on) + '</b><div class="mut small">' + lbEsc(lbRomaji(x.on.split(',')[0])) + '</div></div><div><span>Kun\'yomi</span><b>' + lbEsc(x.kun) + '</b><div class="mut small">' + lbEsc(lbRomaji(x.kun.split(',')[0])) + '</div></div></div>' +
     '<div class="lb-word-list">' + x.words.map(function (w) {
-      return '<div class="lb-word"><div><b>' + lbEsc(w.w) + '</b><span>' + lbEsc(w.r) + '</span><em>' + lbEsc(w.a) + '</em></div>' + lbAudioBtn(w.w, 'jp') + '</div>';
+      return '<div class="lb-word"><div><b>' + lbEsc(w.w) + '</b><span>' + lbEsc(w.r) + ' · ' + lbEsc(lbRomaji(w.r)) + '</span><em>' + lbEsc(w.a) + '</em></div>' + lbAudioBtn(w.w, 'jp') + '</div>';
     }).join('') + '</div>' +
     '<div class="lb-tip"> On\'yomi dipakai dalam kata gabungan (mis. 日本), kun\'yomi dipakai saat kanji berdiri sendiri atau diikuti hiragana (mis. 日にち).</div>' +
   '</div>';

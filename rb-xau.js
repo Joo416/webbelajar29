@@ -13,6 +13,13 @@
   const when = (iso) => (iso ? new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const pips = (v) => (v == null ? '—' : (v > 0 ? '+' : '') + v);
   const xcut = (v, n) => String(v == null ? '' : v).slice(0, n || 240);
+  const fmtAge = (ms) => {
+    const m = Math.max(0, Math.floor(Number(ms || 0) / 60000));
+    if (m < 1) return 'baru saja';
+    if (m < 60) return m + ' menit lalu';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h + ' jam' + (r ? ' ' + r + ' menit' : '') + ' lalu';
+  };
   const FOCUS = [
     { k: 'NFP', t: 'NFP', s: 'tenaga kerja' },
     { k: 'CPI', t: 'CPI', s: 'inflasi' },
@@ -21,11 +28,15 @@
   ];
   const NEWS_KEY = 'rb_xau_news_v6_';
   let newsFocus = 'NFP', newsData = null, newsBusy = false, newsClock = null, newsAutoT3 = false, newsGen = 0;
-  /* News di-refresh tiap 20 menit; Signal tiap 15 menit selama halaman
-     terbuka. State hasilnya disimpan per akun (UID) di cache lokal + dokumen
-     state Firestore yang sama, jadi saat browser ditutup lalu dibuka lagi
-     hasil akun langsung dipakai dan tidak dihitung dari nol. */
-  const NEWS_REFRESH_MS = 20 * 60000;
+  /* State hasil disimpan per akun (UID) di cache lokal + dokumen state
+     Firestore yang sama, jadi saat browser ditutup lalu dibuka lagi hasil
+     akun langsung dipakai dan tidak dihitung dari nol. */
+  /* Biaya AI: satu analisis = 8 panelis + 2 dokumen. Karena itu refresh
+     otomatis dibatasi 15 menit (bukan 5 menit), tombol manual punya jeda
+     10 menit, dan server memakai ulang panel AI maksimal 10 menit. Umur data
+     selalu ditampilkan supaya pengguna tahu seberapa segar angkanya. */
+  const NEWS_REFRESH_MS = 15 * 60000;
+  const NEWS_MANUAL_MS = 10 * 60000;
   const SIG_REFRESH_MS = 15 * 60000;
   let newsTimer = null, newsAt = 0, newsCd = null, newsRetryAt = 0;
   function newsTransient(e) {
@@ -35,6 +46,7 @@
   let sigData = null, sigBusy = false, sigTimer = null, sigRO = null, sigAt = 0, sigMode = 'DAY', sigChartBars = 100, sigHistAt = 0;
   let sigRetryAt = 0, sigWake = false, sigBootGen = 0;
   let chartLabelAll = false, chartTF = 'ALL';
+  let chartFreshAt = 0, chartFreshBusy = false, chartAge = null, chartHoverIdx = -1, chartRowsN = 0, chartTags = [];
   try { chartLabelAll = localStorage.getItem('rb_xau_chart_labels') === 'all'; } catch (e) { }
   try { const tf = localStorage.getItem('rb_xau_chart_tf'); if (['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf)) chartTF = tf; } catch (e) { }
   let sigCd = null;
@@ -1324,8 +1336,9 @@
     newsAt = cacheAt(newsData);
     X$('pane').innerHTML = `
       <div class="card">
-        <div class="rb-card-head"><h3>📰 News Analisis XAUUSD</h3><span class="rb-pill">4 rilis inti + rilis bersamaan</span></div>
-        <div class="rb-note">Pilih satu rilis. <b>Panel beberapa AI independen</b> hanya membaca rilis itu — tanpa bercampur rilis lain — memakai data TradingView, FRED/BLS/BEA/Treasury, kalender ekonomi, media finansial global, dan YouTube. Arah <b>BUY/SELL</b>, status <b>spike</b>, dan prakiraan <b>T-3 menit</b> dihitung dari data; AI menjelaskan mengapa data itu valid dan di mana keterbatasannya. Data diperbarui otomatis, tidak perlu klik tombol.</div>
+        <div class="rb-card-head"><h3>📰 News Analisis XAUUSD</h3><span class="rb-pill" id="xNewsAge">umur data —</span></div>
+        <div class="rb-note">Pilih satu rilis. <b>Panel beberapa AI independen</b> hanya membaca rilis itu — tanpa bercampur rilis lain — memakai data TradingView, FRED/BLS/BEA/Treasury, kalender ekonomi, media finansial global, dan YouTube. Arah <b>BUY/SELL</b>, status <b>spike</b>, dan prakiraan <b>T-3 menit</b> dihitung dari data; AI menjelaskan mengapa data itu valid dan di mana keterbatasannya. Satu analisis memakai 8 panelis + 2 dokumen AI, jadi refresh otomatis dibatasi <b>15 menit</b> dan tombol manual berjeda <b>10 menit</b>.</div>
+        <div class="rb-actions" style="margin-top:10px"><button class="btn alt" type="button" id="xNewsNow" onclick="pXauRefreshNow()">🔄 Perbarui sekarang (jeda 10 menit)</button></div>
         <div class="rb-pill-row" id="xTabRow" style="margin-top:10px">${FOCUS.map(f => `<button class="rb-pill${f.k === newsFocus ? ' y' : ''}" data-k="${f.k}" onclick="pXauFocus('${f.k}')">${f.t} · ${f.s}</button>`).join('')}</div>
         <div id="xNewsMsg" class="mut small" style="margin-top:8px"></div>
         <div id="xNewsNext" class="small" style="margin-top:4px;color:var(--warn)"></div>
@@ -1341,11 +1354,22 @@
       const tick = function () {
         const el = X$('xNewsNext');
         if (!el) { clearInterval(newsCd); newsCd = null; return; }
+        const age = newsAt ? Math.max(0, Date.now() - newsAt) : null;
+        const ageEl = X$('xNewsAge');
+        if (ageEl) ageEl.textContent = age == null ? 'umur data —' : 'umur data ' + fmtAge(age);
+        const nowBtn = X$('xNewsNow');
+        const waitManual = age != null && age < NEWS_MANUAL_MS ? NEWS_MANUAL_MS - age : 0;
+        if (nowBtn) {
+          nowBtn.disabled = newsBusy || waitManual > 0;
+          nowBtn.textContent = newsBusy ? '⏳ Menghitung…'
+            : waitManual > 0 ? '🔄 Perbarui dalam ' + Math.ceil(waitManual / 60000) + ' menit'
+            : '🔄 Perbarui sekarang';
+        }
         if (newsBusy) { el.textContent = '⏳ Mengumpulkan data terbaru & AI…'; return; }
         const retry = Math.max(0, (newsRetryAt || 0) - Date.now());
         const left = retry || Math.max(0, NEWS_REFRESH_MS - (Date.now() - (newsAt || Date.now())));
         const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-        el.textContent = (retry ? 'Mencoba lagi dalam ' : 'Refresh otomatis dalam ') + m + ':' + String(s).padStart(2, '0') + (retry ? ' · data tersimpan tetap ditampilkan' : ' · tanpa tombol');
+        el.textContent = (retry ? 'Mencoba lagi dalam ' : 'Refresh otomatis dalam ') + m + ':' + String(s).padStart(2, '0') + (retry ? ' · data tersimpan tetap ditampilkan' : ' · hemat biaya AI');
       };
       tick();
       newsCd = setInterval(tick, 1000);
@@ -1370,6 +1394,16 @@
       })();
     })();
     boot.catch(function (e) { const m0 = X$('xNewsMsg'); if (m0) m0.textContent = '⚠️ ' + e.message; });
+  };
+  /* Tombol manual dibatasi supaya tidak memicu 8 panggilan AI berulang. */
+  window.pXauRefreshNow = function () {
+    if (newsBusy) return;
+    if (newsAt && Date.now() - newsAt < NEWS_MANUAL_MS) {
+      const msg = X$('xNewsMsg');
+      if (msg) msg.textContent = 'Data masih baru (' + fmtAge(Date.now() - newsAt) + '). Tunggu ' + Math.ceil((NEWS_MANUAL_MS - (Date.now() - newsAt)) / 60000) + ' menit lagi untuk menghemat kuota AI.';
+      return;
+    }
+    window.pXauRun();
   };
   window.pXauFocus = function (k) {
     newsAutoT3 = false;
@@ -1549,7 +1583,7 @@
       const errs = (p && p.errors || []).slice(0, 6);
       return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel AI</h3><span class="rb-pill">0/${XE((p && p.attempts) || 8)} valid</span></div><div class="warn">Panel AI tidak memberi jawaban JSON valid. Arah mesin tetap dipakai; ringkasan di bawah disusun dari data mesin.</div>${errs.length ? `<div class="small mut" style="margin-top:5px">${errs.map(x => '• ' + XE(x)).join('<br>')}</div>` : ''}</div>`;
     }
-    return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel ${XE(p.total)} AI independen</h3><span class="rb-pill y">${p.consensus === 'SPLIT' ? 'terbelah' : 'mayoritas ' + XE(p.consensus)} · ${XE(p.agreement)}%</span></div>
+    return `<div class="card"><div class="rb-card-head"><h3>🤖 Panel ${XE(p.total)} AI independen</h3><span class="rb-pill y">${p.consensus === 'SPLIT' ? 'terbelah' : 'mayoritas ' + XE(p.consensus)} · ${XE(p.agreement)}%</span>${p.reused ? `<span class="rb-pill" title="Panel AI dipakai ulang untuk menghemat kuota">dipakai ulang${p.reusedAt ? ' · ' + XE(new Date(p.reusedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) : ''}</span>` : ''}</div>
       <div class="small mut">${XE(p.note)} ${p.distinctProviders ? '· ' + p.distinctProviders + ' penyedia berbeda' : ''}${p.avgConfidence != null ? ' · rata-rata keyakinan ' + p.avgConfidence + '%' : ''}</div>
       <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill" style="color:var(--ok)">BUY ${p.votes.BUY}</span><span class="rb-pill" style="color:var(--no)">SELL ${p.votes.SELL}</span></div>
       ${p.total < (p.attempts || 8) ? `<div class="small mut" style="margin-top:4px">${p.total} dari ${XE(p.attempts || 8)} panelis menjawab; ${XE(p.invalid || 0)} balasan tidak valid/terpotong. Panel tetap menampilkan suara yang valid.</div>` : ''}
@@ -1857,7 +1891,7 @@
     if (!out) return;
     if (!j) { out.innerHTML = ''; return; }
     if (!j.ok) { out.innerHTML = `<div class="card"><div class="warn">${XE(j.error || 'Data tidak tersedia')}</div><div class="small mut" style="margin-top:6px">Server mencoba ulang otomatis; data tersimpan per akun tetap dipertahankan bila sudah ada.</div></div>`; return; }
-    out.innerHTML = verdictCard(j) + timingCard(j) + newsPlaybookCard(j) + releaseCompareCard(j) + eventCard(j) + releaseCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis berjalan tiap 20 menit.</div>' : '');
+    out.innerHTML = verdictCard(j) + timingCard(j) + newsPlaybookCard(j) + releaseCompareCard(j) + eventCard(j) + releaseCard(j) + panelCard(j) + evidenceCard(j) + docCard(j) + fundamentalCard(j) + macroCard(j) + marketCard(j) + wireCard(j) + sourcesCard(j) + dataCard(j) + knowledgeCard(j.knowledge, 'Bukti global terpercaya: situs resmi, industri, media, YouTube & akademi emas') + (cached ? '<div class="small mut" style="margin-top:6px">Data tersimpan per akun — refresh otomatis tiap 15 menit, tombol manual berjeda 10 menit (hemat AI).</div>' : '');
     startNewsClock(j.event && j.event.when);
   }
 
@@ -1957,6 +1991,7 @@
         if (c && c.ok && Array.isArray(c.rows) && c.rows.length) rows = c.rows;
       } catch (e) { }
       if (j === sigData) await histSync(j, rows);
+      await refreshChartCandles(false);
     } catch (e) { } finally { histFreshBusy = false; }
   }
   window.pSigRun = async function (silent) {
@@ -2031,7 +2066,8 @@
   window.pChartTF = function (tf) {
     chartTF = ['ALL', 'M1', 'M5', 'M15', 'H1', 'H4', 'D1', 'W1'].includes(tf) ? tf : 'ALL';
     try { localStorage.setItem('rb_xau_chart_tf', chartTF); } catch (e) { }
-    if (sigData) paintSignal(sigData);
+    chartHoverIdx = -1;
+    if (sigData) { paintSignal(sigData); setTimeout(function () { refreshChartCandles(true); }, 0); }
   };
   window.pChartLabels = function () {
     chartLabelAll = !chartLabelAll;
@@ -2082,7 +2118,9 @@
       <div class="small mut">Kekuatan ${XE(j.directionStrength)}% · harga ${num(j.price)} · ${XE(j.priceSource)} · ${XE(j.markers ? j.markers.length : 0)} tanda chart</div>
       <div class="rb-pill-row" style="margin-top:8px"><span class="rb-pill y">Entry M5</span>${j.freshness && j.freshness.dataLive ? `<span class="rb-pill ${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin <= 10 ? 'y' : ''}">${j.freshness.candleAgeMin != null && j.freshness.candleAgeMin > 10 ? 'Candle tertunda ' + XE(j.freshness.candleAgeMin) + ' mnt' : 'Candle TradingView real-time'}</span>` : '<span class="rb-pill">Candle cadangan</span>'}<span class="rb-pill">ATR5 ${num(j.atr5)}</span><span class="rb-pill">RSI5 ${num(j.rsi5)}</span><span class="rb-pill">${XE(j.session && j.session.name)}</span><span class="rb-pill">${XE(j.daily && j.daily.trend)}</span>${j.adr ? `<span class="rb-pill">ADR ${XE(j.adr.avgPips)} pip</span>` : ''}<span class="rb-pill">Risiko ${XE(j.eventRisk && j.eventRisk.level)}</span></div>
       ${j.freshness ? `<div class="small mut" style="margin-top:6px">Harga ${j.freshness.priceAt ? new Date(j.freshness.priceAt).toLocaleTimeString('id-ID') : '—'} · candle M5 ${j.freshness.candleAgeMin != null ? (j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') : '—'} lalu · ${XE(j.freshness.candleSource)}</div>` : ''}
-      ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Bias dominan ${XE(j.direction)} dan trigger M5 ${XE(j.m5TriggerDir || '—')} berbeda. Arah final tetap bias dominan; trigger M5 yang melawan hanya pullback, bukan alasan membalik entry. Setup ditampilkan sebagai PENDING/LIMIT sampai trigger searah — bukan entry melawan tren.</div>` : ''}
+      ${j.htfDirection ? `<div class="small" style="margin-top:6px"><b>Arah 1D–4H:</b> ${XE(j.htfDirection.why)} · sumber <b>${XE(j.directionSource || '1D–4H')}</b> → <b style="color:var(--tx)">${XE(j.direction)}</b> <span class="mut">(1H–15m menentukan POI, 5m–1m hanya konfirmasi/entry)</span></div>` : ''}
+      ${j.htfConflict ? `<div class="warn" style="margin-top:8px">⚠️ D1 dan H4 bertentangan. Metode top-down tidak mengizinkan entry sampai keduanya sepakat; level tetap tampil sebagai rencana, tetapi status SIAP ditahan dan entry tidak boleh dipaksa.</div>` : ''}
+      ${j.biasConflict ? `<div class="warn" style="margin-top:8px">⚠️ Arah 1D–4H ${XE(j.direction)} dan trigger 5m–1m ${XE(j.m5TriggerDir || '—')} berbeda. Arah tidak dibalik oleh trigger LTF; setup ditampilkan sebagai PENDING/TUNGGU sampai trigger searah — bukan entry melawan tren.</div>` : ''}
       ${j.marketOpen === false ? `<div class="warn" style="margin-top:8px">⚠️ Pasar tutup atau candle M5 tertunda${j.freshness && j.freshness.candleAgeMin != null ? ' (' + XE(j.freshness.candleAgeMin > 120 ? Math.round(j.freshness.candleAgeMin / 60) + ' jam' : j.freshness.candleAgeMin + ' menit') + ')' : ''}. Status setup dipaksa TUNGGU; level hanya rencana untuk pembukaan, bukan sinyal entry sekarang.</div>` : ''}
       ${j.smcGate ? `<div class="${j.smcGate.ok ? 'small' : 'warn'}" style="margin-top:8px">${j.smcGate.ok ? '✅' : '⛔'} <b>SMC:</b> ${XE(j.smcGate.note)}${j.smcGate.ok && !j.smcGate.executable ? ' Rencana LIMIT valid tetap ditampilkan (PENDING); status SIAP menunggu syarat eksekusi.' : ''}</div>` : ''}
       ${j.eventRisk && j.eventRisk.level !== 'RENDAH' ? `<div class="warn" style="margin-top:8px">⚠️ ${XE(j.eventRisk.note)}</div>` : ''}
@@ -2311,16 +2349,36 @@
      paintSignal sendiri tidak menarik Firestore agar mode/zoom tidak memicu
      siklus tulis dan tidak menimpa status remote yang lebih baru. */
   let histSyncBusy = false, histSyncPending = null;
+  let sigLearnRefreshAt = 0;
+  function countSettledSL() {
+    const deleted = histDeletedSet();
+    return histLoad().filter(h => !deleted.has(h.key) && String(h.status || '') === 'SL').length;
+  }
+  /* Setiap SL yang baru tervalidasi candle M5 langsung dipakai mesin:
+     catatan SL dikirim ulang ke server (learnPayload) sehingga pola, sifat
+     teknikal, penyebab, dan keyakinan diperbarui saat itu juga — bukan
+     menunggu refresh 15 menit berikutnya. Dibatasi 2 menit agar tidak
+     memicu putaran request berulang. */
+  function refreshAfterSl(n) {
+    if (!n) return;
+    if (Date.now() - sigLearnRefreshAt < 120000) return;
+    sigLearnRefreshAt = Date.now();
+    toast('🧪 ' + n + ' SL baru dipelajari. Mesin memperbarui level, keyakinan, dan syarat konfirmasi…');
+    setTimeout(function () { if (X$('sigOut')) requestSigRefresh(true); }, 900);
+  }
   async function histSync(j, freshRows) {
     if (histSyncBusy) { histSyncPending = { j, rows: freshRows }; return; }
     histSyncBusy = true;
     try {
       await histPull();
       learnApply(j);
+      const slBefore = countSettledSL();
       try { histUpdate(j, freshRows); } catch (e) { }
+      const slNew = countSettledSL() - slBefore;
       paintSignal(j);
       histPushLocal();
       histPushDeleted().catch(function () { });
+      if (slNew > 0) refreshAfterSl(slNew);
     } finally {
       histSyncBusy = false;
       if (histSyncPending) { const n = histSyncPending; histSyncPending = null; setTimeout(function () { histSync(n.j, n.rows); }, 0); }
@@ -2336,6 +2394,7 @@
     learnApply(j);
     out.innerHTML = signalVerdict(j) + planCard(j) + signalPlaybookCard(j) + globalCard(j) + checklistCard(j) + mtfCard(j) + styleCard(j) + smcCard(j) + methodCard(j) + liquidityCard(j) + tfCard(j) + chartCard(j) + setupsCard(j) + marksCard(j) + aiCard(j) + learningCard(j) + histCard();
     drawChart(j);
+    refreshChartCandles(false);
     if (!sigRO && window.ResizeObserver && X$('xSigChart')) {
       let raf = 0;
       sigRO = new ResizeObserver(function () {
@@ -2365,6 +2424,29 @@
     }, 9000);
   };
 
+  function tfKeyNow() { return chartTF === 'ALL' ? 'm5' : ({ M1: 'm1', M5: 'm5', M15: 'm15', H1: 'h1', H4: 'h4', D1: 'd1', W1: 'w1' }[chartTF] || 'm5'); }
+  /* Candle chart yang dipakai untuk menggambar diperbarui tiap ~60 detik dari
+     TradingView, terpisah dari payload sinyal 15 menit. Penanda tetap memakai
+     timestamp candle asal dari server, jadi label tidak bergeser saat candle
+     baru masuk. */
+  async function refreshChartCandles(force) {
+    if (!sigData || !X$('xSigChart') || chartFreshBusy) return;
+    if (chartTF === 'W1') return;
+    if (!force && Date.now() - chartFreshAt < 55000) return;
+    chartFreshBusy = true;
+    const key = tfKeyNow(), tf = key.toUpperCase();
+    try {
+      const c = await tcall({ action: 'xauCandles', tf: tf, limit: Math.max(80, Math.min(320, sigChartBars + 40)) });
+      if (!sigData || !c || !c.ok || !Array.isArray(c.rows) || !c.rows.length) return;
+      sigData.chart = sigData.chart || {};
+      sigData.chart[key] = c.rows;
+      chartFreshAt = Date.now();
+      chartAge = { tf: tf, at: c.generatedAt || new Date().toISOString(), source: c.source || '' };
+      drawChart(sigData);
+      const stamp = X$('sigStamp'), lastT = c.rows[c.rows.length - 1].t;
+      if (stamp) stamp.textContent = 'candle ' + tf + ' · ' + new Date(lastT).toLocaleTimeString('id-ID');
+    } catch (e) { } finally { chartFreshBusy = false; }
+  }
   function drawChart(j) {
     const cv = X$('xSigChart');
     const state = X$('sigChartState');
@@ -2379,7 +2461,7 @@
     /* Chart mengikuti tab TF yang dipilih. Jangan fallback ke M5: TF kosong
        harus terlihat kosong supaya pengguna tidak mengira candle M5 adalah
        candle TF yang sedang dipilih. */
-    const tfKey = chartTF === 'ALL' ? 'm5' : ({ M1: 'm1', M5: 'm5', M15: 'm15', H1: 'h1', H4: 'h4', D1: 'd1', W1: 'w1' }[chartTF] || 'm5');
+    const tfKey = tfKeyNow();
     const tfLabel = chartTF === 'ALL' ? 'M5' : chartTF;
     const allRows = Array.isArray(j.chart[tfKey]) ? j.chart[tfKey] : [];
     if (!allRows.length) {
@@ -2388,6 +2470,8 @@
       return;
     }
     const rows = allRows.slice(-Math.max(30, Math.min(240, sigChartBars)));
+    chartRowsN = rows.length;
+    chartTags = [];
     if (rows.length < 5) { clearChart(); showState('Chart kosong: TF ' + tfLabel + ' hanya punya ' + rows.length + ' candle (minimal 5). Tidak memakai fallback M5.'); return; }
     if (state) { state.style.display = 'none'; state.textContent = ''; }
     const ap = modeOf(j, sigMode) || j.plan;
@@ -2407,6 +2491,23 @@
         e.preventDefault();
         window.xSigZoom(e.deltaY > 0 ? 1 : -1);
       }, { passive: false });
+      let hoverRaf = 0;
+      const setHover = function (e) {
+        if (!sigData || !chartRowsN) return;
+        const rect = cv.getBoundingClientRect(), w = cv.clientWidth || rect.width, padR = 78, padL = 8;
+        const step = (w - padL - padR) / chartRowsN;
+        const px = (e.clientX || 0) - rect.left;
+        const idx = step > 0 ? Math.floor((px - padL) / step) : -1;
+        const next = idx >= 0 && idx < chartRowsN ? idx : -1;
+        if (next === chartHoverIdx) return;
+        chartHoverIdx = next;
+        cancelAnimationFrame(hoverRaf);
+        hoverRaf = requestAnimationFrame(function () { if (sigData) drawChart(sigData); });
+      };
+      cv.addEventListener('mousemove', setHover);
+      cv.addEventListener('mouseleave', function () { if (chartHoverIdx !== -1) { chartHoverIdx = -1; if (sigData) drawChart(sigData); } });
+      cv.addEventListener('touchstart', function (e) { if (e.touches && e.touches[0]) setHover(e.touches[0]); }, { passive: true });
+      cv.addEventListener('touchmove', function (e) { if (e.touches && e.touches[0]) setHover(e.touches[0]); }, { passive: true });
     }
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2457,14 +2558,17 @@
     /* Hanya label + teks + titik penanda. Titik memakai timestamp candle asal
        dari server (m.at); fallback ke candle yang menyentuh level hanya bila
        candle asal berada di luar window chart. */
-    const tagBoxes = [];
+    const tagBoxes = [], tagSeen = {};
+    /* Toleransi mengikuti durasi TF: penanda yang terbentuk di tengah candle
+       D1/H4 tetap menempel ke candle berjalan, bukan dilempar ke tepi kanan. */
+    const tfMs = ({ m1: 60000, m5: 300000, m15: 900000, h1: 3600000, h4: 14400000, d1: 86400000, w1: 604800000 })[tfKey] || 300000;
     const anchorOf = (m) => {
       const at = m.at ? Date.parse(m.at) : NaN;
       if (isFinite(at)) {
         /* Jangan menempelkan label HTF kuno ke candle pertama yang terlihat:
            itu membuat penanda salah posisi. Marker di luar window digambar
            di tepi kanan sebagai label level, tanpa titik candle palsu. */
-        if (at < rows[0].t - 300000 || at > rows[rows.length - 1].t + 300000) return -1;
+        if (at < rows[0].t - 300000 || at > rows[rows.length - 1].t + tfMs) return -1;
         let best = rows.length - 1, bd = Infinity;
         rows.forEach((r, i) => { const d = Math.abs(r.t - at); if (d < bd) { bd = d; best = i; } });
         return best;
@@ -2488,7 +2592,13 @@
       const py = outside ? (m.price > hi ? padT + 10 : H - padB - 4) : y(m.price);
       const r = off ? null : rows[idx];
       const above = outside ? m.price > hi : m.price >= lastC;
-      const text = String(mt || '?') + (m.tf ? ' ' + m.tf : '') + ' ' + Number(m.price).toFixed(1) + (m.ai ? ' •' : '') + (outside ? (m.price > hi ? ' ↑' : ' ↓') : '');
+      const text = String(mt || '?') + (m.tf ? ' ' + m.tf : '') + ' ' + Number(m.price).toFixed(2) + (m.ai ? ' •' : '') + (outside ? (m.price > hi ? ' ↑' : ' ↓') : '');
+      /* Satu label untuk satu candle + satu teks: penanda ganda dari TF berbeda
+         tidak ditumpuk di titik yang sama. */
+      const tagKey = text + '|' + idx;
+      if (tagSeen[tagKey]) return;
+      tagSeen[tagKey] = 1;
+      chartTags.push({ idx: idx, text: text, price: m.price, type: mt, tf: m.tf, at: m.at });
       g.save();
       g.font = '700 9px Manrope, sans-serif'; g.textAlign = 'left';
       const tw = g.measureText(text).width + 4;
@@ -2553,6 +2663,29 @@
       level(ap.sl, '#ef4444', 'SL ' + Number(ap.sl).toFixed(2), false);
       level(ap.tp2, '#22c55e', 'TP2 ' + Number(ap.tp2).toFixed(2), true);
       if (ap.tpMax && ap.tpMax !== ap.tp2) level(ap.tpMax, '#86efac', 'TPmax ' + Number(ap.tpMax).toFixed(2), true);
+    }
+    /* Kursor: tampilkan waktu, OHLC, dan label yang benar-benar milik candle itu.
+       Ini membuat posisi tiap label bisa diperiksa tanpa menebak. */
+    if (chartHoverIdx >= 0 && chartHoverIdx < rows.length) {
+      const r = rows[chartHoverIdx], cx = x(chartHoverIdx) + bw / 2;
+      g.save();
+      g.strokeStyle = 'rgba(148,163,184,.55)'; g.lineWidth = 1; g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(cx, padT); g.lineTo(cx, H - padB); g.stroke(); g.setLineDash([]);
+      const hits = chartTags.filter(t => t.idx === chartHoverIdx);
+      const lines = [new Date(r.t).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
+        'O ' + Number(r.o).toFixed(2) + '  H ' + Number(r.h).toFixed(2),
+        'L ' + Number(r.l).toFixed(2) + '  C ' + Number(r.c).toFixed(2)]
+        .concat(hits.slice(0, 10).map(t => t.text));
+      g.font = '700 9px Manrope, sans-serif';
+      const tw2 = Math.max.apply(null, lines.map(l => g.measureText(l).width)) + 12;
+      const bh = lines.length * 11 + 8;
+      let bx = cx + 8; if (bx + tw2 > W - padR) bx = Math.max(padL, cx - tw2 - 8);
+      const by = padT + 3;
+      g.fillStyle = 'rgba(2,6,23,.94)'; g.fillRect(bx, by, tw2, bh);
+      g.strokeStyle = 'rgba(148,163,184,.45)'; g.strokeRect(bx + .5, by + .5, tw2 - 1, bh - 1);
+      g.fillStyle = '#e2e8f0';
+      lines.forEach((l, i) => g.fillText(l, bx + 6, by + 12 + i * 11));
+      g.restore();
     }
   }
 

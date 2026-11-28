@@ -113,10 +113,31 @@ html[data-theme=light] .theme-btn{background:#ffffff}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<style id="rbAuthSplit">
+#rbAuthSplash{position:fixed;inset:0;z-index:500;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(760px 420px at 20% -10%,rgba(125,150,255,.18),transparent 64%),linear-gradient(180deg,var(--bg2),var(--bg))}
+#rbAuthSplash[hidden]{display:none}
+.rb-auth-splash-in{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;max-width:340px}
+.rb-auth-splash-logo{width:58px;height:58px;border-radius:19px;display:grid;place-items:center;font-size:1.5rem;
+  background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:0 18px 36px -24px rgba(125,150,255,.95)}
+.rb-auth-splash-in b{font-family:"Sora",sans-serif;font-size:1.06rem;letter-spacing:-.03em}
+.rb-auth-splash-in span{font-size:.84rem;color:var(--mut);line-height:1.6}
+.rb-auth-spin{width:24px;height:24px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:rbauthspin .8s linear infinite;margin-top:6px}
+@keyframes rbauthspin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.rb-auth-spin{animation:none}}
+</style>
 </head>
 <body>
 <a class="v22skip" href="#app">Lewati ke konten</a>
-<div class="wrap">
+<div id="rbAuthSplash" role="status" aria-live="polite">
+  <div class="rb-auth-splash-in">
+    <div class="rb-auth-splash-logo" aria-hidden="true">📖</div>
+    <b>Ruang Belajar</b>
+    <span id="rbSplashMsg">Memeriksa sesi…</span>
+    <div class="rb-auth-spin" aria-hidden="true"></div>
+  </div>
+</div>
+<div class="wrap" id="rbShell" hidden>
 <!-- ✏️ [TEKS BISA DIUBAH] Judul besar halaman / nama web (ikon 📖 + nama) -->
   <div class="topbar">
     <div>
@@ -138,20 +159,15 @@ html[data-theme=light] .theme-btn{background:#ffffff}
   <div id="app" tabindex="-1"></div>
 </div>
 
+<script src="rb-firebase-config.js"></script>
+<script src="rb-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDKv_cb50KmpAPv8qxVGspsFQPWPT7Ym2w",
-  authDomain: "ruangbelajar-8584c.firebaseapp.com",
-  projectId: "ruangbelajar-8584c",
-  storageBucket: "ruangbelajar-8584c.firebasestorage.app",
-  messagingSenderId: "645886662774",
-  appId: "1:645886662774:web:754d8425ed0df42f11a757"
-};
+const firebaseConfig = window.RB_FIREBASE_CONFIG || {};
 
 // ✏️ [TEKS BISA DIUBAH] Daftar teks MAPEL: Nama pelajaran di menu. PERHATIAN: nama ini juga tersimpan di database (soal/riwayat lama); mengganti nama membuat data lama tidak terbaca di pelajaran baru.
 const MAPEL={
@@ -165,18 +181,26 @@ const SAMPLE=[
 ];
 
 let db=null,auth=null,user=null;
-try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();auth=firebase.auth()}catch(e){console.error(e);document.getElementById('warn').innerHTML='<div class="warn">⚠️ Firebase gagal dimuat.</div>'}
+try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();auth=firebase.auth()}catch(e){console.error(e);var _sm=document.getElementById('rbSplashMsg');if(_sm)_sm.textContent='⚠️ Firebase gagal dimuat. Periksa koneksi lalu muat ulang halaman.'}
 
 const S={sec:'sekolah',mapel:'Bahasa Indonesia',tab:'latihan',qs:[],i:0,score:0,done:false,chat:{},gen:[],bank:[]};
 /* Simpan posisi layar utama agar refresh tidak melempar pengguna ke awal. */
 const RB_UI_KEY='rb_ui_state_v1';
+function rbKnownMapel(m){
+  try{
+    const all=(MAPEL.sekolah||[]).concat((typeof SMK_GROUPS!=='undefined'?SMK_GROUPS:[]).flatMap(G=>G.m.map(x=>x[0])));
+    return m==='Trading'||all.includes(m);
+  }catch(e){return true}
+}
 function rbSaveUi(){try{localStorage.setItem(RB_UI_KEY,JSON.stringify({sec:S.sec,tab:S.tab,mapel:S.mapel}))}catch(e){}}
 function rbRestoreUi(){
   try{
     const x=JSON.parse(localStorage.getItem(RB_UI_KEY)||'null');if(!x||typeof x!=='object')return;
     if(['beranda','sekolah','bahasa','trading','admin'].includes(x.sec))S.sec=x.sec;
     if(typeof x.tab==='string'&&x.tab)S.tab=x.tab;
-    if(typeof x.mapel==='string'&&x.mapel)S.mapel=x.mapel;
+    /* Mapel dari sesi lama bisa sudah tidak ada (mis. nama berubah). Tanpa
+       validasi, halaman Latihan terbuka kosong tanpa penjelasan. */
+    if(typeof x.mapel==='string'&&x.mapel&&rbKnownMapel(x.mapel))S.mapel=x.mapel;
     if(S.sec==='admin'&&!S.admin)S.sec='beranda';
   }catch(e){}
 }
@@ -214,15 +238,24 @@ async function seed(){
   const b=db.batch();SAMPLE.filter(x=>x.kategori===S.sec&&x.mapel===S.mapel).forEach(x=>b.set(db.collection('soal').doc(),{...x,uid:user.uid}));await b.commit();pBank();
 }
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi loginView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function loginView(){
-  document.querySelector('.tabs').style.display='none';$('userbar').innerHTML='';
-  const mb=document.getElementById('rbMenuBtn');if(mb)mb.hidden=true;
-  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div class="hero-ico">🎓</div><h3 style="font-size:1.24rem;justify-content:center;margin:0 0 8px;letter-spacing:-.02em">Masuk untuk mulai belajar</h3><div class="mut small" style="margin-bottom:20px;line-height:1.65;max-width:34ch;margin-left:auto;margin-right:auto">Soal, riwayat, dan catatanmu tersimpan di akunmu sendiri.</div><button class="btn full" onclick="login()">🔑 Masuk dengan Google</button><div class="hint"> Akses dibatasi. Setelah masuk, akunmu <b>menunggu persetujuan admin</b>. Bila sudah disetujui tetapi masih tertahan, tekan <b>Cek lagi</b> atau hubungi admin.</div><a class="btn alt full" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:10px" href="https://www.instagram.com/kyenth29?lqvp=MXI2cmk3NDl4Y3o0Yw==" target="_blank" rel="noopener noreferrer">📩 Hubungi admin via Instagram</a><div id="lerr" class="small" style="margin-top:12px;overflow-wrap:anywhere"></div></div>`;
+/* Halaman login sekarang terpisah di login.html. index.html hanya boleh
+   menampilkan isi aplikasi setelah sesi dan izin akses diverifikasi. */
+function rbGoLogin(st,msg){
+  try{if(msg)sessionStorage.setItem('rb_auth_msg',String(msg))}catch(e){}
+  location.replace('login.html'+(st?'?state='+encodeURIComponent(st):''));
 }
+function rbShowShell(){
+  const s=document.getElementById('rbShell'),p=document.getElementById('rbAuthSplash');
+  if(p)p.hidden=true;
+  if(s)s.hidden=false;
+  const sm=document.getElementById('rbSplashMsg');if(sm)sm.textContent='Sesi terverifikasi.';
+}
+function loginView(){rbGoLogin();}
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi login(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function login(){try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){$('lerr').textContent='Gagal masuk: '+e.message}}
 if(auth)auth.onAuthStateChanged(u=>{
   user=u;if(!u){S.admin=false;return loginView()}
+  const _splashMsg=document.getElementById('rbSplashMsg');if(_splashMsg)_splashMsg.textContent='Memeriksa izin akses…';
   document.querySelector('.tabs').style.display='none';
   const mb=document.getElementById('rbMenuBtn');if(mb)mb.hidden=false;
   $('userbar').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;flex-wrap:wrap">${u.photoURL?`<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" style="width:32px;height:32px;border-radius:50%">`:''}<span style="flex:1;min-width:0;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.displayName||u.email||'Pengguna')}</span></div>`;
@@ -756,27 +789,16 @@ const tsNow=()=>firebase.firestore.FieldValue.serverTimestamp();
 const tabsShow=v=>{document.querySelector('.tabs').style.display=v?'':'none'};
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi gate(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function gate(u){
-  tabsShow(false);S.admin=false;const em=String(u.email||'').toLowerCase();
+  tabsShow(false);S.admin=false;
   $('app').innerHTML='<div class="card">⏳ Memeriksa izin akses...</div>';
-  if(!em)return deniedView('error','Akun Google ini tidak memiliki email.');
-  try{
-    const ref=db.collection('pengguna').doc(em),base={email:em,nama:u.displayName||'',foto:u.photoURL||'',uid:u.uid};
-    let d=await ref.get();
-    if(!d.exists){await ref.set({...base,status:'menunggu',dibuat:tsNow()});d=await ref.get()}
-    const data=d.data()||{},st=data.status;
-    // Admin hanya dari email resmi / flag dokumen — bukan dari izin baca koleksi.
-    const admin=em==='amoraarik6@gmail.com'||data.admin===true;
-    if(admin){await ref.set({...base,status:'aktif',admin:true,terakhir:tsNow()},{merge:true});S.admin=true;return enter()}
-    if(st==='aktif')return enter();
-    deniedView(st==='diblokir'?'diblokir':'menunggu')
-  }catch(e){deniedView('error',e.message)}
+  /* Satu sumber aturan izin (rb-auth.js) dipakai halaman login dan isi
+     aplikasi, supaya tidak ada dua versi cek akses yang bisa berbeda. */
+  const r=await window.RBAuth.check(u,{db:db});
+  if(r.ok){S.admin=!!r.admin;return enter()}
+  deniedView(r.status||'error',r.message||'')
 }
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi deniedView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function deniedView(st,msg){
-  tabsShow(false);const em=(user&&user.email)||'';
-  const T={menunggu:['⏳','Menunggu persetujuan admin','Akunmu sudah terdaftar, tetapi admin belum mengizinkan akses. Kamu bisa masuk setelah admin menyetujui.'],diblokir:['🚫','Akses diblokir','Admin memblokir akunmu. Hubungi admin bila ini keliru.'],error:['⚠️','Gagal memeriksa izin',msg||'']}[st];
-  $('app').innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div class="hero-ico">${T[0]}</div><h3 style="font-size:1.2rem;justify-content:center;margin:0 0 8px;letter-spacing:-.02em">${T[1]}</h3><div class="mut small" style="margin-bottom:16px;line-height:1.65;max-width:36ch;margin-left:auto;margin-right:auto">${esc(T[2])}</div>${em?`<div class="acct"> ${esc(em)}</div>`:''}${st==='diblokir'?'<div class="hint">Bila menurutmu ini keliru, <b>hubungi admin</b> dan sebutkan alamat email di atas.</div>':'<div style="margin-top:18px"><button class="btn full" onclick="gate(user)">🔄 Cek lagi</button></div>'}</div>`;
-}
+function deniedView(st,msg){rbGoLogin(st||'error',msg||'');}
 /* ---- panel admin ---- */
 let AD={f:'semua',q:'',list:[]};
 const ST_ORD={menunggu:0,aktif:1,diblokir:2};
@@ -864,6 +886,30 @@ function randTopic(){
 /* ---- LATIHAN ---- */
 function initRun(qs,ex,rt){if(!rt)seenAdd(qs);Object.assign(S,{qs,i:0,sel:Array(qs.length).fill(null),dn:[],sc:[],flag:[],exam:ex,retry:rt,left:Math.ceil(qs.length*(qs.some(q=>q.tipe==='essay')?180:90))});startTimer();show()}
 // ✏️ [TEKS BISA DIUBAH] 🎯 TKA & Sekolah → Latihan & riwayat — fungsi pLatihan(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
+/* Kurikulum real-time ringkas di tab Belajar (memakai cache 12 jam yang sama dengan Buat Soal). */
+function kurLatLevel(){
+  const lvs=lvOptions();if(!lvs.length)return '';
+  if(S.lvl&&lvs.includes(S.lvl))return S.lvl;
+  const g=lvs.filter(l=>/Kelas|TKA/.test(l));return g[0]||lvs[0];
+}
+function kurLatKey(){return 'kur20_'+S.mapel+'_'+kurLatLevel()}
+function kurLatCached(){try{const c=JSON.parse(localStorage.getItem(kurLatKey())||'null');return c&&Date.now()-c.t<12*3600e3?c.v:null}catch(e){return null}}
+function kurLatHtml(k){
+  const b=$('kurLat');if(!b)return;
+  if(!k){b.innerHTML='<div class="mut small" style="margin-top:6px">Materi acuan belum diperiksa. Tekan tombol di atas untuk mencocokkan latihan dengan kurikulum resmi terbaru.</div>';return}
+  if(k.ok===false){b.innerHTML='<div class="mut small" style="margin-top:6px">'+esc(k.reason||'Tingkat ini tidak memakai kurikulum sekolah.')+'</div>';return}
+  const src=(k.sources||[]).filter(s=>/^https?:\/\//.test(s.uri)).slice(0,4);
+  b.innerHTML='<div class="small mut" style="margin:6px 0">'+esc(k.live&&k.kurikulum&&k.kurikulum!=='tidak tertera'?k.kurikulum:'Kurikulum Merdeka')+' • '+esc(k.level||'')+' • Fase '+esc(k.fase||'-')+' • '+esc(k.live?(k.keyakinan||'sedang'):'baseline internal')+(k.cached?' • cache':'')+'</div>'
+    +(k.inti&&k.inti.length?'<div class="small"><b>Materi inti resmi:</b> '+k.inti.slice(0,8).map(esc).join('; ')+'</div>':'')
+    +(k.perubahan?'<div class="small" style="margin-top:4px"><b>Penekanan terbaru:</b> '+esc(k.perubahan)+'</div>':'')
+    +(src.length?'<details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--b)">Sumber resmi ('+src.length+')</summary>'+src.map(s=>'<div class="small"><a href="'+esc(s.uri)+'" target="_blank" rel="noopener noreferrer" style="color:var(--b)">'+esc(s.title)+'</a></div>').join('')+'</details>':'')
+    +'<div class="small mut" style="margin-top:6px">Diperiksa '+esc(k.fetchedAt?new Date(k.fetchedAt).toLocaleString('id-ID'):'-')+' • <a href="#" onclick="kurLatFetch(true);return false" style="color:var(--b)">Periksa ulang</a></div>';
+}
+async function kurLatFetch(force){
+  if(typeof kurFetch20!=='function'||typeof user==='undefined'||!user)return;
+  const b=$('kurLat'),lv=kurLatLevel();if(b)b.innerHTML='<div class="mut small" style="margin-top:6px">⏳ Memeriksa kurikulum resmi terbaru…</div>';
+  try{const k=await kurFetch20(S.mapel,lv,force);applyKur20(S.mapel,lv,k);kurLatHtml(k)}catch(e){if(b)b.innerHTML='<div class="warn" style="margin-top:6px">⚠️ '+esc(e.message)+'</div>'}
+}
 function pLatihan(){
   let pr=null;try{pr=JSON.parse(localStorage.getItem(progKey()))}catch(e){}
   const lvs=lvOptions();
@@ -876,8 +922,10 @@ function pLatihan(){
     <label>Jumlah soal</label><select id="n"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
     <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" id="ex" style="width:18px"> Mode ujian (timer, bisa pindah soal, pembahasan setelah selesai)</label>
     <button class="btn full" onclick="start()">Mulai ▶</button><div id="msg" class="mut small" style="margin-top:10px"></div></div>
+    ${isUmum()?'':`<div class="card"><div class="rb-card-head"><h3>📚 Kurikulum & materi real-time</h3><span class="rb-pill">Kemendikdasmen/BSKAP</span></div><div class="mut small">Materi acuan ${esc(S.mapel)} untuk ${esc(kurLatLevel()||'tingkat ini')} dicek ke situs resmi, lalu dipakai saat membuat soal baru.</div><div class="row" style="margin-top:8px"><button class="btn alt full" onclick="kurLatFetch(false)">🔍 Periksa materi terbaru</button><button class="btn full" onclick="S.tab='buat';home()">✍️ Buat soal sesuai kurikulum</button></div><div id="kurLat"></div></div>`}
     <div class="card"><h3>📊 Statistik <span class="mut small">(ketuk untuk detail)</span></h3><div id="stat" class="mut">Memuat...</div></div>
     <div class="card"><h3>🕘 Riwayat <span class="mut small">(ketuk untuk lihat soal)</span></h3><div id="hist" class="mut">Memuat...</div></div>`;
+  if(!isUmum())kurLatHtml(kurLatCached());
   loadHist();
 }
 async function loadQs2(n){
@@ -1401,6 +1449,7 @@ function ndHtml15(j){
 function tabLabel16(){const b=$('t-trading');if(b)b.textContent='Trading'}
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi enter(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function enter(){
+  rbShowShell();
   const em=String((user&&user.email)||'').toLowerCase();S.trading=!!S.admin;S.tradeReq=null;S.tradeErr='';
   if(!S.admin&&em){try{const d=await db.collection('izin_trading').doc(em).get();S.tradeReq=d.exists?{id:d.id,...d.data()}:null;S.trading=!!S.tradeReq&&S.tradeReq.status==='disetujui'}catch(e){S.tradeErr=e.message||String(e)}}
   tabsShow(true);const tb=document.querySelector('.tabs');
@@ -1408,7 +1457,6 @@ async function enter(){
   if(!S.admin&&$('t-admin'))$('t-admin').remove();
   rbRestoreUi();tabLabel16();home();if(S.admin)adminBadge();
 }
-function home(){if(S.sec==='trading'&&!S.admin&&!S.trading)return tradingLockView();return homeBase()}
 // ✏️ [TEKS BISA DIUBAH] 🔐 Login, akses & izin — fungsi tradingLockView(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 function tradingLockView(){
   ['sekolah','trading','kamus','admin'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',k==='trading')});
@@ -1448,26 +1496,7 @@ async function adminView(){
   drawAdmin();adminBadge();
 }
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi drawAdmin(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function drawAdmin(){
-  const L=AD.list,c=k=>L.filter(x=>x.status===k).length;
-  $('app').innerHTML=trCard16()+`<div class="card"><h3>👥 Kelola pengguna</h3><div class="mut small">Hanya akun berstatus <b>aktif</b> yang bisa memakai web, data, dan AI. Pengguna baru otomatis masuk daftar <b>menunggu</b> sampai kamu menyetujuinya. Izin Trading diberikan terpisah per pengguna.</div>
-    <div class="row" style="margin-top:12px">${[['aktif','aktif'],['menunggu','menunggu'],['diblokir','diblokir']].map(([k,l])=>`<div class="exp" style="text-align:center;color:var(--tx)"><b style="font-size:1.3rem">${c(k)}</b><div class="small mut">${l}</div></div>`).join('')}</div>
-    <div class="stabs" style="margin-top:12px">${['semua','menunggu','aktif','diblokir'].map(k=>`<button class="${AD.f===k?'on':''}" onclick="AD.f='${k}';drawAdmin()">${k}</button>`).join('')}</div>
-    <input id="adq" placeholder="Cari email atau nama..." autocomplete="off" value="${esc(AD.q)}" oninput="adSearch(this.value)">
-    <div id="adlist"></div></div>
-    <div class="card"><h3>✅ Izinkan email tertentu</h3><div class="mut small" style="margin-bottom:8px">Daftarkan email sebelum orangnya login, langsung berstatus aktif.</div><input id="adem" type="email" placeholder="nama@gmail.com" autocomplete="off"><button class="btn full" onclick="adAdd()">Izinkan</button></div>`;
-  drawAdList();
-}
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi drawAdList(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function drawAdList(){
-  const me=String((user&&user.email)||'').toLowerCase(),q=AD.q.toLowerCase().trim();
-  const rows=AD.list.filter(x=>(AD.f==='semua'||x.status===AD.f)&&(!q||((x.email||'')+' '+(x.nama||'')).toLowerCase().includes(q))).sort((a,b)=>((ST_ORD[a.status]??3)-(ST_ORD[b.status]??3))||String(a.email).localeCompare(String(b.email)));
-  const box=$('adlist');if(!box)return;
-  box.innerHTML=rows.length?rows.map(x=>{const self=x.email===me,id=esc(x.id),tr=(AD.tr&&AD.tr[x.id]||{}).status;
-    const tb=x.admin?'<span class="badge b-aktif"> admin</span>':`<span class="badge ${tr==='disetujui'?'b-aktif':tr==='menunggu'?'b-menunggu':'b-diblokir'}" title="izin Trading"> ${tr==='disetujui'?'diizinkan':tr==='menunggu'?'minta izin':'tidak ada'}</span>`;
-    const acts=self?'<span class="mut small">(kamu)</span>':`${x.status!=='aktif'?`<button class="x" style="background:#1f1f1f;color:var(--b)" data-id="${id}" onclick="adSet(this,'aktif')">✅ Izinkan</button>`:''}${x.status!=='diblokir'?`<button class="x" data-id="${id}" onclick="adSet(this,'diblokir')">⛔ Blokir</button>`:''}${x.admin?'':tr==='disetujui'?`<button class="x" style="background:#141414;color:var(--bad)" data-id="${id}" onclick="adTrade(this,'dicabut')">↩️ Cabut Trading</button>`:`<button class="x" style="background:#242424;color:#f2f2f2" data-id="${id}" onclick="adTrade(this,'disetujui')">✅ Beri Trading</button>`}<button class="x" style="background:#242424;color:#f2f2f2" data-id="${id}" onclick="adDel(this)">Hapus</button>`;
-    return `<div class="item" style="align-items:center;flex-wrap:wrap;gap:8px"><span style="display:flex;align-items:center;gap:8px">${x.foto?`<img src="${esc(x.foto)}" referrerpolicy="no-referrer" style="width:30px;height:30px;border-radius:50%">`:''}<span><b>${esc(x.nama||'(belum ada nama)')}</b>${x.admin?' ':''}<div class="small mut">${esc(x.email||x.id)}</div></span></span><span class="badge b-${esc(x.status)}">${esc(x.status)}</span>${tb}<span style="display:flex;gap:6px;flex-wrap:wrap">${acts}</span></div>`}).join(''):'<div class="mut small" style="margin-top:10px">Tidak ada pengguna yang cocok.</div>';
-}
 // ✏️ [TEKS BISA DIUBAH] 👑 Admin (kelola pengguna, izin, status AI) — fungsi adTrade(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 async function adTrade(el,st){
   const id=el.dataset.id;if(!id)return;
@@ -1612,11 +1641,6 @@ const STARTERS18={
  'Umum (Trivia Dunia)':['Berapa penduduk dan PDB per kapita Jepang menurut data terbaru?','Bagaimana gunung berapi terbentuk?','Negara apa saja yang berbatasan darat dengan Brasil?']
 };
 // ✏️ [TEKS BISA DIUBAH] 🤖 Tutor (sekolah & Trading) — fungsi drawChat(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function drawChat(){
-  const box=$('chat');if(!box)return;const c=S.chat[S.mapel]||[],st=STARTERS18[S.mapel]||(TOPICS[S.mapel]&&TOPICS[S.mapel].length?TOPICS[S.mapel].slice(0,3).map(t=>'Jelaskan '+t+' dengan contoh praktik'):['Jelaskan konsep dasar materi ini dengan contoh']);
-  box.innerHTML=c.length?c.map(m=>`<div class="msg ${m.role}">${fmt(m.content)}${m.role==='assistant'&&m.meta?metaHtml18(m.meta):''}</div>`).join(''):`<div class="mut small">Tanyakan apa saja tentang <b>${esc(S.mapel)}</b>. Tutor menjawab dengan sumber tepercaya dan memeriksa jawabannya.</div><div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${st.map((t,i)=>`<button class="x" style="background:#242424;color:#f2f2f2;text-align:left" onclick="starter18(${i})">${esc(t)}</button>`).join('')}</div>`;
-  box.scrollTop=1e9;
-}
 function starter18(i){const t=(STARTERS18[S.mapel]||[])[i];if(t&&$('ci')){$('ci').value=t;send2()}}
 async function send(){
   const v=(($('ci')||{}).value||'').trim();if(!v)return;$('ci').value='';
@@ -1854,24 +1878,6 @@ function setSec(s){
   S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':'latihan';home()
 }
 // ✏️ [TEKS BISA DIUBAH] 🎯 TKA & Sekolah → Latihan & riwayat — fungsi homeBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
-function homeBase(){
-  if(S.sec==='admin')return adminView();
-  if(S.sec==='kamus')return kamusView();
-  ['sekolah','trading','kamus'].forEach(k=>{const b=$('t-'+k);if(b)b.classList.toggle('on',S.sec===k)});
-  if(S.sec==='trading'){
-    S.mapel='Trading';if(!['xau','signal','tutor','jurnal'].includes(S.tab))S.tab='xau';
-    const T=[['xau',' News Analisis'],['signal',' Signal Entry'],['tutor',' Tutor'],['jurnal',' Jurnal']];
-    $('app').innerHTML=`<div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
-    return pane();
-  }
-  if(['xau','jurnal'].includes(S.tab))S.tab='latihan';
-  const T=[['latihan',' Latihan'],['tutor',' Tutor'],['buat',' Soal'],['bank',' Bank']];
-  $('app').innerHTML=`<div class="card"><label style="margin-top:0">Pelajaran / topik</label>
-    <select onchange="S.mapel=this.value;S.gen=[];S.sub='';pane()">${mapelOptions()}</select></div>
-    <div class="stabs">${T.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';home()">${l}</button>`).join('')}</div><div id="pane"></div>`;
-  pane();
-}
-function pane(){const f={latihan:pLatihan,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:(typeof pJurnal==='function'?pJurnal:pLatihan),xau:(typeof pXauNews==='function'?pXauNews:pLatihan),signal:(typeof pSignalEntry==='function'?pSignalEntry:pXauNews)}[S.tab];if(f)return f()}
 // Tab Catatan lama sudah dihapus; catatan trade & news kini berada di tab Jurnal.
 Object.assign(STARTERS18,{'Trading':['Rilis ekonomi apa yang akan datang minggu ini dan dampaknya ke USD?','Bagaimana arah USD dan pair utama berdasarkan data terbaru?','Jelaskan order block dan fair value gap dengan contoh','Hitung ukuran posisi: akun $1.000, risiko 1%, stop 25 pip']});
 /* ---------- kamus: definisi dibantu sumber kamus global ---------- */
@@ -1921,7 +1927,9 @@ function aiRow19(x,isProv){
 /* ===== END V20 ===== */
 </script>
 
-<script>window.__v20={homeBase:homeBase,pane:pane,finish:finish,home:home,enter:enter,setSec:setSec,startTimer:startTimer,initRun:initRun,loadQs2:loadQs2,saveProg:saveProg};</script>
+<script>/* Jembatan modul lama. Memakai getter supaya tidak bergantung pada urutan
+   muat skrip: fungsi baru tersedia setelah semua modul selesai dimuat. */
+window.__v20={get homeBase(){return homeBase},get pane(){return pane},get finish(){return finish},get home(){return home},get enter(){return enter},get setSec(){return setSec},get startTimer(){return startTimer},get initRun(){return initRun},get loadQs2(){return loadQs2},get saveProg(){return saveProg}};</script>
 <script>
 /* ===== UPDATE V21: UI modern mobile-first + Beranda (streak, target harian, XP) + Tryout berwaktu + Papan peringkat ===== */
 (function(){
@@ -2044,16 +2052,6 @@ let v21BoardCat='s',v21MiniReq=0,v21PapanReq=0;
 function v21CatLabel(c){const x=V21_CATS.find(v=>v[0]===c);return x?x[1]:'Sekolah'}
 function v21CatButtons(){return '<div class="v21-cats">'+V21_CATS.map(([k,l])=>'<button class="'+(v21BoardCat===k?'on':'')+'" onclick="v21Cat(\''+k+'\')">'+l+'</button>').join('')+'</div>'}
 function v21Cat(c){if(!V21_CATS.some(x=>x[0]===c))return;v21BoardCat=c;if($('v21mini'))v21MiniBoard();if($('v21board'))pPapan()}
-function v21Kind(x){
-  if(!x)return'';
-  const sec=String(x.kategori||x.sec||''),mapel=String(x.mapel||'');
-  if(sec==='trading')return'';
-  if(x.exam||x.mode==='ujian')return't';
-  if(sec==='tka')return't';
-  if(sec==='umum')return'u';
-  if(sec==='sekolah')return /^umum/i.test(mapel)?'u':'s';
-  return'';
-}
 function v21Stat(x,c){x=x||{};return{b:Math.max(0,+x[c+'Benar']||0),s:Math.max(0,+x[c+'Salah']||0),t:Math.max(0,+x[c+'Total']||0)}}
 function v21Acc(st){const t=(st.b||0)+(st.s||0);return t?Math.round((st.b||0)/t*100):0}
 function v21Cmp(a,b,c){const A=v21Stat(a,c),B=v21Stat(b,c);return B.b-A.b||v21Acc(B)-v21Acc(A)||(+b.xp||0)-(+a.xp||0)||String(a.nama||'').localeCompare(String(b.nama||''))}
@@ -2142,26 +2140,6 @@ async function v21MiniBoard(){
 }
 
 /* ---------- Beranda ---------- */
-function pBeranda(){
-  const a=v21Act(),st=v21Streak(a),tg=v21Target(),t=v21Today(a),w=v21Week(a);
-  const days=Object.values(a.days),sum=days.reduce((s,x)=>s+(x.n||0),0),ok=days.reduce((s,x)=>s+(x.ok||0),0);
-  const acc=sum?Math.round(ok/sum*100):0,pct=Math.min(100,Math.round((t.n||0)/tg*100)),maxN=Math.max(1,...w.map(x=>x.n));
-  const nm=((user&&(user.displayName||user.email))||'Siswa').split(' ')[0];
-  $('pane').innerHTML='<div class="card v21-hero"><div class="v21-hero-top"><div style="flex:1;min-width:0">'
-    +'<div class="mut small">Selamat datang, '+esc(nm)+' </div>'
-    +'<div class="v21-hero-title">'+(t.n>=tg?'Target hari ini tercapai! ':'Ayo kejar target hari ini')+'</div>'
-    +'<div class="v21-chips"><span class="chip"> '+st+' hari</span><span class="chip"> '+a.xp+' XP</span><span class="chip"> '+acc+'% akurasi</span></div></div>'
-    +'<div class="ring" style="--p:'+pct+'"><div class="ring-in"><b>'+t.n+'</b><span>/'+tg+'</span></div></div></div>'
-    +'<div class="v21-actions"><button class="btn" onclick="v21Go(\'latihan\')">🎯 Latihan</button><button class="btn alt" onclick="v21Go(\'tryout\')">📝 Tryout</button><button class="btn alt" onclick="v21Go(\'tutor\')">💬 Tutor</button></div>'
-    +'<div class="v21-target"><span class="mut small">Target harian</span><select onchange="v21SetTarget(this.value)">'+[10,20,30,50,100].map(n=>'<option value="'+n+'"'+(n===tg?' selected':'')+'>'+n+' soal</option>').join('')+'</select></div></div>'
-    +'<div class="card"><h3> 7 hari terakhir</h3><div class="v21-bars">'
-    +w.map(x=>'<div class="v21-bar" title="'+x.n+' soal"><i style="height:'+Math.max(6,Math.round(x.n/maxN*100))+'%"></i><span>'+x.lbl+'</span></div>').join('')
-    +'</div><div class="mut small" style="margin-top:10px">'+sum+' soal total • '+ok+' benar • streak terbaik '+(a.best||st)+' hari</div></div>'
-    +'<div class="card"><div class="v21-board-head"><h3>🏆 Peringkat</h3><button class="x" onclick="v21Go(\'papan\')">Semua ›</button></div>'
-    +v21CatButtons()+'<div class="mut small" style="margin:2px 0 8px">Pilih kategori. Semua akun Google yang aktif ikut peringkat.</div><div id="v21mini" class="mut small">Memuat...</div></div>';
-  v21MiniBoard();
-}
-function v21Go(tab){S.sec='sekolah';S.tab=tab;home()}
 function v21Home(){S.sec='beranda';home()}
 
 /* ---------- Tryout berwaktu ---------- */
@@ -2226,34 +2204,11 @@ function v21MarkTabs(){['beranda','sekolah','bahasa','trading','admin'].forEach(
 function home(){
   v21MarkTabs();
   let out;
-  if(S.sec==='bahasa'){S.tab='bahasa';out=langHome();}
+  if(S.sec==='bahasa'){S.tab='bahasa';out=(typeof langHome==='function')?langHome():'<div class="card">⚠️ Modul bahasa belum termuat. Muat ulang halaman.</div>';}
   else if(S.sec==='trading'&&!S.admin&&!S.trading)out=tradingLockView();
   else out=homeBase();
   rbSaveUi();
   return out;
-}
-function homeBase(){
-  if(S.sec==='admin')return adminView();
-  if(S.sec==='kamus')return kamusView();
-  v21MarkTabs();
-  if(S.sec==='beranda'){S.tab='beranda';$('app').innerHTML='<div id="pane"></div>';return pane()}
-  if(S.sec==='trading'){
-    S.mapel='Trading';
-    if(['xau','signal','tutor','jurnal'].indexOf(S.tab)<0)S.tab='xau';
-    const T=[['xau',' News Analisis'],['signal',' Signal Entry'],['tutor',' Tutor'],['jurnal',' Jurnal']];
-    $('app').innerHTML='<div class="stabs">'+T.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" onclick="S.tab=\''+k+'\';home()">'+l+'</button>').join('')+'</div><div id="pane"></div>';
-    return pane();
-  }
-  if(S.mapel==='Trading')S.mapel=MAPEL.sekolah[0];
-  if(['beranda','latihan','tryout','tutor','buat','bank','papan'].indexOf(S.tab)<0)S.tab='latihan';
-  const T=[['beranda',' Beranda'],['latihan',' Latihan'],['tryout',' Tryout'],['tutor',' Tutor'],['buat',' Soal'],['bank',' Bank'],['papan',' Peringkat']];
-  $('app').innerHTML='<div class="card v21-pick"><label style="margin-top:0">Pelajaran / topik</label><select onchange="S.mapel=this.value;S.gen=[];S.sub=\'\';pane()">'+mapelOptions()+'</select></div><div class="stabs">'+T.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" onclick="S.tab=\''+k+'\';home()">'+l+'</button>').join('')+'</div><div id="pane"></div>';
-  pane();
-}
-function pane(){
-  const f={beranda:pBeranda,latihan:pLatihan,tryout:pTryout,tutor:pTutor,buat:pBuat,bank:pBank,jurnal:(typeof pJurnal==='function'?pJurnal:pLatihan),xau:(typeof pXauNews==='function'?pXauNews:pLatihan),signal:(typeof pSignalEntry==='function'?pSignalEntry:pXauNews),papan:pPapan}[S.tab];
-  if(f)return f();
-  S.tab='latihan';return pLatihan();
 }
 
 /* ---------- sambungkan ke mesin yang sudah ada ---------- */
@@ -2606,15 +2561,15 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa-jp-data.js?v=20261121a"></script>
 <script src="bahasa-jp-data2.js?v=20261121a"></script>
 <script src="bahasa-jp-grammar.js?v=20261121a"></script>
-<script src="bahasa.js?v=20261121a"></script>
+<script src="bahasa.js?v=20261127a"></script>
 <script src="rb-core.js?v=20261121a"></script>
 <script src="rb-content.js?v=20261122h"></script>
 <script src="rb-ui.js?v=20261121a"></script>
 <script src="rb-alch.js?v=20261122h"></script>
 <script src="rb-alch-live.js?v=20261122h"></script>
 <script src="rb-v33.js?v=20261121a"></script>
-<script src="rb-xau.js?v=20261122h"></script>
+<script src="rb-xau.js?v=20261127c"></script>
 <script src="rb-admin.js?v=20261121a"></script>
-<link rel="stylesheet" href="rb-v35.css?v=20261121a">
+<link rel="stylesheet" href="rb-v35.css?v=20261127b">
 </body>
 </html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" id="rbThemeColor" content="#0b0d11">
+<meta name="robots" content="noindex">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('rb21_theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.getElementById('rbThemeColor');
+    if (m) m.setAttribute('content', t === 'light' ? '#f6f7fa' : '#0b0d11');
+  } catch (e) { }
+})();
+</script>
+<title>Masuk · Ruang Belajar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#08090c;--bg2:#0d1015;--card:#12151b;--card2:#191d24;--field:#0e1116;
+  --line:#232830;--line2:#333a45;--tx:#edf0f5;--mut:#98a1ae;
+  --accent:#7d96ff;--accent2:#c9a2ff;--accent-soft:rgba(125,150,255,.15);
+  --ok:#43dc9b;--ok-soft:rgba(67,220,155,.13);
+  --no:#ff6f80;--no-soft:rgba(255,111,128,.13);
+  --warn:#f0bc63;--warn-soft:rgba(240,188,99,.12);--warn-line:rgba(240,188,99,.3);
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 26px 60px -40px rgba(0,0,0,.95);
+  color-scheme:dark;
+}
+html[data-theme=light]{
+  --bg:#f4f6f9;--bg2:#ffffff;--card:#ffffff;--card2:#f2f5f9;--field:#f7f9fc;
+  --line:#e2e7ef;--line2:#ccd4e0;--tx:#0f1319;--mut:#646d7b;
+  --accent:#3457e0;--accent2:#7b3ff2;--accent-soft:rgba(52,87,224,.1);
+  --ok:#0d8a5f;--ok-soft:rgba(13,138,95,.1);
+  --no:#cd3145;--no-soft:rgba(205,49,69,.09);
+  --warn:#9a6100;--warn-soft:rgba(154,97,0,.09);--warn-line:rgba(154,97,0,.24);
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 26px 60px -44px rgba(16,24,40,.5);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:clamp(18px,4vw,48px) clamp(14px,3vw,24px);
+  font-family:"Manrope",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--tx);line-height:1.6;-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(760px 420px at 12% -8%,rgba(125,150,255,.18),transparent 64%),
+    radial-gradient(700px 460px at 96% 108%,rgba(201,162,255,.14),transparent 62%),
+    linear-gradient(180deg,var(--bg2),var(--bg) 540px);
+  background-color:var(--bg);
+}
+html[data-theme=light] body{
+  background:
+    radial-gradient(760px 420px at 12% -8%,rgba(52,87,224,.10),transparent 64%),
+    radial-gradient(700px 460px at 96% 108%,rgba(123,63,242,.08),transparent 62%),
+    linear-gradient(180deg,#fff,var(--bg) 540px);
+  background-color:var(--bg);
+}
+.auth-wrap{width:100%;max-width:460px;display:flex;flex-direction:column;gap:16px}
+.auth-brand{display:flex;align-items:center;gap:12px;padding:0 4px}
+.brand-logo{
+  width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-size:1.3rem;
+  background:linear-gradient(145deg,var(--accent),var(--accent2));
+  box-shadow:0 18px 34px -22px rgba(125,150,255,.95);flex:0 0 auto;
+}
+.auth-brand b{display:block;font-family:"Sora",sans-serif;font-size:1.12rem;letter-spacing:-.03em;line-height:1.2}
+.auth-brand small{display:block;font-size:.66rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-top:3px}
+.auth-card{
+  background:linear-gradient(168deg,var(--card2),var(--card) 56%);
+  border:1px solid var(--line);border-radius:24px;padding:clamp(22px,5vw,32px);
+  box-shadow:var(--shadow);text-align:center;
+}
+html[data-theme=light] .auth-card{background:linear-gradient(168deg,#fff,#fbfcff)}
+.auth-ico{
+  width:68px;height:68px;margin:0 auto 16px;border-radius:22px;display:grid;place-items:center;
+  font-size:1.75rem;background:var(--accent-soft);border:1px solid var(--line);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.auth-card h1{
+  font-family:"Sora",sans-serif;font-size:clamp(1.22rem,4.4vw,1.46rem);line-height:1.28;
+  letter-spacing:-.035em;margin:0 0 8px;
+}
+.auth-card p{margin:0;color:var(--mut);font-size:.88rem;line-height:1.7;max-width:36ch;margin-inline:auto}
+.auth-actions{display:grid;gap:9px;margin-top:22px}
+.auth-btn{
+  width:100%;min-height:50px;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  border:0;border-radius:15px;padding:13px 18px;font:inherit;font-size:.94rem;font-weight:750;
+  letter-spacing:-.01em;cursor:pointer;color:#fff;text-decoration:none;
+  background:linear-gradient(155deg,var(--accent),var(--accent2));
+  box-shadow:0 16px 32px -22px rgba(125,150,255,.95);
+  transition:transform .12s,opacity .15s,background .15s,border-color .15s;
+}
+.auth-btn:hover{opacity:.95}
+.auth-btn:active{transform:scale(.988)}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-btn.alt{background:var(--card2);color:var(--tx);border:1px solid var(--line);box-shadow:none}
+.auth-btn.alt:hover{background:var(--field);border-color:var(--line2)}
+.auth-btn.ghost{background:transparent;color:var(--mut);border:1px solid var(--line);box-shadow:none;font-weight:650}
+.auth-btn.ghost:hover{color:var(--tx);background:var(--field)}
+.auth-btn:focus-visible,.auth-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.auth-hint{
+  margin-top:16px;padding:12px 14px;border-radius:14px;text-align:left;
+  background:var(--field);border:1px solid var(--line);font-size:.78rem;line-height:1.65;color:var(--mut);
+}
+.auth-hint b{color:var(--tx)}
+.auth-note{margin-top:12px;font-size:.74rem;line-height:1.6;color:var(--mut)}
+.auth-err{
+  margin-top:12px;padding:11px 13px;border-radius:13px;text-align:left;
+  background:var(--no-soft);border:1px solid rgba(255,111,128,.24);
+  color:var(--tx);font-size:.8rem;line-height:1.55;overflow-wrap:anywhere;
+}
+.auth-err:empty{display:none}
+.auth-acct{
+  display:inline-flex;align-items:center;gap:8px;max-width:100%;margin-top:14px;
+  padding:7px 13px;border-radius:999px;background:var(--field);border:1px solid var(--line);
+  font-size:.78rem;color:var(--mut);overflow-wrap:anywhere;
+}
+.auth-badge{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+  font-size:.7rem;font-weight:750;letter-spacing:.02em;margin-bottom:14px;
+  background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--tx);
+}
+.auth-badge.ok{background:var(--ok-soft);border-color:var(--ok-soft);color:var(--ok)}
+.auth-badge.no{background:var(--no-soft);border-color:rgba(255,111,128,.24);color:var(--no)}
+.auth-spin{
+  width:26px;height:26px;border-radius:50%;margin:0 auto 14px;
+  border:3px solid var(--line);border-top-color:var(--accent);animation:authspin .8s linear infinite;
+}
+@keyframes authspin{to{transform:rotate(360deg)}}
+.auth-foot{
+  margin:2px 4px 0;text-align:center;font-size:.72rem;line-height:1.65;color:var(--mut);
+}
+.auth-foot a,.auth-link{color:var(--accent);text-decoration:none;font-weight:700}
+.auth-foot a:hover,.auth-link:hover{text-decoration:underline}
+@media(max-width:420px){
+  .auth-card{border-radius:21px;padding:20px 17px}
+  .auth-btn{min-height:48px}
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-spin{animation:none}
+  .auth-btn{transition:none}
+}
+</style>
+</head>
+<body>
+<main class="auth-wrap">
+  <header class="auth-brand">
+    <span class="brand-logo" aria-hidden="true">📖</span>
+    <div>
+      <b>Ruang Belajar</b>
+      <small>Pelajaran · Bahasa · Trading</small>
+    </div>
+  </header>
+
+  <section id="authCard" class="auth-card" aria-live="polite">
+    <div class="auth-spin" aria-hidden="true"></div>
+    <h1>Memeriksa sesi…</h1>
+    <p>Menyiapkan halaman masuk.</p>
+  </section>
+
+  <p class="auth-foot">Akses dibatasi. Data soal, riwayat, dan catatan tersimpan di akunmu sendiri.<br>Butuh bantuan? <a href="https://www.instagram.com/kyenth29?lqvp=MXI2cmk3NDl4Y3o0Yw==" target="_blank" rel="noopener noreferrer">Hubungi admin via Instagram</a>.</p>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="rb-firebase-config.js"></script>
+<script src="rb-auth.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var card = $('authCard');
+  var auth = null, db = null, user = null, busy = false, redirecting = false;
+  var CONTACT = 'https://www.instagram.com/kyenth29?lqvp=MXI2cmk3NDl4Y3o0Yw==';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function setCard(html) { if (card) card.innerHTML = html; }
+  function storedMsg() {
+    try {
+      var m = sessionStorage.getItem('rb_auth_msg');
+      if (m) sessionStorage.removeItem('rb_auth_msg');
+      return m || '';
+    } catch (e) { return ''; }
+  }
+
+  function renderLogin(err) {
+    var q = new URLSearchParams(location.search);
+    var st = q.get('state');
+    var ended = st && st !== 'masuk' ? 'Sesi sebelumnya berakhir. Masuk lagi untuk melanjutkan.' : '';
+    setCard(
+      '<div class="auth-ico" aria-hidden="true">🎓</div>'
+      + '<h1>Masuk untuk mulai belajar</h1>'
+      + '<p>Gunakan akun Google yang sudah diizinkan admin. Setelah masuk, kamu langsung dibawa ke halaman belajar.</p>'
+      + '<div class="auth-actions">'
+      + '<button class="auth-btn" type="button" id="rbLoginBtn" onclick="rbAuthLogin()">🔑 Masuk dengan Google</button>'
+      + '<a class="auth-btn alt" href="' + CONTACT + '" target="_blank" rel="noopener noreferrer">📩 Hubungi admin via Instagram</a>'
+      + '</div>'
+      + '<div class="auth-hint">Akun baru berstatus <b>menunggu persetujuan admin</b>. Bila sudah disetujui tetapi masih tertahan, tekan <b>Cek lagi</b> di halaman status atau minta admin menyetujui emailmu.</div>'
+      + (ended ? '<div class="auth-note">' + ended + '</div>' : '')
+      + '<div class="auth-err" id="authErr" role="alert">' + esc(err || '') + '</div>'
+    );
+  }
+
+  function renderChecking(msg) {
+    setCard(
+      '<div class="auth-spin" aria-hidden="true"></div>'
+      + '<h1>Memeriksa izin akses…</h1>'
+      + '<p>' + esc(msg || 'Membaca status akun di server.') + '</p>'
+    );
+  }
+
+  function renderStatus(state, msg) {
+    var T = {
+      menunggu: { ico: '⏳', badge: 'Menunggu persetujuan', cls: '', title: 'Akunmu sudah terdaftar', body: 'Admin belum mengizinkan akses. Kamu bisa masuk setelah admin menyetujui akun ini.' },
+      diblokir: { ico: '🚫', badge: 'Akses diblokir', cls: 'no', title: 'Akses diblokir', body: 'Admin memblokir akun ini. Hubungi admin bila menurutmu ini keliru.' },
+      error: { ico: '⚠️', badge: 'Gagal memeriksa izin', cls: 'no', title: 'Status akses belum terbaca', body: 'Periksa koneksi lalu coba lagi. Bila tetap gagal, hubungi admin.' }
+    }[state] || { ico: '⚠️', badge: 'Status tidak dikenal', cls: 'no', title: 'Status akses belum terbaca', body: 'Coba lagi atau hubungi admin.' };
+    setCard(
+      '<div class="auth-ico" aria-hidden="true">' + T.ico + '</div>'
+      + '<div class="auth-badge ' + T.cls + '">' + T.badge + '</div>'
+      + '<h1>' + T.title + '</h1>'
+      + '<p>' + T.body + '</p>'
+      + (msg ? '<div class="auth-err" role="alert">' + esc(msg) + '</div>' : '')
+      + (user && user.email ? '<div class="auth-acct">' + esc(user.email) + '</div>' : '')
+      + '<div class="auth-actions">'
+      + '<button class="auth-btn" type="button" id="rbCheckBtn" onclick="rbAuthCheck()">🔄 Cek lagi</button>'
+      + '<a class="auth-btn alt" href="' + CONTACT + '" target="_blank" rel="noopener noreferrer">📩 Hubungi admin</a>'
+      + '<button class="auth-btn ghost" type="button" onclick="rbAuthLogout()">Keluar dari akun</button>'
+      + '</div>'
+    );
+  }
+
+  function renderFatal(msg) {
+    setCard(
+      '<div class="auth-ico" aria-hidden="true">⚠️</div>'
+      + '<h1>Halaman masuk tidak bisa dimuat</h1>'
+      + '<p>Firebase gagal disiapkan. Periksa koneksi internet lalu muat ulang halaman.</p>'
+      + '<div class="auth-err" role="alert">' + esc(msg || '') + '</div>'
+      + '<div class="auth-actions"><button class="auth-btn alt" type="button" onclick="location.reload()">Muat ulang</button></div>'
+    );
+  }
+
+  function setBusy(v) {
+    busy = !!v;
+    var b = $('rbLoginBtn') || $('rbCheckBtn');
+    if (b) { b.disabled = !!v; }
+  }
+
+  function goApp() {
+    if (redirecting) return;
+    redirecting = true;
+    renderChecking('Akses disetujui. Membuka halaman belajar…');
+    location.replace('index.html');
+  }
+
+  window.rbAuthLogin = async function () {
+    if (!auth) return renderFatal('Firebase Auth tidak tersedia.');
+    var err = $('authErr');
+    if (err) err.textContent = '';
+    setBusy(true);
+    try {
+      await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      /* onAuthStateChanged akan memeriksa izin dan membuka aplikasi. */
+    } catch (e) {
+      setBusy(false);
+      var m = String(e && e.message || e);
+      if (/popup-closed-by-user|cancelled-popup-request/i.test(m)) m = 'Jendela Google ditutup sebelum selesai. Coba lagi.';
+      else if (/popup-blocked/i.test(m)) m = 'Popup Google diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.';
+      else if (/network-request-failed/i.test(m)) m = 'Koneksi gagal. Periksa internet lalu coba lagi.';
+      if (err) err.textContent = 'Gagal masuk: ' + m;
+      else renderLogin('Gagal masuk: ' + m);
+    }
+  };
+
+  window.rbAuthLogout = async function () {
+    if (!auth) return renderLogin();
+    setBusy(true);
+    try { await auth.signOut(); } catch (e) { }
+    setBusy(false);
+    renderLogin();
+  };
+
+  window.rbAuthCheck = async function () {
+    if (!user) return renderLogin();
+    await checkAccess();
+  };
+
+  /* Logika izin ada di rb-auth.js agar halaman masuk dan isi aplikasi
+     memakai aturan yang sama persis (tidak ada dua versi cek akses). */
+  async function checkAccess() {
+    if (!user || busy || redirecting) return;
+    setBusy(true);
+    renderChecking('Membaca status akun dan izin Trading…');
+    var r = await window.RBAuth.check(user, { db: db });
+    setBusy(false);
+    if (redirecting) return;
+    if (r.ok) return goApp();
+    renderStatus(r.status || 'error', r.message || '');
+  }
+
+  function boot() {
+    var cfg = window.RB_FIREBASE_CONFIG;
+    if (!cfg) return renderFatal('Konfigurasi Firebase tidak ditemukan.');
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(cfg);
+      auth = firebase.auth();
+      db = firebase.firestore();
+    } catch (e) {
+      return renderFatal(e && e.message || String(e));
+    }
+    var st = new URLSearchParams(location.search).get('state');
+    var sm = storedMsg();
+    auth.onAuthStateChanged(function (u) {
+      user = u || null;
+      /* Popup login masih berstatus sibuk saat callback ini dipanggil.
+         Reset dulu supaya checkAccess tidak keluar karena guard busy. */
+      busy = false;
+      if (!u) {
+        renderLogin(st === 'error' && sm ? sm : '');
+        return;
+      }
+      checkAccess();
+    });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

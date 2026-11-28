@@ -571,6 +571,50 @@ html[data-theme="light"] .rb-hero-main {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
+/* ==========================================================================
+   V37 — lapisan penutup responsif (HP, tablet, laptop).
+   Hanya aturan yang BELUM ada di V33–V35: tabel lebar digeser di dalam
+   kartunya, tombol penuh di HP, tinggi chart masuk akal, dan efek AI berhenti
+   saat pengguna meminta hemat data. Tanpa blur/gradient/shadow baru supaya
+   tetap ringan di perangkat kelas bawah.
+   ========================================================================== */
+.card, .exp, .warn, .hint, .item, .rb-sig, .rb-release, .rb-kpi, .msg { min-width: 0; }
+.card a, .item > span, td, th, .rb-pill { overflow-wrap: anywhere; }
+
+/* Modern ringan: permukaan rata, garis tipis, angka tabular — tanpa blur,
+   gradient baru, atau bayangan tambahan yang membebani perangkat lambat. */
+.card { border-radius: 16px; }
+.rb-card-head h3, .card > h3 { letter-spacing: -.02em; }
+.rb-lv b, .rb-kpi b, .item b, .rb-table td { font-variant-numeric: tabular-nums; }
+.tabs button, .stabs button { transition: background .12s ease, color .12s ease; }
+@media (hover: hover) { .card:hover { border-color: var(--line2); } }
+
+@media (min-width: 768px) and (max-width: 1180px) {
+  .wrap { padding-left: 20px; padding-right: 20px; }
+}
+
+@media (max-width: 720px) {
+  .wrap { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  /* Tabel lebar bergulir di kartunya, bukan memaksa halaman melebar. */
+  table { display: block; max-width: 100%; overflow-x: auto; white-space: normal; -webkit-overflow-scrolling: touch; }
+  .rb-table th, .rb-table td { white-space: normal; }
+  .rb-actions .btn, .btn.full { width: 100%; margin-left: 0; margin-right: 0; }
+  .x { min-height: 40px; }
+  .rb-tv, .rb-tv-ta { height: clamp(260px, 46vh, 380px); }
+  .rb-chart-frame { height: 280px; }
+  .rb-ai-log { max-height: 80px; }
+  .rb-term-gallery, .rb-term-rules, .rb-chart-levels { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 360px) {
+  .wrap { padding-left: 10px; padding-right: 10px; }
+  .card { padding: 12px 11px !important; }
+}
+
+@media (prefers-reduced-data: reduce) {
+  .rb-ai-scan::before, .rb-ai-orb, .rb-ai-orb::after, .rb-live-dot { animation: none !important; }
+}
+
 /* ---------- mode terang: jangan biarkan lapisan gelap menimpa tema ---------- */
 html[data-theme="light"] {
   --bg: #f3f7fc;
