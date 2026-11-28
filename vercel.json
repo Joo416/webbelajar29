@@ -7,6 +7,10 @@
     "api/fund.js": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/yt.js": {
+      "maxDuration": 20,
+      "memory": 512
     }
   },
   "regions": [

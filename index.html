@@ -146,6 +146,7 @@ html[data-theme=light] .theme-btn{background:#ffffff}
       <div class="sub">Pelajaran · Bahasa · Trading</div>
     </div>
     <button id="rbMenuBtn" class="rb-topmenu" type="button" onclick="rbDrawer(true)" aria-label="Buka menu tampilan dan akun" aria-expanded="false" hidden>Menu</button>
+    <button id="rbMusicBtn" class="rb-topmenu rb-music-top" type="button" onclick="rbMusicOpen()" aria-label="Buka pemutar musik YouTube">🎵 Musik</button>
   </div>
   <div id="warn"></div>
   <div id="userbar"></div>
@@ -929,6 +930,7 @@ function pLatihan(){
   let pr=null;try{pr=JSON.parse(localStorage.getItem(progKey()))}catch(e){}
   const lvs=lvOptions();
   $('pane').innerHTML=`${pr&&pr.qs?`<div class="card"><h3>🎯 Latihan belum selesai</h3><div class="mut small">${esc(pr.mapel)} • ${pr.sel.filter(v=>v!=null&&v!==''&&!(Array.isArray(v)&&!v.length)).length}/${pr.qs.length} terjawab</div><div class="row"><button class="btn full" onclick="resume()">Lanjutkan</button><button class="btn alt full" onclick="clearProg();pLatihan()">Buang</button></div></div>`:''}
+    <div class="card" style="border-left:3px solid var(--accent)"><div class="rb-between"><b>Baru di sini?</b><button class="x" onclick="S.tab='panduan';home()">📖 Baca panduan 2 menit</button></div><div class="mut small" style="margin-top:4px">Panduan berurutan dari memilih pelajaran sampai membaca hasil dan naik peringkat.</div></div>
     <div class="card"><h3>Mulai latihan: ${esc(S.mapel)}</h3>
     ${isUmum()?'':`<label>Subtopik (opsional)</label><input id="sub" placeholder="kosong = semua" value="${esc(S.sub||'')}">
     <div class="row"><div><label>Tingkat</label><select id="lv"><option value="">Semua tingkat</option>${lvs.map(l=>`<option ${S.lvl===l?'selected':''}>${l}</option>`).join('')}</select></div>
@@ -1890,7 +1892,12 @@ function topicList(lv){
 /* ---------- tab Trading: hanya News, Analisis, Tutor, Jurnal, Catatan ---------- */
 function setSec(s){
   if(s==='bahasa'){S.sec='bahasa';S.mapel='Bahasa Inggris';S.tab='bahasa';return home()}
-  S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':'latihan';home()
+  /* Pengguna baru jarang membuka panduan. Saat pertama kali menekan tab
+     Belajar, tampilkan panduan lebih dulu; setelah dibaca, tab kembali ke
+     Latihan seperti biasa. Tombol panduan tetap tersedia di deretan tab. */
+  let firstGuide=false;
+  try{firstGuide=s==='sekolah'&&!localStorage.getItem('rb_panduan_seen')}catch(e){}
+  S.sec=s;S.mapel=s==='trading'?'Trading':(MAPEL[s]?MAPEL[s][0]:S.mapel);S.tab=s==='trading'?'xau':(firstGuide?'panduan':'latihan');home()
 }
 // ✏️ [TEKS BISA DIUBAH] 🎯 TKA & Sekolah → Latihan & riwayat — fungsi homeBase(): tulisan yang tampil di web ada di dalam fungsi ini (di antara tanda > < atau di dalam tanda kutip).
 // Tab Catatan lama sudah dihapus; catatan trade & news kini berada di tab Jurnal.
@@ -2138,7 +2145,12 @@ async function v21BackfillStats(){
 async function v21BoardList(n,cat){
   if(!db)return null;
   try{
-    const s=await db.collection('papan').limit(250).get();
+    /* Firestore bisa menggantung saat jaringan memblokir; tanpa batas waktu
+       papan peringkat berhenti di "Memuat..." selamanya. */
+    const s=await Promise.race([
+      db.collection('papan').limit(250).get(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Papan peringkat melebihi 15 detik')),15000))
+    ]);
     const l=s.docs.map(d=>d.data()).filter(x=>x&&x.uid);
     l.sort((a,b)=>v21Cmp(a,b,cat||v21BoardCat));
     return l.slice(0,n||20);
@@ -2158,7 +2170,7 @@ async function v21MiniBoard(){
 }
 
 /* ---------- Beranda ---------- */
-function v21Home(){S.sec='beranda';home()}
+function v21Home(){S.sec='beranda';S.tab='beranda';home();try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}}
 
 /* ---------- Tryout berwaktu ---------- */
 function pTryout(){
@@ -2586,15 +2598,16 @@ input,select,textarea{background:var(--field)}
 <script src="bahasa-jp-data.js?v=20261121a"></script>
 <script src="bahasa-jp-data2.js?v=20261121a"></script>
 <script src="bahasa-jp-grammar.js?v=20261121a"></script>
-<script src="bahasa.js?v=20261128a"></script>
-<script src="rb-core.js?v=20261128d"></script>
+<script src="bahasa.js?v=20261128b"></script>
+<script src="rb-core.js?v=20261128f"></script>
 <script src="rb-content.js?v=20261122h"></script>
 <script src="rb-ui.js?v=20261121a"></script>
 <script src="rb-alch.js?v=20261122h"></script>
 <script src="rb-alch-live.js?v=20261122h"></script>
 <script src="rb-v33.js?v=20261121a"></script>
-<script src="rb-xau.js?v=20261128a"></script>
+<script src="rb-xau.js?v=20261128b"></script>
 <script src="rb-admin.js?v=20261128d"></script>
-<link rel="stylesheet" href="rb-v35.css?v=20261128d">
+<script src="rb-music.js?v=20261128c"></script>
+<link rel="stylesheet" href="rb-v35.css?v=20261128e">
 </body>
 </html>

@@ -314,6 +314,11 @@ function homeBase() {
   if (S.sec === 'admin') return adminView();
   if (S.sec === 'kamus') return kamusView();
   if (typeof v21MarkTabs === 'function') v21MarkTabs();
+  /* Panduan tampil sekali secara otomatis, termasuk saat halaman pertama kali
+     dibuka langsung di tab Belajar. Setelah dibaca, alur kembali normal. */
+  if (S.sec === 'sekolah' && S.tab === 'latihan') {
+    try { if (!localStorage.getItem('rb_panduan_seen')) S.tab = 'panduan'; } catch (e) { }
+  }
   if (S.sec === 'beranda') {
     if (['beranda', 'papan', 'kalender'].indexOf(S.tab) < 0) S.tab = 'beranda';
     $('app').innerHTML = '<div id="pane"></div>';
@@ -330,7 +335,7 @@ function homeBase() {
   }
   if (S.mapel === 'Trading') S.mapel = (MAPEL.sekolah && MAPEL.sekolah[0]) || 'Bahasa Indonesia';
   if (['latihan', 'tryout', 'tutor', 'soal', 'buat', 'bank'].indexOf(S.tab) < 0) S.tab = 'latihan';
-  const T = [['latihan', '🎯 Latihan'], ['tryout', '📝 Tryout'], ['tutor', '💬 Tutor'], ['soal', '📘 Belajar Soal'], ['buat', '✨ Buat Soal'], ['bank', '🗂️ Bank Soal']];
+  const T = [['panduan', '📖 Panduan'], ['latihan', '🎯 Latihan'], ['tryout', '📝 Tryout'], ['tutor', '💬 Tutor'], ['soal', '📘 Belajar Soal'], ['buat', '✨ Buat Soal'], ['bank', '🗂️ Bank Soal']];
   $('app').innerHTML = '<div class="card v21-pick"><label style="margin-top:0">Pelajaran / topik</label>'
     + '<select onchange="S.mapel=this.value;S.gen=[];S.sub=\'\';pane()">' + mapelOptions() + '</select></div>'
     + '<div class="stabs">' + T.map(function (x) {
@@ -340,7 +345,7 @@ function homeBase() {
 }
 function pane() {
   const map = {
-    beranda: pBeranda, papan: pPapan, kalender: pKalender,
+    beranda: pBeranda, papan: pPapan, kalender: pKalender, panduan: pPanduan,
     latihan: pLatihan, tryout: pTryout, tutor: pTutor,
     soal: (typeof pSoal === 'function' ? pSoal : pLatihan),
     buat: pBuat, bank: pBank,
@@ -535,6 +540,74 @@ function pBeranda() {
   rb26StartClocks();
 }
 
+/* ==========================================================================
+   PANDUAN BELAJAR — ditampilkan sebagai tab tersendiri supaya siswa tidak
+   perlu mencari dokumen terpisah. Urutannya sama dengan alur pemakaian nyata:
+   pilih pelajaran → siapkan soal → latihan → baca pembahasan → tanya tutor →
+   tryout → lihat progres. Semua tombol memakai navigasi yang sudah ada.
+   ========================================================================== */
+function pPanduan() {
+  try { localStorage.setItem('rb_panduan_seen', '1'); } catch (e) { }
+  const mapel = rb26Safe(S.mapel || 'Bahasa Indonesia');
+  const step = (n, title, body) => '<div class="rb-step"><b>' + n + '. ' + title + '</b>' + body + '</div>';
+  return '<div class="card rb-hero"><div class="rb-eyebrow">Panduan pemakaian</div>'
+    + '<h2>Cara memakai Ruang Belajar dari awal sampai akhir</h2>'
+    + '<div class="rb-note">Ikuti urutan ini sekali. Setelah terbiasa, kamu bisa langsung lompat ke tab yang dibutuhkan. Pelajaran aktif sekarang: <b>' + mapel + '</b>.</div>'
+    + '<div class="rb-actions"><button class="btn" onclick="S.tab=\'latihan\';home()">🎯 Mulai latihan</button>'
+    + '<button class="btn alt" onclick="S.tab=\'buat\';home()">✨ Buat soal</button>'
+    + '<button class="btn alt" onclick="S.tab=\'tutor\';home()">💬 Tanya tutor</button>'
+    + '<button class="btn alt" onclick="v21Home()">🏠 Lihat progres</button></div></div>'
+
+    + '<div class="card"><div class="rb-card-head"><h3>🚦 Alur 7 langkah</h3><span class="rb-pill">urut dari atas</span></div>'
+    + '<div class="rb-flow">'
+      + step(1, 'Pilih pelajaran dan subtopik', '<div class="small mut">Di bagian paling atas tab Belajar ada menu <b>Pelajaran / topik</b>. Pilih mapel dulu (mis. Matematika). Subtopik, tingkat, dan jenis soal diatur saat memulai latihan. Mengganti pelajaran akan memuat bank soal pelajaran itu.</div>')
+      + step(2, 'Siapkan soal lebih dulu bila bank masih kosong', '<div class="small mut">Buka <b>✨ Buat Soal</b>, isi topik (boleh kosong untuk acak), pilih jumlah, lalu tekan <b>Buat soal</b>. Soal buatan AI otomatis masuk ke bank dan bisa langsung dilatih. Tab <b>Latihan</b> mengambil soal dari bank ini, jadi tanpa soal latihan tidak bisa dimulai.</div>')
+      + step(3, 'Latihan harian', '<div class="small mut">Di <b>🎯 Latihan</b> pilih subtopik, tingkat, jenis soal, dan jumlah soal. Biarkan <b>Utamakan soal yang belum pernah dikerjakan</b> tercentang agar soal tidak berulang. Mode ujian memberi timer dan pembahasan muncul setelah selesai. Tekan <b>Mulai ▶</b>.</div>')
+      + step(4, 'Jawab, lalu baca pembahasan', '<div class="small mut">Setiap jawaban langsung dinilai. Baca <b>pembahasan</b> walau jawabanmu benar: di situ letak langkah berpikirnya. Bila latihan terputus, kartu <b>Latihan belum selesai</b> muncul dan bisa dilanjutkan.</div>')
+      + step(5, 'Belajar Soal dan tanya Tutor', '<div class="small mut">Tab <b>📘 Belajar Soal</b> menampilkan semua soalmu dalam mode daftar atau kartu. Buka satu soal untuk melihat kunci, minta <b>Jelaskan & cara berpikir</b>, atau kirim ke Tutor. Tab <b>💬 Tutor</b> dipakai untuk bertanya bebas tentang materi; tutor selalu memakai mesin lokal bila server AI sedang sibuk.</div>')
+      + step(6, 'Uji dengan Tryout', '<div class="small mut">Tab <b>📝 Tryout</b> membuat simulasi berwaktu. Pilih jumlah soal dan durasi, kerjakan soal mudah dulu, dan biarkan waktu habis bila perlu — jawaban otomatis dikumpulkan. Skor tryout masuk ke riwayat dan peringkat.</div>')
+      + step(7, 'Cek hasil dan jaga streak', '<div class="small mut">Buka <b>🏠 Beranda</b> untuk melihat XP, akurasi, kalender konsistensi, dan papan peringkat. Tab <b>🗂️ Bank Soal</b> dipakai merapikan soal (cari, filter, hapus). Riwayat latihan ada di bagian bawah tab Latihan.</div>')
+    + '</div></div>'
+
+    + '<div class="rb-grid">'
+      + '<div class="card"><div class="rb-card-head"><h3>🧭 Arti tiap tab</h3></div>'
+        + '<table class="rb-table"><thead><tr><th>Tab</th><th>Dipakai untuk</th></tr></thead><tbody>'
+        + '<tr><td>📖 Panduan</td><td>Halaman ini: urutan pemakaian dan arti istilah.</td></tr>'
+        + '<tr><td>🎯 Latihan</td><td>Mengerjakan soal dari bank dengan filter dan timer opsional.</td></tr>'
+        + '<tr><td>📝 Tryout</td><td>Simulasi ujian berwaktu, skor masuk riwayat.</td></tr>'
+        + '<tr><td>💬 Tutor</td><td>Tanya jawab materi dengan AI + mesin lokal cadangan.</td></tr>'
+        + '<tr><td>📘 Belajar Soal</td><td>Membaca ulang soal, kunci, dan pembahasan; melatih soal terpilih.</td></tr>'
+        + '<tr><td>✨ Buat Soal</td><td>Menambah soal baru sesuai topik dan kurikulum.</td></tr>'
+        + '<tr><td>🗂️ Bank Soal</td><td>Mencari, memfilter, dan menghapus soal.</td></tr>'
+        + '</tbody></table></div>'
+      + '<div class="card"><div class="rb-card-head"><h3>📈 Cara progres dihitung</h3></div>'
+        + '<ul class="small" style="line-height:1.7;padding-left:18px;margin:0">'
+        + '<li><b>XP</b> bertambah dari jawaban benar; makin banyak benar, makin cepat naik.</li>'
+        + '<li><b>Streak</b> = jumlah hari berurutan kamu mengerjakan minimal satu soal. Satu hari terlewat, streak mulai dari 1 lagi.</li>'
+        + '<li><b>Akurasi</b> = jawaban benar ÷ total jawaban yang tercatat.</li>'
+        + '<li><b>Peringkat</b> diurutkan dari jumlah jawaban benar per kategori: Sekolah, TKA, Umum. Soal sekolah tetap masuk kategori Sekolah walau dikerjakan dalam mode tryout.</li>'
+        + '<li><b>Kalender</b> menandai hari yang benar-benar kamu pakai belajar, bukan hari saat halaman dibuka.</li>'
+        + '</ul>'
+        + '<div class="rb-callout ok" style="margin-top:10px"><b>Target realistis:</b> 10–20 soal per hari lebih baik daripada 100 soal sekali lalu berhenti seminggu.</div>'
+      + '</div>'
+    + '</div>'
+
+    + '<div class="card"><div class="rb-card-head"><h3>❓ Pertanyaan yang sering muncul</h3></div>'
+      + '<details class="rb-accordion"><summary>Latihan bilang “tidak ada soal”</summary><div class="rb-acc-body">Bank soal untuk pelajaran itu masih kosong atau filternya terlalu sempit. Buka <b>✨ Buat Soal</b> dan buat 10 soal, atau longgarkan subtopik/tingkat/jenis soal.</div></details>'
+      + '<details class="rb-accordion"><summary>Kenapa soal yang sama muncul lagi?</summary><div class="rb-acc-body">Pastikan <b>Utamakan soal yang belum pernah/jarang dikerjakan</b> tercentang. Bila bank hanya berisi sedikit soal, pengulangan tidak bisa dihindari — tambah soal baru.</div></details>'
+      + '<details class="rb-accordion"><summary>Jawaban AI terasa lambat atau gagal</summary><div class="rb-acc-body">Server AI punya batas waktu dan beberapa penyedia cadangan. Tunggu, lalu coba lagi. Tutor tetap bisa menjawab dari mesin lokal untuk pertanyaan materi umum.</div></details>'
+      + '<details class="rb-accordion"><summary>Peringkat tidak berubah</summary><div class="rb-acc-body">Peringkat diperbarui setelah latihan selesai dan tersinkron ke akun. Pastikan kamu memakai akun Google yang sama dan koneksi stabil; papan memuat ulang otomatis setiap kali dibuka.</div></details>'
+      + '<details class="rb-accordion"><summary>Data hilang setelah ganti perangkat</summary><div class="rb-acc-body">Soal dan riwayat tersimpan di akun (Firestore). Progres latihan lokal juga disimpan per akun di perangkat; tunggu sinkronisasi selesai sebelum menutup halaman.</div></details>'
+    + '</div>'
+
+    + '<div class="card"><div class="rb-card-head"><h3>▶️ Mulai sekarang</h3></div><div class="rb-actions" style="margin-top:0">'
+      + '<button class="btn" onclick="S.tab=\'buat\';home()">1. Buat soal</button>'
+      + '<button class="btn alt" onclick="S.tab=\'latihan\';home()">2. Latihan</button>'
+      + '<button class="btn alt" onclick="S.tab=\'soal\';home()">3. Belajar soal</button>'
+      + '<button class="btn alt" onclick="S.tab=\'tutor\';home()">4. Tanya tutor</button>'
+    + '</div></div>';
+}
+
 function pKalender() {
   const a = rb26Act();
   const st = (typeof v21Streak === 'function' ? v21Streak(a) : 0);
@@ -579,7 +652,7 @@ async function pPapan() {
   const req = ++v21PapanReq;
   const label = (typeof v21CatLabel === 'function' ? v21CatLabel(v21BoardCat) : 'Sekolah');
   $('pane').innerHTML = '<div class="card"><div class="rb-card-head"><h3>🏆 Peringkat ' + rb26Safe(label) + '</h3>'
-    + '<div style="display:flex;gap:6px"><button class="x" onclick="v21Home()">← Beranda</button><button class="x" onclick="pPapan()">Tutup</button></div></div>'
+    + '<div style="display:flex;gap:6px"><button class="x" onclick="v21Home()">← Beranda</button><button class="x" onclick="pPapan()">🔄 Muat ulang</button></div></div>'
     + '<div class="rb-note">Diurutkan dari jumlah jawaban benar. Setiap akun Google aktif otomatis masuk peringkat.</div>'
     + v21CatButtons()
     + '<div id="v21board" class="mut small rb-ranklist">Memuat...</div></div>'

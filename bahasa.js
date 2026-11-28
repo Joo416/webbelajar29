@@ -262,8 +262,8 @@ function langHome() {
     jp: { flag: '🇯🇵', name: 'Bahasa Jepang', sub: 'Hiragana, katakana, kanji, kosakata, tata bahasa, kuis.' }
   }[lang];
   const nav = lang === 'en'
-    ? [['verbs', ' Kamus Verb'], ['flash', ' Flashcard'], ['quiz', ' Latihan'], ['ai', ' AI Inggris'], ['stats', ' Progres']]
-    : [['kana', 'あ Kana'], ['kanji', '漢 Kanji'], ['vocab', ' Kosakata'], ['grammar', ' Tata Bahasa'], ['quiz', ' Latihan'], ['ai', ' AI Jepang']];
+    ? [['verbs', '📚 Kamus Verb'], ['flash', '🎴 Flashcard'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Inggris'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']]
+    : [['kana', 'あ Kana'], ['kanji', '漢 Kanji'], ['vocab', '📗 Kosakata'], ['grammar', '🧩 Tata Bahasa'], ['quiz', '🎯 Latihan'], ['listen', '🎧 Dengar'], ['write', '✍️ Tulis'], ['phrases', '💬 Frasa'], ['ai', '🤖 AI Jepang'], ['stats', '📊 Progres'], ['guide', '📖 Panduan']];
   const app = $('app');
   app.innerHTML =
     '<div class="lb-hero">' +
@@ -305,8 +305,8 @@ function lbRender() {
   const box = $('lbmain'); if (!box) return;
   const lang = LB.lang, tab = lbCurTab();
   const V = {
-    en: { verbs: lbEnVerbs, flash: lbEnFlash, quiz: lbEnQuiz, ai: lbEnAI, stats: lbEnStats },
-    jp: { kana: lbJpKana, kanji: lbJpKanji, vocab: lbJpVocab, grammar: lbJpGrammar, quiz: lbJpQuiz, ai: lbJpAI, stats: lbJpStats }
+    en: { verbs: lbEnVerbs, flash: lbEnFlash, quiz: lbEnQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbEnAI, stats: lbEnStats, guide: lbGuide },
+    jp: { kana: lbJpKana, kanji: lbJpKanji, vocab: lbJpVocab, grammar: lbJpGrammar, quiz: lbJpQuiz, listen: lbListen, write: lbWrite, phrases: lbPhrases, ai: lbJpAI, stats: lbJpStats, guide: lbGuide }
   }[lang];
   const f = V && V[tab];
   box.innerHTML = f ? f() : lbNeed(lang);
@@ -1310,4 +1310,206 @@ function lbKanjiDetail(x) {
     '<div class="lb-tip"> On\'yomi dipakai dalam kata gabungan (mis. 日本), kun\'yomi dipakai saat kanji berdiri sendiri atau diikuti hiragana (mis. 日にち).</div>' +
   '</div>';
 }
+
+/* ==========================================================================
+   FITUR BELAJAR TAMBAHAN — mendengar, menulis, frasa harian, dan panduan.
+   Semua latihan memakai data kamus yang sudah ada (verb Inggris dan kosakata
+   Jepang), jadi tidak ada terjemahan yang dikarang saat runtime. Frasa di
+   bawah ditulis manual dengan romaji dan catatan pemakaian.
+   ========================================================================== */
+document.head.insertAdjacentHTML('beforeend', '<style>' +
+  '.lb-opt{display:block;width:100%;text-align:left;margin-top:7px;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--tx);font:inherit;font-size:.86rem;cursor:pointer;transition:.14s}' +
+  '.lb-opt:hover{border-color:var(--line2);background:var(--card2)}' +
+  '.lb-opt.ok{border-color:var(--ok);background:var(--ok-soft);color:var(--tx)}' +
+  '.lb-opt.no{border-color:var(--no);background:var(--no-soft);color:var(--tx)}' +
+  '.lb-play{display:grid;place-items:center;width:100%;min-height:92px;border-radius:16px;border:1px dashed var(--line2);background:var(--field);color:var(--tx);font-size:2rem;cursor:pointer;margin:8px 0}' +
+  '.lb-play:hover{border-color:var(--accent);background:var(--accent-soft)}' +
+  '.lb-write{display:flex;gap:8px;margin-top:10px}' +
+  '.lb-write input{flex:1;min-width:0}' +
+  '.lb-phrase{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:13px;background:var(--field);margin-bottom:7px}' +
+  '.lb-phrase-main{flex:1;min-width:0}' +
+  '.lb-phrase-main b{display:block;font-size:.95rem;line-height:1.45}' +
+  '.lb-phrase-main span{display:block;font-size:.76rem;color:var(--accent2);margin-top:1px}' +
+  '.lb-phrase-main em{display:block;font-style:normal;font-size:.82rem;color:var(--mut);margin-top:3px}' +
+  '.lb-guide-step{display:flex;gap:11px;padding:11px 13px;border:1px solid var(--line);border-radius:13px;background:var(--field);margin-bottom:8px}' +
+  '.lb-guide-step i{flex:0 0 28px;height:28px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-style:normal;font-weight:800;font-size:.78rem}' +
+  '.lb-guide-step b{display:block;font-size:.88rem}' +
+  '.lb-guide-step div div{font-size:.78rem;color:var(--mut);line-height:1.55;margin-top:2px}' +
+  '</style>');
+
+const LB_PHRASES = {
+  en: [
+    { c: 'Sapaan', t: 'Good morning.', id: 'Selamat pagi.', note: 'Dipakai dari pagi sampai sekitar pukul 12 siang.' },
+    { c: 'Sapaan', t: 'Good afternoon.', id: 'Selamat siang.', note: 'Dipakai setelah tengah hari sampai sore.' },
+    { c: 'Sapaan', t: 'How are you?', id: 'Apa kabar?', note: 'Jawaban umum: I am fine, thank you. And you?' },
+    { c: 'Sapaan', t: 'Nice to meet you.', id: 'Senang berjumpa denganmu.', note: 'Biasanya saat pertama kali berkenalan.' },
+    { c: 'Sapaan', t: 'See you tomorrow.', id: 'Sampai jumpa besok.', note: 'See you later = sampai nanti, belum tentu besok.' },
+    { c: 'Sopan', t: 'Thank you very much.', id: 'Terima kasih banyak.', note: 'Very much memperkuat rasa terima kasih.' },
+    { c: 'Sopan', t: 'You are welcome.', id: 'Sama-sama.', note: 'Jawaban atas thank you.' },
+    { c: 'Sopan', t: 'Excuse me, may I ask a question?', id: 'Permisi, boleh saya bertanya?', note: 'Excuse me dipakai untuk memulai interaksi sopan.' },
+    { c: 'Sekolah', t: 'I do not understand this lesson.', id: 'Saya tidak memahami pelajaran ini.', note: 'Do not + verb 1 untuk kalimat negatif present.' },
+    { c: 'Sekolah', t: 'Could you explain it again, please?', id: 'Bisakah Anda menjelaskannya lagi?', note: 'Could lebih sopan daripada can.' },
+    { c: 'Sekolah', t: 'I have finished my homework.', id: 'Saya sudah menyelesaikan pekerjaan rumah saya.', note: 'Have + V3 menyatakan hasil yang sudah selesai.' },
+    { c: 'Perjalanan', t: 'How much does this cost?', id: 'Berapa harga ini?', note: 'Does dipakai karena subjek this adalah orang ketiga tunggal.' },
+    { c: 'Perjalanan', t: 'Where is the nearest bus stop?', id: 'Di mana halte bus terdekat?', note: 'Nearest = paling dekat.' },
+    { c: 'Perjalanan', t: 'I would like a glass of water, please.', id: 'Saya mau segelas air.', note: 'I would like lebih sopan daripada I want.' },
+    { c: 'Harian', t: 'I usually study for one hour every evening.', id: 'Saya biasanya belajar satu jam setiap malam.', note: 'Usually menandakan kebiasaan; study tetap V1.' },
+    { c: 'Harian', t: 'Please speak a little more slowly.', id: 'Tolong bicara sedikit lebih lambat.', note: 'More slowly = lebih lambat (adverb).' }
+  ],
+  jp: [
+    { c: 'Sapaan', t: 'おはようございます。', r: 'ohayou gozaimasu', id: 'Selamat pagi.', note: 'Bentuk sopan. Ke teman dekat cukup おはよう (ohayou).' },
+    { c: 'Sapaan', t: 'こんにちは。', r: 'konnichiwa', id: 'Selamat siang.', note: 'Dipakai pada siang sampai sore.' },
+    { c: 'Sapaan', t: 'こんばんは。', r: 'konbanwa', id: 'Selamat malam.', note: 'Dipakai setelah hari gelap. こんばんは ditulis dengan は, dibaca wa.' },
+    { c: 'Sapaan', t: 'はじめまして。', r: 'hajimemashite', id: 'Senang berkenalan.', note: 'Diucapkan saat pertama kali bertemu.' },
+    { c: 'Sapaan', t: 'また明日。', r: 'mata ashita', id: 'Sampai jumpa besok.', note: 'Kasual; bentuk sopannya また明日会いましょう.' },
+    { c: 'Sopan', t: 'ありがとうございます。', r: 'arigatou gozaimasu', id: 'Terima kasih.', note: 'Bentuk sopan. Kasual: ありがとう (arigatou).' },
+    { c: 'Sopan', t: 'すみません。', r: 'sumimasen', id: 'Permisi / maaf.', note: 'Dipakai untuk memanggil pelayan, minta maaf, atau menarik perhatian.' },
+    { c: 'Sopan', t: 'ちょっと聞いてもいいですか。', r: 'chotto kiite mo ii desu ka', id: 'Boleh saya bertanya sebentar?', note: '聞いて = bentuk て dari 聞く (bertanya/mendengar).' },
+    { c: 'Sekolah', t: 'わかりません。', r: 'wakarimasen', id: 'Saya tidak mengerti.', note: 'Bentuk sopan negatif dari わかります (mengerti).' },
+    { c: 'Sekolah', t: 'もう一度言ってください。', r: 'mou ichido itte kudasai', id: 'Tolong katakan sekali lagi.', note: 'もう一度 = sekali lagi; 言ってください = tolong katakan.' },
+    { c: 'Sekolah', t: 'これは何ですか。', r: 'kore wa nan desu ka', id: 'Ini apa?', note: 'これ = ini; 何 = apa; か menandai pertanyaan.' },
+    { c: 'Perjalanan', t: 'これはいくらですか。', r: 'kore wa ikura desu ka', id: 'Ini berapa harganya?', note: 'いくら = berapa (harga).' },
+    { c: 'Perjalanan', t: '駅はどこですか。', r: 'eki wa doko desu ka', id: 'Di mana stasiun?', note: 'どこ = di mana; partikel は dibaca wa.' },
+    { c: 'Perjalanan', t: '水をください。', r: 'mizu o kudasai', id: 'Tolong beri saya air.', note: 'を menandai objek; ください = tolong berikan.' },
+    { c: 'Harian', t: '毎晩一時間勉強します。', r: 'maiban ichijikan benkyou shimasu', id: 'Saya belajar satu jam setiap malam.', note: '毎晩 = setiap malam; 一時間 = satu jam.' },
+    { c: 'Harian', t: 'いただきます。', r: 'itadakimasu', id: 'Ungkapan sebelum makan.', note: 'Tidak diterjemahkan kata per kata; artinya menerima hidangan dengan syukur.' }
+  ]
+};
+
+function lbPhrases() {
+  const lang = LB.lang, cat = LB.phraseCat || 'Semua';
+  const all = LB_PHRASES[lang] || [];
+  const cats = ['Semua'].concat(all.map(function (p) { return p.c; }).filter(function (c, i, a) { return a.indexOf(c) === i; }));
+  const list = all.filter(function (p) { return cat === 'Semua' || p.c === cat; });
+  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Frasa harian</div><h3>' + (lang === 'jp' ? 'Kalimat siap pakai — Jepang' : 'Kalimat siap pakai — Inggris') + '</h3></div><span class="lb-count">' + list.length + ' frasa</span></div>' +
+    '<div class="mut small" style="margin-bottom:4px">Setiap frasa punya terjemahan Indonesia, catatan pemakaian, dan tombol dengar. Dengarkan, tiru, lalu pakai dalam kalimatmu sendiri.</div>' +
+    '<div class="lb-chips lb-cats">' + cats.map(function (c) {
+      return '<button type="button" class="lb-chip lb-chip-btn ' + (cat === c ? 'on' : '') + '" onclick="lbPhraseCat(\'' + lbEsc(c) + '\')">' + lbEsc(c) + '</button>';
+    }).join('') + '</div>' +
+    '<div style="margin-top:10px">' + list.map(function (p) {
+      return '<div class="lb-phrase"><div class="lb-phrase-main"><b>' + lbEsc(p.t) + '</b>' + (p.r ? '<span>' + lbEsc(p.r) + '</span>' : '') + '<em>' + lbEsc(p.id) + '</em><div class="lb-note">' + lbEsc(p.note || '') + '</div></div>' + lbAudioBtn(p.t, lang) + '</div>';
+    }).join('') + '</div></div>' +
+    '<div class="card lb-panel"><div class="lb-panel-head"><h3>Latih frasa ini</h3></div><div class="mut small">Uji pendengaran dan ejaan memakai frasa yang sama.</div><div class="lb-cta-row" style="margin-top:8px"><button class="btn" onclick="lbTabClick(\'listen\')">🎧 Latihan dengar</button><button class="btn alt" onclick="lbTabClick(\'write\')">✍️ Latihan tulis</button></div></div>';
+}
+function lbPhraseCat(c) { LB.phraseCat = c; lbRender(); }
+
+function lbListenPool(lang) {
+  const seen = {}, out = [];
+  if (lang === 'jp') {
+    LB_JP_VOCAB.forEach(function (v) {
+      if (!v || !v.k || !v.a) return;
+      const k = v.k + '|' + v.a; if (seen[k]) return; seen[k] = 1;
+      out.push({ say: v.k, ans: v.a, extra: v.r || '', key: 'jp:listen:' + v.k });
+    });
+  } else {
+    LB_VERBS.forEach(function (v) {
+      const a = String(v.arti || '').split(',')[0].trim();
+      if (!v.v1 || !a) return;
+      const k = v.v1 + '|' + a; if (seen[k]) return; seen[k] = 1;
+      out.push({ say: v.v1, ans: a, extra: '', key: 'en:listen:' + v.v1 });
+    });
+  }
+  return out;
+}
+
+function lbListenStart() {
+  const lang = LB.lang, pool = lbListenPool(lang);
+  if (pool.length < 4) { lbToast('Data belum cukup untuk latihan dengar.'); return; }
+  const item = pool[Math.floor(Math.random() * pool.length)];
+  const used = {}; used[item.ans] = 1;
+  const others = [];
+  lbShuffle(pool).forEach(function (x) {
+    if (others.length >= 3 || used[x.ans]) return;
+    used[x.ans] = 1; others.push(x.ans);
+  });
+  const opts = lbShuffle([item.ans].concat(others));
+  const prev = LB.listen && LB.listen.lang === lang ? LB.listen : null;
+  LB.listen = { lang: lang, item: item, opts: opts, picked: -1, ok: false, n: prev ? prev.n + 1 : 1, score: prev ? prev.score : 0 };
+  lbRender();
+  setTimeout(function () { lbSay(item.say, lang); }, 220);
+}
+function lbListenReplay() { if (LB.listen) lbSay(LB.listen.item.say, LB.listen.lang); }
+function lbListenPick(i) {
+  const L = LB.listen; if (!L || L.picked >= 0) return;
+  L.picked = i; L.ok = L.opts[i] === L.item.ans;
+  if (L.ok) L.score++;
+  lbAward(L.lang, L.ok ? 8 : 2, L.ok);
+  lbMarkMastery(L.lang, L.item.key, L.ok);
+  lbRender();
+}
+function lbListen() {
+  const lang = LB.lang, L = LB.listen && LB.listen.lang === lang ? LB.listen : null;
+  const head = '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Latihan mendengar</div><h3>Dengar, lalu pilih artinya</h3></div><span class="lb-count">' + (L ? 'benar ' + L.score + '/' + L.n : 'siap') + '</span></div>' +
+    '<div class="mut small">Kata diucapkan memakai suara browser. Jika belum terdengar, tekan tombol putar lagi dan pastikan volume perangkat menyala.</div>';
+  if (!L) return head + '<div class="lb-empty"><div class="lb-empty-ico">🎧</div><b>Mulai latihan dengar</b><div class="mut small">Empat pilihan arti, satu kata yang diucapkan.</div></div><button class="btn full" onclick="lbListenStart()">▶ Mulai</button></div>';
+  return head + '<button type="button" class="lb-play" onclick="lbListenReplay()" aria-label="Putar ulang suara">🔊<span class="small" style="font-size:.72rem">ketuk untuk memutar ulang</span></button>' +
+    L.opts.map(function (o, i) {
+      const cls = L.picked < 0 ? '' : o === L.item.ans ? ' ok' : i === L.picked ? ' no' : '';
+      return '<button type="button" class="lb-opt' + cls + '" onclick="lbListenPick(' + i + ')">' + lbEsc(o) + '</button>';
+    }).join('') +
+    (L.picked >= 0 ? '<div class="lb-feedback ' + (L.ok ? 'ok' : 'no') + '" style="margin-top:10px"><b>' + (L.ok ? '✅ Benar' : '❌ Belum tepat') + '</b><div class="small" style="margin-top:4px">Kata: <b>' + lbEsc(L.item.say) + '</b>' + (L.item.extra ? ' · ' + lbEsc(L.item.extra) : '') + ' — ' + lbEsc(L.item.ans) + '</div></div><button class="btn full" style="margin-top:8px" onclick="lbListenStart()">Soal berikutnya ▶</button>' : '') +
+    '</div>';
+}
+
+function lbWritePool(lang) {
+  return lbListenPool(lang).map(function (x) {
+    return { prompt: x.ans, answer: x.say, extra: x.extra, key: (lang === 'jp' ? 'jp:write:' : 'en:write:') + x.say };
+  });
+}
+function lbWriteStart() {
+  const lang = LB.lang, pool = lbWritePool(lang);
+  if (!pool.length) { lbToast('Data belum cukup untuk latihan tulis.'); return; }
+  const item = pool[Math.floor(Math.random() * pool.length)];
+  const prev = LB.write && LB.write.lang === lang ? LB.write : null;
+  LB.write = { lang: lang, item: item, value: '', checked: false, ok: false, n: prev ? prev.n + 1 : 1, score: prev ? prev.score : 0 };
+  lbRender();
+  setTimeout(function () { const i = $('lbw-in'); if (i) i.focus(); }, 60);
+}
+function lbWriteInput(v) { if (LB.write) LB.write.value = v; }
+function lbWriteCheck() {
+  const W = LB.write; if (!W || W.checked) return;
+  const inp = $('lbw-in'); const raw = String(inp ? inp.value : W.value || '').trim();
+  W.value = raw;
+  const norm = function (s) { return String(s || '').toLowerCase().replace(/[.,!?;:\u3002\u3001\uff01\uff1f\s]/g, ''); };
+  const want = [W.item.answer].concat(W.lang === 'jp' ? [W.item.extra || '', lbRomaji(W.item.answer)] : []).map(norm).filter(Boolean);
+  W.checked = true; W.ok = want.indexOf(norm(raw)) >= 0;
+  if (W.ok) W.score++;
+  lbAward(W.lang, W.ok ? 10 : 2, W.ok);
+  lbMarkMastery(W.lang, W.item.key, W.ok);
+  lbRender();
+}
+function lbWrite() {
+  const lang = LB.lang, W = LB.write && LB.write.lang === lang ? LB.write : null;
+  const head = '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Latihan menulis</div><h3>Tulis bentuk asing dari arti Indonesia</h3></div><span class="lb-count">' + (W ? 'benar ' + W.score + '/' + W.n : 'siap') + '</span></div>' +
+    '<div class="mut small">Inggris: tulis V1. Jepang: tulis kana/kanji atau romaji. Ejaan dinilai tanpa membedakan huruf besar, spasi, dan tanda baca.</div>';
+  if (!W) return head + '<div class="lb-empty"><div class="lb-empty-ico">✍️</div><b>Mulai latihan menulis</b><div class="mut small">Ingat bentuk asing dari arti yang ditampilkan.</div></div><button class="btn full" onclick="lbWriteStart()">▶ Mulai</button></div>';
+  return head + '<div class="exp" style="margin-top:10px;color:var(--tx)"><div class="small mut">Tulis dalam ' + (lang === 'jp' ? 'bahasa Jepang' : 'bahasa Inggris') + ':</div><div style="font-size:1.12rem;font-weight:700;margin-top:3px">' + lbEsc(W.item.prompt) + '</div></div>' +
+    '<div class="lb-write"><input id="lbw-in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + (lang === 'jp' ? 'kana / romaji' : 'kata Inggris') + '" value="' + lbEsc(W.value) + '" oninput="lbWriteInput(this.value)" onkeydown="if(event.key===\'Enter\')lbWriteCheck()" ' + (W.checked ? 'disabled' : '') + '><button class="btn" type="button" onclick="lbWriteCheck()" ' + (W.checked ? 'disabled' : '') + '>Periksa</button></div>' +
+    (W.checked ? '<div class="lb-feedback ' + (W.ok ? 'ok' : 'no') + '" style="margin-top:10px"><b>' + (W.ok ? '✅ Tepat' : '❌ Belum tepat') + '</b><div class="small" style="margin-top:4px">Jawaban: <b>' + lbEsc(W.item.answer) + '</b>' + (W.item.extra ? ' · ' + lbEsc(W.item.extra) : '') + '</div></div><button class="btn full" style="margin-top:8px" onclick="lbWriteStart()">Soal berikutnya ▶</button>' : '') +
+    '</div>';
+}
+
+function lbGuide() {
+  const lang = LB.lang, jp = lang === 'jp';
+  const step = function (n, t, d) { return '<div class="lb-guide-step"><i>' + n + '</i><div><b>' + t + '</b><div>' + d + '</div></div></div>'; };
+  const tabs = jp
+    ? 'Kana → Kanji → Kosakata → Tata Bahasa → Latihan → Dengar/Tulis → Frasa → AI → Progres'
+    : 'Kamus Verb → Flashcard → Latihan → Dengar/Tulis → Frasa → AI → Progres';
+  return '<div class="card lb-panel"><div class="lb-panel-head"><div><div class="lb-eyebrow">Panduan</div><h3>Cara belajar ' + (jp ? 'bahasa Jepang' : 'bahasa Inggris') + ' dari nol</h3></div><span class="lb-count">20 menit/hari</span></div>' +
+    '<div class="mut small">Urutan tab yang disarankan: <b>' + tabs + '</b>. Tidak perlu membuka semuanya setiap hari; pilih satu jalur sesuai waktu yang kamu punya.</div>' +
+    '<div style="margin-top:12px">' +
+      step(1, 'Kenali bunyi dan bentuk dasar', jp ? 'Mulai dari tab Kana. Baca setiap baris sambil mendengarkan tombol audio, lalu uji dengan kuis kana sampai hiragana dan katakana tidak tertukar. Jangan langsung menghafal kanji sebelum kana lancar.' : 'Mulai dari Kamus Verb. Buka beberapa verb, dengarkan pelafalan IPA, dan baca contoh V1/V2/V3. Fokus pada 10 verb yang paling sering kamu pakai.') +
+      step(2, 'Tambah kosakata sedikit setiap hari', jp ? 'Buka Kosakata dan pilih satu kategori. Hafalkan 8–10 kata dengan flashcard, lalu uji di Latihan mode Arti ID→JP dan JP→ID. Ulangi kata yang salah besok, bukan hari ini terus-menerus.' : 'Buka Flashcard untuk 15–20 verb. Nilai jujur “hafal” atau “belum hafal”; kartu yang belum hafal akan kembali di sesi berikutnya.') +
+      step(3, 'Latih mendengar dan menulis', 'Tab Dengar melatih telinga mengenali kata tanpa melihat tulisan. Tab Tulis melatih mengingat bentuk asli dari arti Indonesia. Lakukan masing-masing 10 soal; ini yang membuat bahasa benar-benar aktif, bukan hanya dikenali.') +
+      step(4, 'Pakai frasa dalam situasi nyata', 'Buka Frasa, pilih kategori Sapaan atau Sekolah, dengarkan, lalu tiru dengan suara keras. Ganti satu kata dalam frasa dengan kosakata yang sudah kamu hafal agar kalimat menjadi milikmu.') +
+      step(5, 'Tanya AI saat bingung', 'Gunakan tab AI untuk menanyakan perbedaan kata, partikel, atau cara mengucapkan kalimatmu. Tulis pertanyaan spesifik dan sertakan kalimat yang ingin diperiksa. AI menjelaskan, tetapi tetap cocokkan dengan kamus.') +
+      step(6, 'Ukur progres dan ulangi', 'Buka Progres setiap akhir minggu. Lihat akurasi, item yang dikuasai, dan XP harian. Kalau akurasi di bawah 70%, ulangi materi lama sebelum menambah materi baru.') +
+    '</div></div>' +
+    '<div class="card lb-panel"><div class="lb-panel-head"><h3>Rencana 7 hari</h3></div><table class="lb-table" style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr><th style="text-align:left;padding:6px">Hari</th><th style="text-align:left;padding:6px">Fokus</th><th style="text-align:left;padding:6px">Target</th></tr></thead><tbody>' +
+      [['1', jp ? 'Hiragana baris a–na' : '10 verb umum', 'Kenali bentuk + bunyi'], ['2', jp ? 'Hiragana sisa + dakuten' : 'V2 dan V3', 'Baca tanpa melihat romaji'], ['3', jp ? 'Katakana dasar' : '20 verb baru', 'Flashcard 15 kartu'], ['4', jp ? '10 kosakata kategori Sapaan' : 'Frasa sapaan', 'Dengar + tiru 10 kali'], ['5', jp ? 'Pola は/を/に' : 'Present simple', 'Tulis 5 kalimat sendiri'], ['6', jp ? 'Frasa harian' : 'Frasa perjalanan', 'Latihan dengar 10 soal'], ['7', 'Ulang semua', 'Kuis campur + cek progres']].map(function (r) {
+        return '<tr><td style="padding:6px;border-top:1px solid var(--line)">' + r[0] + '</td><td style="padding:6px;border-top:1px solid var(--line)">' + r[1] + '</td><td style="padding:6px;border-top:1px solid var(--line)">' + r[2] + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+    '<div class="card lb-panel"><div class="lb-panel-head"><h3>Mulai dari sini</h3></div><div class="lb-cta-row"><button class="btn" onclick="lbTabClick(\'' + (jp ? 'kana' : 'verbs') + '\')">▶ Langkah 1</button><button class="btn alt" onclick="lbTabClick(\'listen\')">🎧 Latihan dengar</button><button class="btn alt" onclick="lbTabClick(\'phrases\')">💬 Frasa harian</button></div></div>';
+}
+
 
