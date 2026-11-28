@@ -330,6 +330,8 @@ test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', a
   assert.equal(res.statusCode, 200, JSON.stringify(res.body).slice(0, 800));
   const j = res.body;
   assert.ok(['BUY', 'SELL'].includes(j.direction), 'arah final tidak boleh WAIT');
+  assert.equal(j.directionSource, '1D–4H', 'arah final wajib bersumber dari 1D–4H');
+  assert.ok(j.htfDirection && ['BUY', 'SELL'].includes(j.htfDirection.dir), 'arah HTF D1/H4 wajib terbaca');
   assert.ok(Array.isArray(j.setups) && j.setups.length >= 1, 'minimal satu rencana entry harus muncul');
   ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'].forEach(tf => {
     assert.ok(j.chart && Array.isArray(j.chart[tf]) && j.chart[tf].length > 0, 'chart.' + tf + ' harus ada');
@@ -340,6 +342,7 @@ test('Signal: chart semua TF + rencana entry SMC/Fibonacci, SL 30, TP2 >=200', a
   assert.ok(Array.isArray(j.mtf.mid.breaks) && Array.isArray(j.mtf.mid.reversals), 'MTF harus menghitung break/reversal');
   assert.equal(typeof j.mtf.ltf.m1Available, 'boolean', 'status ketersediaan M1 wajib jujur');
   j.setups.forEach(s => {
+    assert.equal(s.dir, j.direction, s.style + ' wajib searah arah 1D–4H');
     assert.equal(s.type, 'LIMIT', s.style + ' wajib LIMIT');
     assert.equal(s.order, s.dir === 'BUY' ? 'LIMIT BUY' : 'LIMIT SELL', s.style + ' harus punya arah limit');
     assert.equal(s.slPips, 30, s.style + ' SL wajib 30 pip');
