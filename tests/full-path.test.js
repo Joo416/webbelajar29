@@ -830,3 +830,66 @@ test('Alchemist Live: penanda istilah presisi dari candle TradingView', () => {
   assert.equal(ctx.__alchTest.alTfKey('D1'), 'D1');
   assert.match(ctx.__alchTest.alLiveSlotHtml(0, ['FVG', 'Fair Value Gap', 'contoh', 'contoh', 'M15'], { tfKey: 'M15' }), /data-alch-live="0"/);
 });
+
+/* Regresi arah 1D–4H: D1 RANGE tidak boleh dibaca BEARISH dari struktur lama
+   atau skor TradingView. Dulu D1 RANGE membuat gate HTF gagal dan semua setup
+   hilang. Sekarang arah wajib mengikuti H4 yang jelas dan gate tetap lolos. */
+test('Regresi arah: D1 RANGE + H4 BULLISH tetap menghasilkan BUY, gate lolos, setup terisi', async () => {
+  const saved = C.candles;
+  function rangeSeries(step, n, base, lastClosed, freq) {
+    const out = [];
+    let p = base;
+    for (let i = 0; i < n; i++) {
+      const t = lastClosed - (n - 1 - i) * step;
+      const o = p;
+      const c = o + Math.sin(i / freq) * 12 + Math.cos(i / (freq * .49)) * 3.4;
+      const h = Math.max(o, c) + Math.abs(Math.sin(i / 3.1)) * 5.4 + .12;
+      const l = Math.min(o, c) - Math.abs(Math.cos(i / 4.2)) * 5.4 - .12;
+      out.push({ t, o: r2(o), h: r2(h), l: r2(l), c: r2(c) });
+      p = c;
+    }
+    return out;
+  }
+  const pack = candlePack();
+  const d1r = rangeSeries(D1, 120, 3600, Math.floor(NOW / D1) * D1 - D1, 2);
+  pack.d1 = { rows: d1r, last: d1r[d1r.length - 1], source: 'mock D1 RANGE', ok: true };
+  const h4u = series(H4, 120, 3520, .42, 4, Math.floor(NOW / H4) * H4 - H4);
+  pack.h4 = { rows: h4u, last: h4u[h4u.length - 1], source: 'mock H4 BULLISH', ok: true };
+  /* H1/M15/M5 juga bullish supaya POI dan trigger M5 searah BUY tersedia;
+     yang diuji adalah D1 RANGE, bukan pasar yang seluruhnya bearish. */
+  pack.h1 = { rows: series(H1, 240, 3540, .16, 5.2, Math.floor(NOW / H1) * H1 - H1), source: 'mock H1 BULLISH', ok: true };
+  pack.h1.last = pack.h1.rows[pack.h1.rows.length - 1];
+  pack.m15 = { rows: series(M15, 260, 3560, .07, 4.2, Math.floor(NOW / M15) * M15 - M15), source: 'mock M15 BULLISH', ok: true };
+  pack.m15.last = pack.m15.rows[pack.m15.rows.length - 1];
+  pack.m5 = { rows: series(M5, 420, 3590, .03, 2.6, Math.floor(NOW / M5) * M5 - M5), source: 'mock M5 BULLISH', ok: true };
+  pack.m5.last = pack.m5.rows[pack.m5.rows.length - 1];
+  C.candles = async () => pack;
+  /* Harga acuan harus konsisten dengan candle uji; kalau tidak, shift harga
+     dari quote mock lama menggeser semua zona dan target likuiditas. */
+  const savedTv = C.tvRead, savedSpot = C.spot;
+  const tvBull = tvRead();
+  Object.keys(tvBull.tf).forEach(k => { tvBull.tf[k] = { ...tvBull.tf[k], rec: .5, recLabel: 'BUY' }; });
+  tvBull.weighted = .5; tvBull.bias = 1; tvBull.biasLabel = 'BUY';
+  C.tvRead = async () => ({ ...tvBull, price: pack.m5.last.c, at: NOW });
+  C.spot = async () => ({ ok: true, price: pack.m5.last.c - .1, at: NOW, source: 'mock spot' });
+  try {
+    const res = await call(S.signalHandler, { fresh: true });
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body).slice(0, 700));
+    const j = res.body;
+    assert.equal(j.htfDirection.d1Trend, 'RANGE', 'prasyarat uji: D1 harus terbaca RANGE');
+    assert.equal(j.htfDirection.h4Trend, 'BULLISH', 'prasyarat uji: H4 harus terbaca BULLISH');
+    assert.equal(j.htfDirection.h4, 'BUY', 'H4 BULLISH harus menjadi BUY');
+    assert.equal(j.direction, 'BUY', 'D1 RANGE tidak boleh membalik arah H4 menjadi SELL');
+    assert.equal(j.directionSource, '1D–4H', 'arah harus tetap bersumber 1D–4H, bukan skor cadangan');
+    assert.equal(j.mtf.htf.direction.ok, true, 'gate HTF harus lolos saat D1 RANGE + H4 searah');
+    assert.equal(j.mtf.htf.direction.d1, 'RANGE');
+    assert.equal(j.mtf.htf.direction.h4, 'BULLISH');
+    assert.ok(j.setups.length >= 1, 'setup limit tidak boleh kosong hanya karena D1 RANGE');
+    assert.ok(j.setups.every(s => s.dir === 'BUY'), 'semua setup wajib searah H4');
+    assert.ok(j.setups.every(s => s.type === 'LIMIT' && s.slPips === 30 && s.tp2Pips >= 200), 'aturan LIMIT/SL 30/TP2 200 tetap berlaku');
+  } finally {
+    C.candles = saved;
+    C.tvRead = savedTv;
+    C.spot = savedSpot;
+  }
+});
